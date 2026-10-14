@@ -1,0 +1,22 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <TargetFramework>net8.0</TargetFramework>
+    <PlatformTarget>x64</PlatformTarget>
+    <Nullable>disable</Nullable>
+    <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
+    <DefineConstants>$(DefineConstants);_WIN64</DefineConstants>
+    <NoWarn>$(NoWarn);CS0168;CS0219;CS0162;CS0414;CS0649;CS0169;CS8981;SYSLIB0011;CA1416</NoWarn>
+    <EnableDefaultCompileItems>false</EnableDefaultCompileItems>
+    <GenerateAssemblyInfo>false</GenerateAssemblyInfo>
+  </PropertyGroup>
+  <PropertyGroup>
+    <Ref>C:\Users\suare\tools\ref\S7CommPlusDriver\src</Ref>
+  </PropertyGroup>
+  <ItemGroup>
+    <Compile Include="Program.cs" />
+    <Compile Include="$(Ref)\S7CommPlusDriver\**\*.cs" Exclude="$(Ref)\S7CommPlusDriver\Properties\**;$(Ref)\S7CommPlusDriver\obj\**" />
+    <Compile Include="$(Ref)\Zlib.net\*.cs" Exclude="$(Ref)\Zlib.net\AssemblyInfo.cs" />
+    <None Include="$(Ref)\S7CommPlusDriver\OpenSSL-dll-x64\*.dll" CopyToOutputDirectory="PreserveNewest" Link="%(Filename)%(Extension)" />
+  </ItemGroup>
+</Project>
