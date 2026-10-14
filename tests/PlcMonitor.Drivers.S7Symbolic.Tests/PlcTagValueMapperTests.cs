@@ -142,6 +142,15 @@ public class PlcTagValueMapperTests
         type.ShouldBe(TagDataType.Int16);
     }
 
+    [Theory]
+    [InlineData(Softdatatype.S7COMMP_SOFTDATATYPE_BBOOL, TagDataType.Boolean)]
+    [InlineData(Softdatatype.S7COMMP_SOFTDATATYPE_BLOCKFB, TagDataType.UInt16)]
+    [InlineData(Softdatatype.S7COMMP_SOFTDATATYPE_DTL, TagDataType.DateTime)]
+    [InlineData(Softdatatype.S7COMMP_SOFTDATATYPE_TIME, TagDataType.TimeSpan)]
+    [InlineData(Softdatatype.S7COMMP_SOFTDATATYPE_ANY, TagDataType.ByteArray)]
+    public void Data_type_is_derived_from_library_tag_class(uint softdatatype, TagDataType expected) =>
+        PlcTagValueMapper.DataTypeOf(softdatatype).ShouldBe(expected);
+
     [Fact]
     public void Native_type_names_come_from_library()
     {

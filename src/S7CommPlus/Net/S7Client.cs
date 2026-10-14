@@ -108,6 +108,9 @@ namespace S7CommPlusDriver
 		// Si KeyLogDirectory tiene valor, se escribe key_YYYYMMDD_hhmmss.log en ese directorio.
 		public static string KeyLogDirectory { get; set; }
 
+		// PLC-Monitor: grupos TLS ofrecidos en el ClientHello (formato SSL_CTX_set1_groups_list).
+		public static string TlsGroups { get; set; } = "X25519:P-256:P-384";
+
 		public void SSL_CTX_keylog_cb(IntPtr ssl, string line)
 		{
 			if (string.IsNullOrEmpty(KeyLogDirectory)) return;
@@ -139,6 +142,21 @@ namespace S7CommPlusDriver
 				if (ret != 1)
                 {
 					return S7Consts.errOpenSSL;
+				}
+				// PLC-Monitor: OpenSSL >= 3.5 ofrece por defecto el grupo híbrido post-cuántico X25519MLKEM768,
+				// que agranda el ClientHello y las CPU S7 no lo procesan (timeout en el handshake).
+				// Se limitan los grupos a curvas clásicas, como hacen los clientes de Siemens.
+				IntPtr groups = System.Runtime.InteropServices.Marshal.StringToHGlobalAnsi(TlsGroups);
+				try
+				{
+					if (Native.SSL_CTX_ctrl(m_ptr_ctx, Native.SSL_CTRL_SET_GROUPS_LIST, 0, groups) != 1)
+					{
+						return S7Consts.errOpenSSL;
+					}
+				}
+				finally
+				{
+					System.Runtime.InteropServices.Marshal.FreeHGlobal(groups);
 				}
 				m_sslconn = new OpenSSLConnector(m_ptr_ctx, this);
 				m_sslconn.ExpectConnect();

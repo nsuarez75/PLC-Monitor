@@ -144,6 +144,7 @@ namespace S7CommPlusDriver
 
             // Check access level
             UInt32 accessLevel = (getVarSubstreamedRes.Value as ValueUDInt).GetValue();
+            S7pLog.WriteLine("S7CommPlusConnection - Legitimate: access level reported by CPU = " + accessLevel); // PLC-Monitor
             if (accessLevel > AccessLevel.FullAccess && password != "")
             {
                 // Legitimate
@@ -245,9 +246,11 @@ namespace S7CommPlusDriver
                 m_client.Disconnect();
                 return S7Consts.errIsoInvalidPDU;
             }
+            S7pLog.WriteLine("S7CommPlusConnection - Legitimate: ReturnValue = 0x" + setVariableResponse.ReturnValue.ToString("X")); // PLC-Monitor
             // Check if the legitimation attempt was successful
-            Int16 errorCode = (Int16)setVariableResponse.ReturnValue;
-            if (errorCode < 0)
+            // PLC-Monitor: la CPU devuelve 0 si acepta la contraseña. Con contraseña incorrecta un S7-1517F devolvió
+            // 0x2605990006990016; el original truncaba a Int16 (0x0016 > 0) y daba la legitimación por buena.
+            if (setVariableResponse.ReturnValue != 0)
             {
                 S7pLog.WriteLine("S7CommPlusConnection - Legitimate: access denied");
                 m_client.Disconnect();
@@ -378,9 +381,11 @@ namespace S7CommPlusDriver
                 m_client.Disconnect();
                 return S7Consts.errIsoInvalidPDU;
             }
+            S7pLog.WriteLine("S7CommPlusConnection - Legitimate: ReturnValue = 0x" + setVariableResponse.ReturnValue.ToString("X")); // PLC-Monitor
             // Check if the legitimation attempt was successful
-            Int16 errorCode = (Int16)setVariableResponse.ReturnValue;
-            if (errorCode < 0)
+            // PLC-Monitor: la CPU devuelve 0 si acepta la contraseña. Con contraseña incorrecta un S7-1517F devolvió
+            // 0x2605990006990016; el original truncaba a Int16 (0x0016 > 0) y daba la legitimación por buena.
+            if (setVariableResponse.ReturnValue != 0)
             {
                 S7pLog.WriteLine("S7CommPlusConnection - Legitimate: access denied");
                 m_client.Disconnect();

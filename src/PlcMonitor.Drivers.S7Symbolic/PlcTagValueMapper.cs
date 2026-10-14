@@ -11,29 +11,25 @@ namespace PlcMonitor.Drivers.S7Symbolic;
 internal static class PlcTagValueMapper
 {
     private static readonly ConcurrentDictionary<Type, PropertyInfo?> ValueProperties = new();
+    private static readonly ConcurrentDictionary<uint, TagDataType> DataTypes = new();
 
-    /// <summary>Tipo normalizado según el tipo de dato S7 (softdatatype).</summary>
-    public static TagDataType DataTypeOf(uint softdatatype) => softdatatype switch
+    /// <summary>
+    /// Tipo normalizado según el tipo de dato S7 (softdatatype). Se deduce de la clase de tag que crea la propia
+    /// librería, así cualquier tipo que ésta soporte (BBOOL, BLOCK_FB, HW_*...) queda cubierto sin tablas paralelas.
+    /// </summary>
+    public static TagDataType DataTypeOf(uint softdatatype) =>
+        DataTypes.GetOrAdd(softdatatype, static s => PlcTags.TagFactory(string.Empty, new ItemAddress(), s) is { } tag ? DataTypeOf(tag) : TagDataType.Unknown);
+
+    /// <summary>Tipo normalizado de un tag según su clase.</summary>
+    public static TagDataType DataTypeOf(PlcTag tag) => tag switch
     {
-        Softdatatype.S7COMMP_SOFTDATATYPE_BOOL => TagDataType.Boolean,
-        Softdatatype.S7COMMP_SOFTDATATYPE_BYTE or Softdatatype.S7COMMP_SOFTDATATYPE_USINT => TagDataType.Byte,
-        Softdatatype.S7COMMP_SOFTDATATYPE_SINT => TagDataType.SByte,
-        Softdatatype.S7COMMP_SOFTDATATYPE_WORD or Softdatatype.S7COMMP_SOFTDATATYPE_UINT => TagDataType.UInt16,
-        Softdatatype.S7COMMP_SOFTDATATYPE_INT => TagDataType.Int16,
-        Softdatatype.S7COMMP_SOFTDATATYPE_DWORD or Softdatatype.S7COMMP_SOFTDATATYPE_UDINT => TagDataType.UInt32,
-        Softdatatype.S7COMMP_SOFTDATATYPE_DINT => TagDataType.Int32,
-        Softdatatype.S7COMMP_SOFTDATATYPE_LWORD or Softdatatype.S7COMMP_SOFTDATATYPE_ULINT => TagDataType.UInt64,
-        Softdatatype.S7COMMP_SOFTDATATYPE_LINT => TagDataType.Int64,
-        Softdatatype.S7COMMP_SOFTDATATYPE_REAL => TagDataType.Float,
-        Softdatatype.S7COMMP_SOFTDATATYPE_LREAL => TagDataType.Double,
-        Softdatatype.S7COMMP_SOFTDATATYPE_CHAR or Softdatatype.S7COMMP_SOFTDATATYPE_WCHAR
-            or Softdatatype.S7COMMP_SOFTDATATYPE_STRING or Softdatatype.S7COMMP_SOFTDATATYPE_WSTRING => TagDataType.String,
-        Softdatatype.S7COMMP_SOFTDATATYPE_DATE or Softdatatype.S7COMMP_SOFTDATATYPE_DATEANDTIME
-            or Softdatatype.S7COMMP_SOFTDATATYPE_DTL or Softdatatype.S7COMMP_SOFTDATATYPE_LDT => TagDataType.DateTime,
-        Softdatatype.S7COMMP_SOFTDATATYPE_TIME or Softdatatype.S7COMMP_SOFTDATATYPE_LTIME
-            or Softdatatype.S7COMMP_SOFTDATATYPE_TIMEOFDAY or Softdatatype.S7COMMP_SOFTDATATYPE_LTOD
-            or Softdatatype.S7COMMP_SOFTDATATYPE_S5TIME => TagDataType.TimeSpan,
-        _ => TagDataType.Unknown,
+        PlcTagS5Time or PlcTagTimeOfDay or PlcTagLTOD or PlcTagLTime => TagDataType.TimeSpan,
+        PlcTagLDT or PlcTagDTL or PlcTagDate or PlcTagDateAndTime => TagDataType.DateTime,
+        PlcTagChar or PlcTagWChar or PlcTagString or PlcTagWString => TagDataType.String,
+        _ when tag.GetType().Name == "PlcTagTime" => TagDataType.TimeSpan,
+        _ => ValueProperty(tag.GetType())?.PropertyType is { } t
+            ? t == typeof(byte[]) ? TagDataType.ByteArray : ElementType(t.IsArray ? t.GetElementType()! : t)
+            : TagDataType.Unknown,
     };
 
     /// <summary>Nombre del tipo S7 (Int, Real, String...).</summary>

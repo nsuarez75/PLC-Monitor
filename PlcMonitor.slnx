@@ -1,6 +1,7 @@
 <Solution>
   <Folder Name="/src/">
     <Project Path="src/PlcMonitor.Abstractions/PlcMonitor.Abstractions.csproj" />
+    <Project Path="src/PlcMonitor.Cli/PlcMonitor.Cli.csproj" />
     <Project Path="src/PlcMonitor.Core/PlcMonitor.Core.csproj" />
     <Project Path="src/PlcMonitor.Drivers.S7Absolute/PlcMonitor.Drivers.S7Absolute.csproj" />
     <Project Path="src/PlcMonitor.Drivers.S7Symbolic/PlcMonitor.Drivers.S7Symbolic.csproj" />
@@ -10,5 +11,6 @@
     <Project Path="tests/PlcMonitor.Core.Tests/PlcMonitor.Core.Tests.csproj" />
     <Project Path="tests/PlcMonitor.Drivers.S7Absolute.Tests/PlcMonitor.Drivers.S7Absolute.Tests.csproj" />
     <Project Path="tests/PlcMonitor.Drivers.S7Symbolic.Tests/PlcMonitor.Drivers.S7Symbolic.Tests.csproj" />
+    <Project Path="tests/PlcMonitor.IntegrationTests/PlcMonitor.IntegrationTests.csproj" />
   </Folder>
 </Solution>

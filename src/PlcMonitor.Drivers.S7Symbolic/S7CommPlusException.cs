@@ -41,7 +41,7 @@ public sealed class S7CommPlusException : Exception
         S7Consts.errOpenSSL => "Error de OpenSSL/TLS (¿falta libssl-3/libcrypto-3 o la CPU no admite comunicación segura?)",
         S7Consts.errCliNeedPassword => "La CPU necesita contraseña",
         S7Consts.errCliInvalidPassword => "Contraseña incorrecta",
-        S7Consts.errCliAccessDenied => "Acceso denegado",
+        S7Consts.errCliAccessDenied => "Acceso denegado (¿contraseña incorrecta?)",
         _ => S7Client.ErrorText(code),
     };
 }
