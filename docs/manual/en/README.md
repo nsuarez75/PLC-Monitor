@@ -1,6 +1,6 @@
 # PLC-Monitor — Manual (English)
 
-> Version 0.1.0 · Phase 1 (core, S7 drivers and CLI) · Last updated: 2026-10-14
+> Version 1.0.0 · Phase 1 (core, S7 drivers and CLI) · Last updated: 2026-10-14
 
 PLC-Monitor is an in-house, free tool for on-site testing and diagnostics of Siemens S7 PLCs.
 

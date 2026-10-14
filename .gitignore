@@ -27,3 +27,4 @@ key_*.log
 
 # Binarios nativos (OpenSSL) obtenidos con scripts/get-openssl-windows.sh
 native/
+artifacts/

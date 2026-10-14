@@ -1,6 +1,6 @@
 # PLC-Monitor — User guide
 
-> Version 0.1.0 · Last updated: 2026-10-14 · [Castellano](../es/usuario.md)
+> Version 1.0.0 · Last updated: 2026-10-14 · [Castellano](../es/usuario.md)
 
 This version is used from the command line with **`plcmon`**. The desktop app arrives in phase 3.
 

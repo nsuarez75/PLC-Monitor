@@ -1,6 +1,6 @@
 # PLC-Monitor — Manual de uso
 
-> Versión 0.1.0 · Última actualización: 2026-10-14 · [English](../en/user-guide.md)
+> Versión 1.0.0 · Última actualización: 2026-10-14 · [English](../en/user-guide.md)
 
 En esta versión PLC-Monitor se usa desde la línea de comandos con el programa **`plcmon`**. La aplicación de escritorio llegará en la fase 3.
 
