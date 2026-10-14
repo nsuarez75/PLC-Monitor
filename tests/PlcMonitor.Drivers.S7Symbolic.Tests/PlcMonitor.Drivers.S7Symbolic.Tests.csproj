@@ -1,0 +1,5 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <ItemGroup>
+    <ProjectReference Include="..\..\src\PlcMonitor.Drivers.S7Symbolic\PlcMonitor.Drivers.S7Symbolic.csproj" />
+  </ItemGroup>
+</Project>

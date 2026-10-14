@@ -1,0 +1,6 @@
+<Project>
+  <!-- Ejecutables: copiar OpenSSL para Windows (native/win-x64) junto al binario si existe. -->
+  <ItemGroup Condition="'$(OutputType)' == 'Exe' Or '$(OutputType)' == 'WinExe'">
+    <None Include="$(MSBuildThisFileDirectory)..\native\win-x64\*.dll" Link="%(Filename)%(Extension)" CopyToOutputDirectory="PreserveNewest" Visible="false" />
+  </ItemGroup>
+</Project>

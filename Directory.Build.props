@@ -1,0 +1,16 @@
+<Project>
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <LangVersion>latest</LangVersion>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <TreatWarningsAsErrors>true</TreatWarningsAsErrors>
+    <AnalysisLevel>latest-recommended</AnalysisLevel>
+    <!-- CA1515: tipos internos en apps; CA1848/CA1873: LoggerMessage obligatorio; CA2007: ConfigureAwait (sin SynchronizationContext en agente/CLI); CA1720: enums de tipos de datos -->
+    <NoWarn>$(NoWarn);CA1515;CA1848;CA1873;CA2007;CA1720</NoWarn>
+    <Authors>PLC-Monitor</Authors>
+    <Product>PLC-Monitor</Product>
+    <Version>1.0.0</Version>
+    <InvariantGlobalization>true</InvariantGlobalization>
+  </PropertyGroup>
+</Project>

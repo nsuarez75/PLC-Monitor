@@ -1,0 +1,21 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <!--
+    Port a .NET 10 de S7CommPlusDriver (https://github.com/thomas-v2/S7CommPlusDriver, commit dbd61e4).
+    Licencia LGPL-3.0 (ver LICENSE). Las modificaciones están descritas en NOTICE.md.
+  -->
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <RootNamespace>S7CommPlusDriver</RootNamespace>
+    <Nullable>disable</Nullable>
+    <ImplicitUsings>disable</ImplicitUsings>
+    <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
+    <TreatWarningsAsErrors>false</TreatWarningsAsErrors>
+    <!-- Código heredado: no aplicar el análisis estricto del resto de la solución -->
+    <AnalysisLevel>none</AnalysisLevel>
+    <NoWarn>$(NoWarn);CS0168;CS0219;CS0162;CS0414;CS0649;CS0169;CS8981;CS0618;SYSLIB0011;SYSLIB0021;CA1416</NoWarn>
+    <PackageLicenseExpression>LGPL-3.0-only</PackageLicenseExpression>
+  </PropertyGroup>
+  <ItemGroup>
+    <InternalsVisibleTo Include="S7CommPlus.Tests" />
+  </ItemGroup>
+</Project>

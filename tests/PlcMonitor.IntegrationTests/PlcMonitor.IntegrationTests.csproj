@@ -1,0 +1,18 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <!--
+    Tests contra un PLC real. SOLO LECTURA. Se omiten si no están definidas las variables de entorno:
+      PLCMON_IT_SYMBOLIC_HOST   IP de una S7-1200/1500 con comunicación segura
+      PLCMON_IT_PASSWORD        contraseña de acceso (opcional)
+      PLCMON_IT_SYMBOL          símbolo legible para la prueba de lectura (opcional)
+      PLCMON_IT_ABSOLUTE_HOST   IP de un PLC con PUT/GET habilitado (opcional)
+      PLCMON_IT_ABSOLUTE_ADDR   dirección absoluta legible, p.ej. DB1.DBW0 (opcional)
+  -->
+  <ItemGroup>
+    <ProjectReference Include="..\..\src\PlcMonitor.Core\PlcMonitor.Core.csproj" />
+    <ProjectReference Include="..\..\src\PlcMonitor.Drivers.S7Absolute\PlcMonitor.Drivers.S7Absolute.csproj" />
+    <ProjectReference Include="..\..\src\PlcMonitor.Drivers.S7Symbolic\PlcMonitor.Drivers.S7Symbolic.csproj" />
+  </ItemGroup>
+  <ItemGroup>
+    <None Include="$(MSBuildThisFileDirectory)..\..\native\win-x64\*.dll" Link="%(Filename)%(Extension)" CopyToOutputDirectory="PreserveNewest" Visible="false" />
+  </ItemGroup>
+</Project>
