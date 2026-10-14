@@ -96,6 +96,13 @@ public abstract class DeviceConnectionBase : IDeviceConnection
             SetState(ConnectionState.Faulted, ex.Message);
             return AllBad(addresses.Count, QualityCode.BadNotConnected, ex.Message);
         }
+#pragma warning disable CA1031 // Un fallo inesperado del driver se refleja como calidad mala.
+        catch (Exception ex) when (ex is not OperationCanceledException)
+#pragma warning restore CA1031
+        {
+            Logger.LogWarning(ex, "{Device}: error de lectura", DeviceName);
+            return AllBad(addresses.Count, QualityCode.Bad, ex.Message);
+        }
         finally
         {
             _gate.Release();
@@ -121,6 +128,13 @@ public abstract class DeviceConnectionBase : IDeviceConnection
             await SafeCloseAsync();
             SetState(ConnectionState.Faulted, ex.Message);
             return requests.Select(r => new WriteResult(r.Address, QualityCode.BadNotConnected, ex.Message)).ToArray();
+        }
+#pragma warning disable CA1031 // Un fallo inesperado del driver se refleja como resultado malo.
+        catch (Exception ex) when (ex is not OperationCanceledException)
+#pragma warning restore CA1031
+        {
+            Logger.LogWarning(ex, "{Device}: error de escritura", DeviceName);
+            return requests.Select(r => new WriteResult(r.Address, QualityCode.Bad, ex.Message)).ToArray();
         }
         finally
         {

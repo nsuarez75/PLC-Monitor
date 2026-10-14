@@ -1,0 +1,12 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <Description>Driver S7 simbólico (S7CommPlus + TLS) para S7-1200/1500.</Description>
+  </PropertyGroup>
+  <ItemGroup>
+    <ProjectReference Include="..\PlcMonitor.Abstractions\PlcMonitor.Abstractions.csproj" />
+    <ProjectReference Include="..\S7CommPlus\S7CommPlus.csproj" />
+  </ItemGroup>
+  <ItemGroup>
+    <InternalsVisibleTo Include="PlcMonitor.Drivers.S7Symbolic.Tests" />
+  </ItemGroup>
+</Project>
