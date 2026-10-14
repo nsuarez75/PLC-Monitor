@@ -44,6 +44,22 @@ namespace OpenSsl
         [DllImport(SSLDLLNAME, CallingConvention = CallingConvention.Cdecl)]
         public static extern int OPENSSL_init_ssl(UInt64 opts, IntPtr settings);
 
+        /// <summary>PLC-Monitor: vacía la cola de errores de OpenSSL y la devuelve como texto.</summary>
+        public static string DrainErrors()
+        {
+            var sb = new StringBuilder();
+            var buf = new byte[256];
+            UInt64 e;
+            while ((e = ERR_get_error()) != 0)
+            {
+                ERR_error_string_n(e, buf, (size_t)buf.Length);
+                if (sb.Length > 0)
+                    sb.Append(" | ");
+                sb.Append(Encoding.ASCII.GetString(buf, 0, Array.IndexOf(buf, (byte)0) is var n && n >= 0 ? n : buf.Length));
+            }
+            return sb.ToString();
+        }
+
         #endregion
 
         #region SSL
