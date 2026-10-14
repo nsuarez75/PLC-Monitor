@@ -29,6 +29,7 @@ namespace OpenSsl
 
         private readonly IConnectorCallback m_DataSink;
         private int m_bytesAvailable;
+        private bool m_handshakeLogged;
         private readonly byte[] m_buffer = new byte[4096];
         private readonly DataBufferList m_pendingWriteList;
         private readonly DataBufferList m_pendingReadList;
@@ -179,7 +180,8 @@ namespace OpenSsl
                     default:
                         // TOOO: Handle all other errors which don't should occur.
                         // 5 with SSL_ASYNC_PAUSED has been seen...
-                        Trace.WriteLine("OpenSSL HandleError: Error = " + error);
+                        // PLC-Monitor: al log de la librería (antes Trace, que no se veía) con el detalle de OpenSSL.
+                        S7CommPlusDriver.S7pLog.WriteLine("OpenSSL HandleError: SSL_get_error = " + error + " " + Native.DrainErrors());
                         break;
                 }
             }
@@ -197,6 +199,12 @@ namespace OpenSsl
                 if (Native.SSL_in_init(m_pSslConnection) != 0)
                 {
                     // Client waiting in connect
+                }
+                else if (!m_handshakeLogged)
+                {
+                    // PLC-Monitor: traza para diagnosticar dónde se corta la conexión.
+                    m_handshakeLogged = true;
+                    S7CommPlusDriver.S7pLog.WriteLine("OpenSSL: handshake TLS completado");
                 }
 
                 if (dataToRead)

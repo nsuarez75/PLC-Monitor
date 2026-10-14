@@ -106,6 +106,18 @@ public class S7SymbolicConnectionTests
     }
 
     [Fact]
+    public async Task Cpu_without_secure_communication_suggests_the_absolute_driver()
+    {
+        var (conn, cpu) = Create();
+        cpu.ConnectResult = S7Consts.errSecureCommNotAvailable;
+
+        var ex = await Should.ThrowAsync<S7CommPlusException>(() => conn.ConnectAsync());
+        ex.Message.ShouldContain("comunicación segura (TLS)");
+        ex.Message.ShouldContain("s7-absolute");
+        conn.State.ShouldBe(ConnectionState.Faulted);
+    }
+
+    [Fact]
     public async Task Reads_symbols_with_types()
     {
         var (conn, _) = Create();

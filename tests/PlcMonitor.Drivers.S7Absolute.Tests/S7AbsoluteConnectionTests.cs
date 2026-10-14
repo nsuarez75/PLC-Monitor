@@ -105,6 +105,20 @@ public class S7AbsoluteConnectionTests
     }
 
     [Fact]
+    public async Task Put_get_disabled_is_reported_as_access_denied()
+    {
+        var (conn, plc) = Create();
+        await conn.ConnectAsync();
+
+        plc.NextReadException = new InvalidDataException("Received 12 bytes: '32-02-00-00-00-00-00-00-00-00-81-04', expected 26 bytes.");
+        var value = (await conn.ReadAsync(["MW0"])).ShouldHaveSingleItem();
+
+        value.Quality.ShouldBe(QualityCode.BadAccessDenied);
+        value.ErrorDetail!.ShouldContain("PUT/GET");
+        conn.State.ShouldBe(ConnectionState.Connected);
+    }
+
+    [Fact]
     public async Task Connection_loss_marks_faulted_and_all_items_not_connected()
     {
         var (conn, plc) = Create();

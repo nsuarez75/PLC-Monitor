@@ -405,8 +405,10 @@ namespace S7CommPlusDriver
             res = m_client.Connect();
             if (res != 0)
                 return res;
+            S7pLog.WriteLine("S7CommPlusConnection - Connect: ISO-on-TCP connected (TSAP SIMATIC-ROOT-HMI)");
 
             #region Step 1: Unencrypted InitSSL Request / Response
+            S7pLog.WriteLine("S7CommPlusConnection - Connect: Step 1: InitSSL (sin cifrar)");
 
             InitSslRequest sslReq = new InitSslRequest(ProtocolVersion.V1, 0 , 0);
             res = SendS7plusFunctionObject(sslReq);
@@ -430,10 +432,21 @@ namespace S7CommPlusDriver
                 m_client.Disconnect();
                 return m_LastError;
             }
+            S7pLog.WriteLine("S7CommPlusConnection - Connect: InitSslResponse ProtocolVersion=0x" + sslRes.ProtocolVersion.ToString("X2")
+                + " ReturnValue=0x" + sslRes.ReturnValue.ToString("X16") + " TransportFlags=0x" + sslRes.TransportFlags.ToString("X2"));
+            // PLC-Monitor: con el bit de error activo la CPU no va a negociar TLS e ignora el ClientHello
+            // (visto en un S7-1200 que Ignition maneja sin TLS). Se corta aquí en vez de esperar al timeout.
+            if ((sslRes.ReturnValue & 0x8000000000000000) != 0)
+            {
+                S7pLog.WriteLine("S7CommPlusConnection - Connect: la CPU rechaza InitSSL: sin comunicación segura (TLS)");
+                m_client.Disconnect();
+                return S7Consts.errSecureCommNotAvailable;
+            }
 
             #endregion
 
             #region Step 2: Activate TLS. Everything from here onwards is TLS encrypted.
+            S7pLog.WriteLine("S7CommPlusConnection - Connect: Step 2: TLS");
 
             res = m_client.SslActivate();
             if (res != 0)
@@ -445,6 +458,7 @@ namespace S7CommPlusDriver
             #endregion
 
             #region Step 3: CreateObjectRequest / Response (with TLS)
+            S7pLog.WriteLine("S7CommPlusConnection - Connect: Step 3: CreateObject");
 
             var createObjReq = new CreateObjectRequest(ProtocolVersion.V1, 0, false);
             createObjReq.SetNullServerSessionData();
@@ -482,6 +496,7 @@ namespace S7CommPlusDriver
             #endregion
 
             #region Step 4: SetMultiVariablesRequest / Response
+            S7pLog.WriteLine("S7CommPlusConnection - Connect: Step 4: SetMultiVariables");
 
             var setMultiVarReq = new SetMultiVariablesRequest(ProtocolVersion.V2);
             setMultiVarReq.SetSessionSetupData(m_SessionId, serverSession);
@@ -510,6 +525,7 @@ namespace S7CommPlusDriver
             #endregion
 
             #region Step 5: Read SystemLimits
+            S7pLog.WriteLine("S7CommPlusConnection - Connect: Step 5: SystemLimits");
             res = m_CommRessources.ReadMax(this);
             if (res != 0)
             {
@@ -519,6 +535,7 @@ namespace S7CommPlusDriver
             #endregion
 
             #region Step 6: Password
+            S7pLog.WriteLine("S7CommPlusConnection - Connect: Step 6: Legitimation");
             res = legitimate(serverSession, password, username);
             if (res != 0) {
                 m_client.Disconnect();
@@ -533,8 +550,14 @@ namespace S7CommPlusDriver
 
         public void Disconnect()
         {
-            DeleteObject(m_SessionId);
-            m_client.Disconnect();
+            // PLC-Monitor: si la conexión falló antes de crear la sesión no hay nada que borrar en la CPU;
+            // pedir DeleteObject(0) solo provocaba esperar al timeout de lectura.
+            if (m_SessionId != 0)
+            {
+                DeleteObject(m_SessionId);
+                m_SessionId = 0;
+            }
+            m_client?.Disconnect();
         }
 
         /// <summary>

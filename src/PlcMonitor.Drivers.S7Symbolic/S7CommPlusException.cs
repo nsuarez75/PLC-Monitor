@@ -39,6 +39,8 @@ public sealed class S7CommPlusException : Exception
     public static string Describe(int code) => code switch
     {
         S7Consts.errOpenSSL => "Error de OpenSSL/TLS (¿falta libssl-3/libcrypto-3 o la CPU no admite comunicación segura?)",
+        S7Consts.errSecureCommNotAvailable => "La CPU no acepta comunicación segura (TLS). s7-symbolic solo funciona con CPU que la tengan activada " +
+            "(S7-1200 FW ≥ V4.5 / S7-1500 FW ≥ V2.9 con proyecto TIA ≥ V17 y comunicación PG/HMI segura). Usa s7-absolute (PUT/GET)",
         S7Consts.errCliNeedPassword => "La CPU necesita contraseña",
         S7Consts.errCliInvalidPassword => "Contraseña incorrecta",
         S7Consts.errCliAccessDenied => "Acceso denegado (¿contraseña incorrecta?)",

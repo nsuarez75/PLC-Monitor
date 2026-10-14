@@ -68,8 +68,9 @@ internal sealed class S7AbsoluteConnection : DeviceConnectionBase
             }
             catch (Exception ex) when (!IsConnectionLost(ex) && ex is not OperationCanceledException)
             {
-                // P.ej. DB inexistente o área fuera de rango: solo afecta a este bloque.
-                var bad = TagValue.Bad(QualityCode.BadAddressInvalid, TimeProvider.GetUtcNow(), ex.Message);
+                // P.ej. DB inexistente, área fuera de rango o PUT/GET deshabilitado: solo afecta a este bloque.
+                var (quality, detail) = S7ErrorTranslator.Translate(ex, QualityCode.BadAddressInvalid);
+                var bad = TagValue.Bad(quality, TimeProvider.GetUtcNow(), detail);
                 foreach (var (index, _) in block.Items)
                     results[index] = bad;
                 continue;
@@ -126,7 +127,8 @@ internal sealed class S7AbsoluteConnection : DeviceConnectionBase
             }
             catch (Exception ex) when (!IsConnectionLost(ex) && ex is not OperationCanceledException)
             {
-                results[i] = new WriteResult(request.Address, QualityCode.Bad, ex.Message);
+                var (quality, detail) = S7ErrorTranslator.Translate(ex, QualityCode.Bad);
+                results[i] = new WriteResult(request.Address, quality, detail);
             }
         }
         return results;

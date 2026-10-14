@@ -1,0 +1,12 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <ItemGroup>
+    <PackageReference Include="Grpc.Net.Client" />
+    <PackageReference Include="Microsoft.AspNetCore.Mvc.Testing" />
+  </ItemGroup>
+  <ItemGroup>
+    <ProjectReference Include="..\..\src\PlcMonitor.Agent\PlcMonitor.Agent.csproj" />
+  </ItemGroup>
+  <ItemGroup>
+    <Compile Include="..\PlcMonitor.Engine.Tests\FakeDriver.cs" Link="FakeDriver.cs" />
+  </ItemGroup>
+</Project>

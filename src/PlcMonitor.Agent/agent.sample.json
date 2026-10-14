@@ -1,0 +1,40 @@
+{
+  // Ejemplo de configuración del agente. Cópialo como agent.json junto al ejecutable.
+  "devices": [
+    {
+      "name": "s71200-casa",
+      "driver": "s7-absolute",
+      "enabled": true,
+      // Primera llave de escritura. Además cada tag debe tener "writable": true.
+      "writesEnabled": false,
+      "settings": { "host": "10.225.188.120", "cpu": "S71200", "rack": 0, "slot": 1 },
+      "reconnect": { "initialDelayMs": 1000, "maxDelayMs": 30000, "multiplier": 2 },
+      "scanGroups": [
+        {
+          "name": "rapido",
+          "intervalMs": 500,
+          "tags": [
+            { "name": "MW0", "address": "MW0" },
+            { "name": "marca0", "address": "M0.0" }
+          ]
+        },
+        {
+          "name": "lento",
+          "intervalMs": 5000,
+          "tags": [
+            { "name": "MB10", "address": "MB10" }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "s71500-simbolico",
+      "driver": "s7-symbolic",
+      "enabled": false,
+      "settings": { "host": "192.168.0.1", "password": "" },
+      "scanGroups": [
+        { "name": "rapido", "intervalMs": 1000, "tags": [ { "address": "\"DB_Datos\".Contador" } ] }
+      ]
+    }
+  ]
+}

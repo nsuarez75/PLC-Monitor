@@ -78,6 +78,8 @@ namespace S7CommPlusDriver
 		public const int errCliDeviceNotSupported = 0x02900000;
 
 		public const int errOpenSSL = 0x03100000;
+		// PLC-Monitor: la CPU rechaza el InitSSL (no tiene activada la comunicación segura PG/HMI con TLS).
+		public const int errSecureCommNotAvailable = 0x03200000;
 		//------------------------------------------------------------------------------
 		//        PARAMS LIST FOR COMPATIBILITY WITH Snap7.net.cs           
 		//------------------------------------------------------------------------------
