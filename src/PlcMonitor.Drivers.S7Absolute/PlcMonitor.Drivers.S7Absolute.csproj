@@ -1,0 +1,14 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <Description>Driver S7 absoluto (S7comm PUT/GET) para S7-300/400/1200/1500.</Description>
+  </PropertyGroup>
+  <ItemGroup>
+    <PackageReference Include="S7netplus" />
+  </ItemGroup>
+  <ItemGroup>
+    <ProjectReference Include="..\PlcMonitor.Abstractions\PlcMonitor.Abstractions.csproj" />
+  </ItemGroup>
+  <ItemGroup>
+    <InternalsVisibleTo Include="PlcMonitor.Drivers.S7Absolute.Tests" />
+  </ItemGroup>
+</Project>

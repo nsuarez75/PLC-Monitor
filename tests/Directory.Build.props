@@ -5,7 +5,7 @@
     <IsTestProject>true</IsTestProject>
     <OutputType>Exe</OutputType>
     <!-- Tests: nombres con guiones bajos, sin ConfigureAwait, sin documentación -->
-    <NoWarn>$(NoWarn);CA1707;CA1515;CA2007;CA1861;CA1062;CA1859</NoWarn>
+    <NoWarn>$(NoWarn);CA1707;CA1515;CA2007;CA1861;CA1062;CA1859;xUnit1051</NoWarn>
   </PropertyGroup>
   <ItemGroup>
     <PackageReference Include="xunit.v3" />
