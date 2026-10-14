@@ -1,0 +1,215 @@
+// API del agente de PLC-Monitor.
+// La app de escritorio (y cualquier otro cliente) habla con el agente local o remoto solo por aquí.
+syntax = "proto3";
+
+package plcmonitor.agent.v1;
+
+option csharp_namespace = "PlcMonitor.Agent.Contracts";
+
+import "google/protobuf/duration.proto";
+import "google/protobuf/empty.proto";
+import "google/protobuf/timestamp.proto";
+
+service AgentService {
+  // Versión del agente, máquina y drivers disponibles.
+  rpc GetInfo(google.protobuf.Empty) returns (AgentInfo);
+
+  // Dispositivos configurados con su estado de conexión.
+  rpc ListDevices(google.protobuf.Empty) returns (DeviceList);
+
+  // Activa o desactiva un dispositivo en caliente. Con persist=true se guarda en la configuración.
+  rpc SetDeviceEnabled(SetDeviceEnabledRequest) returns (Device);
+
+  // Información que da el propio dispositivo (modelo, firmware...). Vacío si no está conectado.
+  rpc GetDeviceInfo(DeviceRequest) returns (DeviceInfo);
+
+  // Tags configurados con su último valor.
+  rpc ListTags(ListTagsRequest) returns (TagList);
+
+  // Lectura bajo demanda de direcciones cualesquiera (no tienen que estar configuradas).
+  rpc Read(ReadRequest) returns (ReadReply);
+
+  // Escritura en un tag configurado. Exige WritesEnabled en el dispositivo y Writable en el tag.
+  rpc Write(WriteRequest) returns (WriteReply);
+
+  // Primero una foto completa (snapshot) y después los cambios de valores y de estado, sin huecos.
+  // Si el cliente no consume a tiempo, el agente cierra el stream con RESOURCE_EXHAUSTED: hay que volver a suscribirse.
+  rpc Subscribe(SubscribeRequest) returns (stream SubscribeEvent);
+}
+
+enum ConnectionState {
+  CONNECTION_STATE_DISCONNECTED = 0;
+  CONNECTION_STATE_CONNECTING = 1;
+  CONNECTION_STATE_CONNECTED = 2;
+  CONNECTION_STATE_FAULTED = 3;
+}
+
+enum Quality {
+  QUALITY_GOOD = 0;
+  QUALITY_UNCERTAIN = 1;
+  QUALITY_BAD = 2;
+  QUALITY_BAD_NOT_CONNECTED = 3;
+  QUALITY_BAD_ADDRESS_INVALID = 4;
+  QUALITY_BAD_ACCESS_DENIED = 5;
+  QUALITY_BAD_TYPE_MISMATCH = 6;
+  QUALITY_BAD_TIMEOUT = 7;
+  QUALITY_BAD_CONFIGURATION = 8;
+  QUALITY_BAD_NOT_SUPPORTED = 9;
+  QUALITY_BAD_WRITE_DISABLED = 10;
+}
+
+enum DataType {
+  DATA_TYPE_UNKNOWN = 0;
+  DATA_TYPE_BOOLEAN = 1;
+  DATA_TYPE_S_BYTE = 2;
+  DATA_TYPE_BYTE = 3;
+  DATA_TYPE_INT16 = 4;
+  DATA_TYPE_U_INT16 = 5;
+  DATA_TYPE_INT32 = 6;
+  DATA_TYPE_U_INT32 = 7;
+  DATA_TYPE_INT64 = 8;
+  DATA_TYPE_U_INT64 = 9;
+  DATA_TYPE_FLOAT = 10;
+  DATA_TYPE_DOUBLE = 11;
+  DATA_TYPE_STRING = 12;
+  DATA_TYPE_DATE_TIME = 13;
+  DATA_TYPE_TIME_SPAN = 14;
+  DATA_TYPE_BYTE_ARRAY = 15;
+}
+
+message AgentInfo {
+  string version = 1;
+  string machine = 2;
+  string os = 3;
+  google.protobuf.Timestamp started = 4;
+  string config_path = 5;
+  repeated Driver drivers = 6;
+}
+
+message Driver {
+  string id = 1;
+  string name = 2;
+}
+
+message Device {
+  string name = 1;
+  string driver = 2;
+  bool enabled = 3;
+  bool writes_enabled = 4;
+  ConnectionState state = 5;
+  // Motivo del último error o cambio de estado.
+  string detail = 6;
+  google.protobuf.Timestamp since = 7;
+  // Próximo intento de conexión cuando está esperando para reconectar.
+  google.protobuf.Timestamp next_retry = 8;
+  int32 tag_count = 9;
+}
+
+message DeviceList {
+  repeated Device devices = 1;
+}
+
+message DeviceRequest {
+  string device = 1;
+}
+
+message SetDeviceEnabledRequest {
+  string device = 1;
+  bool enabled = 2;
+  bool persist = 3;
+}
+
+message DeviceInfo {
+  map<string, string> properties = 1;
+}
+
+message TagValue {
+  // Valor en texto (cultura invariante), siempre presente; vacío si la calidad es mala.
+  string text = 1;
+  DataType data_type = 2;
+  Quality quality = 3;
+  google.protobuf.Timestamp timestamp = 4;
+  string error = 5;
+  // Valor tipado, para clientes que necesitan números (gráficas, OPC UA...).
+  oneof typed {
+    bool bool_value = 10;
+    sint64 int_value = 11;
+    uint64 uint_value = 12;
+    double double_value = 13;
+    string string_value = 14;
+    bytes bytes_value = 15;
+    google.protobuf.Timestamp time_value = 16;
+    google.protobuf.Duration duration_value = 17;
+  }
+}
+
+message Tag {
+  string device = 1;
+  string name = 2;
+  string address = 3;
+  string group = 4;
+  int32 interval_ms = 5;
+  bool writable = 6;
+  TagValue value = 7;
+}
+
+message ListTagsRequest {
+  // Vacío: los tags de todos los dispositivos.
+  string device = 1;
+}
+
+message TagList {
+  repeated Tag tags = 1;
+}
+
+message ReadRequest {
+  string device = 1;
+  repeated string addresses = 2;
+}
+
+message ReadReply {
+  repeated TagValue values = 1;
+}
+
+message WriteRequest {
+  string device = 1;
+  string tag = 2;
+  // Valor en texto, cultura invariante (punto decimal; true/false o 1/0).
+  string value = 3;
+  // Quién escribe, para el log de auditoría.
+  string user = 4;
+}
+
+message WriteReply {
+  bool success = 1;
+  Quality quality = 2;
+  string error = 3;
+}
+
+message SubscribeRequest {
+  // Dispositivos de interés; vacío = todos.
+  repeated string devices = 1;
+}
+
+message Snapshot {
+  repeated Device devices = 1;
+  repeated Tag tags = 2;
+}
+
+message TagUpdate {
+  string device = 1;
+  string tag = 2;
+  TagValue value = 3;
+}
+
+message TagUpdates {
+  repeated TagUpdate updates = 1;
+}
+
+message SubscribeEvent {
+  oneof event {
+    Snapshot snapshot = 1;
+    TagUpdates tag_updates = 2;
+    Device device_status = 3;
+  }
+}

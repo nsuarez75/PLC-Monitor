@@ -401,6 +401,16 @@ public class TagEngineTests
     }
 
     [Fact]
+    public async Task Engine_can_be_disposed_twice()
+    {
+        var h = new EngineHarness(Device("plc1", tags: [Tag("DB1.DBW0")]));
+        await h.Engine.StartAsync();
+
+        await h.Engine.DisposeAsync();
+        await h.Engine.DisposeAsync();
+    }
+
+    [Fact]
     public void Invalid_configuration_is_rejected_with_all_errors()
     {
         var config = new AgentConfiguration { Devices = { Device("a/b", tags: []), Device("x", tags: []) } };

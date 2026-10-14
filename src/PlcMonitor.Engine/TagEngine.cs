@@ -19,6 +19,7 @@ public sealed class TagEngine : IAsyncDisposable, IEngineSink
     private readonly Lock _sync = new();
     private readonly ILogger _logger;
     private readonly TimeProvider _time;
+    private int _disposed;
 
     public TagEngine(AgentConfiguration configuration, DriverRegistry registry, ILoggerFactory loggerFactory, TimeProvider? timeProvider = null)
     {
@@ -149,6 +150,8 @@ public sealed class TagEngine : IAsyncDisposable, IEngineSink
 
     public async ValueTask DisposeAsync()
     {
+        if (Interlocked.Exchange(ref _disposed, 1) == 1)
+            return;
         await StopAsync();
         foreach (var supervisor in _devices.Values)
             await supervisor.DisposeAsync();

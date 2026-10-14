@@ -34,6 +34,7 @@ internal sealed class DeviceSupervisor : IAsyncDisposable
     private Task _loop = Task.CompletedTask;
     private volatile IDeviceConnection? _connection;
     private DeviceStatus _status;
+    private int _disposed;
     private IReadOnlyList<TagKey> _pollableKeys = [];
 
     public DeviceSupervisor(DeviceConfiguration config, IDriverFactory factory, ILoggerFactory loggerFactory, TimeProvider time, IEngineSink sink)
@@ -162,6 +163,8 @@ internal sealed class DeviceSupervisor : IAsyncDisposable
 
     public async ValueTask DisposeAsync()
     {
+        if (Interlocked.Exchange(ref _disposed, 1) == 1)
+            return;
         await StopAsync();
         _lifecycle.Dispose();
     }

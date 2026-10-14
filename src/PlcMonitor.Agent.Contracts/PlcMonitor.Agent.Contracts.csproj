@@ -1,0 +1,15 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <Description>Contrato gRPC del agente de PLC-Monitor (cliente y servidor generados).</Description>
+    <!-- Código generado por protoc: sin análisis de estilo -->
+    <NoWarn>$(NoWarn);CA1707;CA1716;CA1724</NoWarn>
+  </PropertyGroup>
+  <ItemGroup>
+    <PackageReference Include="Google.Protobuf" />
+    <PackageReference Include="Grpc.Core.Api" />
+    <PackageReference Include="Grpc.Tools" PrivateAssets="All" />
+  </ItemGroup>
+  <ItemGroup>
+    <Protobuf Include="Protos\agent.proto" GrpcServices="Both" />
+  </ItemGroup>
+</Project>
