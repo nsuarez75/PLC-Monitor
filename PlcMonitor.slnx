@@ -1,6 +1,10 @@
 <Solution>
   <Folder Name="/src/">
     <Project Path="src/PlcMonitor.Abstractions/PlcMonitor.Abstractions.csproj" />
+    <Project Path="src/PlcMonitor.Core/PlcMonitor.Core.csproj" />
     <Project Path="src/S7CommPlus/S7CommPlus.csproj" />
+  </Folder>
+  <Folder Name="/tests/">
+    <Project Path="tests/PlcMonitor.Core.Tests/PlcMonitor.Core.Tests.csproj" />
   </Folder>
 </Solution>

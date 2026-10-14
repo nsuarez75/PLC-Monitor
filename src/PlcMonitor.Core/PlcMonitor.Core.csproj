@@ -1,0 +1,11 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <Description>Núcleo de PLC-Monitor: registro de drivers, sondeo y conversión de valores.</Description>
+  </PropertyGroup>
+  <ItemGroup>
+    <ProjectReference Include="..\PlcMonitor.Abstractions\PlcMonitor.Abstractions.csproj" />
+  </ItemGroup>
+  <ItemGroup>
+    <InternalsVisibleTo Include="PlcMonitor.Core.Tests" />
+  </ItemGroup>
+</Project>
