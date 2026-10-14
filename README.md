@@ -1,4 +1,4 @@
-# s7plus-monitor
+# PLC-Monitor
 
 Herramienta propia y gratuita para diagnóstico y pruebas con PLCs Siemens S7 (300/400/1200/1500):
 acceso **simbólico** (S7CommPlus + TLS) y **absoluto** (PUT/GET), suscripciones, historiador,
