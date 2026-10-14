@@ -139,4 +139,5 @@ Compatible with the Ignition syntax and the classic STEP 7 syntax. Case-insensit
 | `Access denied (wrong password?)` | The password does not match any CPU access level |
 | Connects but reads return `BadAccessDenied` | No password given and the CPU is protected |
 | Absolute: error reading a DB | The DB does not exist, is **optimized** (disable *Optimized block access* in TIA) or PUT/GET is not permitted |
+| Absolute: connects and `info` works, but every read is `BadAccessDenied` "S7 error 0x8104" | PUT/GET is disabled. In TIA: CPU properties → Protection & Security → Connection mechanisms → *Permit access with PUT/GET communication*, then download |
 | Traffic analysis needed | `--tls-keylog C:\temp` plus a Wireshark capture. Then: `editcap --inject-secrets tls,key_*.log capture.pcapng out.pcapng` |

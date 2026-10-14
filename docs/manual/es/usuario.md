@@ -141,4 +141,5 @@ Compatible con la sintaxis de Ignition y la clásica de STEP 7. No distingue may
 | `Acceso denegado (¿contraseña incorrecta?)` | La contraseña no corresponde a ningún nivel de acceso de la CPU |
 | Conecta, pero las lecturas dan `BadAccessDenied` | No se indicó contraseña y la CPU está protegida |
 | Absoluto: error al leer un DB | El DB no existe, es **optimizado** (en TIA desactiva *Acceso optimizado al bloque*) o PUT/GET no está permitido |
+| Absoluto: conecta y `info` funciona, pero toda lectura da `BadAccessDenied` «error S7 0x8104» | PUT/GET deshabilitado. En TIA: Propiedades de la CPU → Protección y seguridad → Mecanismos de conexión → *Permitir acceso vía comunicación PUT/GET*, y cargar |
 | Hay que analizar el tráfico | `--tls-keylog C:\temp` y captura con Wireshark. Luego: `editcap --inject-secrets tls,key_*.log captura.pcapng salida.pcapng` |

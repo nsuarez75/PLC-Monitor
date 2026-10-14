@@ -4,12 +4,16 @@
 
 ## 1. Architecture
 
-The full picture (agent, Avalonia app, historian, OPC UA, SSH) is in [docs/arquitectura.md](../../arquitectura.md) (Spanish). This phase builds the foundation:
+The full picture (agent, Avalonia app, historian, OPC UA, SSH) is in [docs/arquitectura.md](../../arquitectura.md) (Spanish). Current state (phase 1 + phase 2 in development):
 
 ```
-                 plcmon (CLI)            [later phases: Agent, App]
+   gRPC clients (Avalonia app in phase 3, scripts...)
+                      │  agent.proto (PlcMonitor.Agent.Contracts)
+              plcmon-agent (PlcMonitor.Agent) ── AgentGrpcService · EngineHost
                       │
-              PlcMonitor.Core  ── DriverRegistry · TagPoller · ValueParser · ValueFormatter
+              PlcMonitor.Engine ── TagEngine · DeviceSupervisor · agent.json
+                      │
+ plcmon (CLI) ── PlcMonitor.Core  ── DriverRegistry · TagPoller · ValueParser · ValueFormatter
                       │
            PlcMonitor.Abstractions ── IDriverFactory · IDeviceConnection · IBrowsableConnection
               │                   │                                   │
@@ -30,6 +34,9 @@ The full picture (agent, Avalonia app, historian, OPC UA, SSH) is in [docs/arqui
 | `src/PlcMonitor.Drivers.S7Absolute` | `s7-absolute` driver on top of S7.Net Plus |
 | `src/S7CommPlus` | .NET 10 port of [S7CommPlusDriver](https://github.com/thomas-v2/S7CommPlusDriver), **LGPL-3**. Separate assembly; changes listed in `NOTICE.md` |
 | `src/PlcMonitor.Cli` | `plcmon` CLI (Spectre.Console) |
+| `src/PlcMonitor.Engine` | Multi-device engine: `TagEngine` (cache, subscriptions, enable/disable, two-key writes with audit), `DeviceSupervisor` (connection, backoff reconnection, scan groups), `agent.json` configuration |
+| `src/PlcMonitor.Agent.Contracts` | `agent.proto` with generated gRPC client and server. Used by the app and other clients without depending on ASP.NET |
+| `src/PlcMonitor.Agent` | `plcmon-agent` service (ASP.NET Core, HTTP/2, Windows Service/systemd). See the [agent manual](agent.md) |
 | `tests/*` | xUnit v3 on Microsoft.Testing.Platform |
 
 ## 2. Driver contract
@@ -113,6 +120,8 @@ scripts/get-openssl-windows.sh
 dotnet build PlcMonitor.slnx
 dotnet test --solution PlcMonitor.slnx          # Microsoft.Testing.Platform (global.json)
 dotnet run --project src/PlcMonitor.Cli -- info -H 192.168.2.1
+dotnet run --project src/PlcMonitor.Agent -- --Agent:ConfigPath=/path/agent.json
+scripts/publish-release.sh linux-x64    # package with the CLI and the agent (in agent/)
 ```
 
 ### Tests
@@ -122,9 +131,11 @@ dotnet run --project src/PlcMonitor.Cli -- info -H 192.168.2.1
 | `PlcMonitor.Core.Tests` | Driver registry, factories, polling with a fake clock, value parser and formatter |
 | `PlcMonitor.Drivers.S7Absolute.Tests` | Address parser, codec, read planner, and the connection against an in-memory simulated PLC |
 | `PlcMonitor.Drivers.S7Symbolic.Tests` | Type mapping on the real library tag classes, and the connection against a simulated CPU |
+| `PlcMonitor.Engine.Tests` | Configuration validation and loading, backoff, engine with a simulated driver (derived from `DeviceConnectionBase`) and a fake clock: reconnection, enable/disable, 4 independent PLCs, two-key writes, subscriptions and slow subscribers |
+| `PlcMonitor.Agent.Tests` | gRPC API against the in-memory agent (`WebApplicationFactory`) with a simulated driver; protobuf mapping |
 | `PlcMonitor.IntegrationTests` | **Real PLC, read-only.** Skipped unless these environment variables are set: `PLCMON_IT_SYMBOLIC_HOST`, `PLCMON_IT_PASSWORD`, `PLCMON_IT_SYMBOL`, `PLCMON_IT_ABSOLUTE_HOST`, `PLCMON_IT_ABSOLUTE_ADDR` |
 
-Status on 2026-10-14: 228 unit tests passing. Integration against the S7-1517F: 5 passed, 1 skipped. The absolute driver is not tested against that PLC because PUT/GET is disabled on it; a PUT/GET-enabled PLC is still needed for a real validation.
+Status on 2026-10-14 (branch `feature/fase2-agente`): 310 tests passing, 6 skipped (integration without a PLC). A real S7-1200 (PUT/GET disabled) confirmed the absolute driver's connection and status read, and the full agent end to end. Phase 1: 228 unit tests passing. Integration against the S7-1517F: 5 passed, 1 skipped. The absolute driver is not tested against that PLC because PUT/GET is disabled on it; a PUT/GET-enabled PLC is still needed for a real validation.
 
 ### Conventions
 - .NET 10, `Nullable` on, `TreatWarningsAsErrors`, `AnalysisLevel latest-recommended`. The legacy `S7CommPlus` code is excluded from analysis.
