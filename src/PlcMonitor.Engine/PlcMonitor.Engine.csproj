@@ -1,0 +1,11 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <Description>Motor de PLC-Monitor: varios dispositivos con reconexión, grupos de escaneo, caché de valores y difusión de cambios.</Description>
+  </PropertyGroup>
+  <ItemGroup>
+    <ProjectReference Include="..\PlcMonitor.Core\PlcMonitor.Core.csproj" />
+  </ItemGroup>
+  <ItemGroup>
+    <InternalsVisibleTo Include="PlcMonitor.Engine.Tests" />
+  </ItemGroup>
+</Project>

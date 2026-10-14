@@ -5,12 +5,14 @@
     <Project Path="src/PlcMonitor.Core/PlcMonitor.Core.csproj" />
     <Project Path="src/PlcMonitor.Drivers.S7Absolute/PlcMonitor.Drivers.S7Absolute.csproj" />
     <Project Path="src/PlcMonitor.Drivers.S7Symbolic/PlcMonitor.Drivers.S7Symbolic.csproj" />
+    <Project Path="src/PlcMonitor.Engine/PlcMonitor.Engine.csproj" />
     <Project Path="src/S7CommPlus/S7CommPlus.csproj" />
   </Folder>
   <Folder Name="/tests/">
     <Project Path="tests/PlcMonitor.Core.Tests/PlcMonitor.Core.Tests.csproj" />
     <Project Path="tests/PlcMonitor.Drivers.S7Absolute.Tests/PlcMonitor.Drivers.S7Absolute.Tests.csproj" />
     <Project Path="tests/PlcMonitor.Drivers.S7Symbolic.Tests/PlcMonitor.Drivers.S7Symbolic.Tests.csproj" />
+    <Project Path="tests/PlcMonitor.Engine.Tests/PlcMonitor.Engine.Tests.csproj" />
     <Project Path="tests/PlcMonitor.IntegrationTests/PlcMonitor.IntegrationTests.csproj" />
   </Folder>
 </Solution>
