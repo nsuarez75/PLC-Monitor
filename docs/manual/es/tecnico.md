@@ -195,5 +195,3 @@ La imagen mínima no trae D-Bus: un usuario normal no puede usar `systemctl` y e
 | SSH.NET | MIT | Despliegue remoto del agente |
 | Microsoft.Data.Sqlite (SQLitePCLRaw, SQLite) | MIT / dominio público | Historiador |
 | System.Security.Cryptography.ProtectedData | MIT | Token de los agentes protegido con DPAPI en Windows |
-
-**No se usa** la librería AGLink ni su clave de activación incluidas en el módulo de Ignition: son de Inductive Automation y DELTA LOGIC.
