@@ -10,6 +10,9 @@ PLC-Monitor incluye o usa los siguientes componentes de terceros / includes or u
 | zlib.net-mutliplatform — https://github.com/cinderblocks/zlib.net | BSD-3-Clause | |
 | S7.Net Plus — https://github.com/S7NetPlus/s7netplus | MIT | |
 | Spectre.Console — https://github.com/spectreconsole/spectre.console | MIT | |
+| Avalonia — https://avaloniaui.net | MIT | App de escritorio (incluye SkiaSharp y HarfBuzzSharp, MIT) |
+| CommunityToolkit.Mvvm — https://github.com/CommunityToolkit/dotnet | MIT | App de escritorio |
+| Inter (fuente) — https://rsms.me/inter | SIL Open Font License 1.1 | App de escritorio (Avalonia.Fonts.Inter) |
 | Microsoft .NET / Microsoft.Extensions.* | MIT | |
 
 PLC-Monitor no incluye ni usa la librería AGLink de DELTA LOGIC ni ningún componente de Inductive Automation.

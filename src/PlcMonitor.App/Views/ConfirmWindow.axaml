@@ -1,0 +1,13 @@
+<Window xmlns="https://github.com/avaloniaui"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        x:Class="PlcMonitor.App.Views.ConfirmWindow"
+        Width="440" SizeToContent="Height" CanResize="False"
+        WindowStartupLocation="CenterOwner" ShowInTaskbar="False">
+  <StackPanel Margin="20" Spacing="16">
+    <TextBlock x:Name="MessageText" TextWrapping="Wrap" />
+    <StackPanel Orientation="Horizontal" HorizontalAlignment="Right" Spacing="8">
+      <Button x:Name="NoButton" Content="Cancelar" IsCancel="True" />
+      <Button x:Name="YesButton" Content="Aceptar" IsDefault="True" Classes="accent" />
+    </StackPanel>
+  </StackPanel>
+</Window>

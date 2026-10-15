@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Genera los paquetes de la release (CLI plcmon + agente en agent/) en artifacts/release/<version>/.
+# Genera los paquetes de la release (CLI plcmon + agente en agent/ + app de escritorio en app/) en artifacts/release/<version>/.
 # Uso: scripts/publish-release.sh [rid...]   (por defecto: win-x64 linux-x64 linux-arm64)
 # No se usa single-file para que S7CommPlusDriver.dll (LGPL-3) siga siendo un fichero reemplazable.
 set -euo pipefail
@@ -17,7 +17,8 @@ for RID in "${RIDS[@]}"; do
   dotnet publish src/PlcMonitor.Cli -c Release -r "$RID" --self-contained true -p:PublishSingleFile=false -o "$DIR" -v q -nologo
   # El agente va en su propia carpeta: lleva el runtime de ASP.NET y no debe pisar ficheros de la CLI.
   dotnet publish src/PlcMonitor.Agent -c Release -r "$RID" --self-contained true -p:PublishSingleFile=false -o "$DIR/agent" -v q -nologo
-  rm -f "$DIR"/*.pdb "$DIR"/agent/*.pdb
+  dotnet publish src/PlcMonitor.App -c Release -r "$RID" --self-contained true -p:PublishSingleFile=false -o "$DIR/app" -v q -nologo
+  rm -f "$DIR"/*.pdb "$DIR"/agent/*.pdb "$DIR"/app/*.pdb
   mkdir -p "$DIR/deploy" && cp deploy/linux/plcmon-agent.service "$DIR/deploy/"
   mkdir -p "$DIR/licenses" "$DIR/docs"
   cp external/S7CommPlusDriver/LICENSE "$DIR/licenses/LGPL-3.0.txt"
@@ -31,8 +32,8 @@ for RID in "${RIDS[@]}"; do
   else
     # Desde Windows se pierde el bit de ejecución: se fija dentro del tar (ejecutables 0755, resto 0644).
     (cd "$OUT" && P="plcmon-$VERSION-$RID" \
-      && EXES=("$P/plcmon" "$P/agent/plcmon-agent") \
-      && for f in "$P/createdump" "$P/agent/createdump"; do [ -f "$f" ] && EXES+=("$f"); done \
+      && EXES=("$P/plcmon" "$P/agent/plcmon-agent" "$P/app/plcmon-app") \
+      && for f in "$P/createdump" "$P/agent/createdump" "$P/app/createdump"; do [ -f "$f" ] && EXES+=("$f"); done \
       && tar -cf "$P.tar" --owner=0 --group=0 --mode=u+rw,go+r,a-x,a+X "${EXES[@]/#/--exclude=}" "$P" \
       && tar -rf "$P.tar" --owner=0 --group=0 --mode=0755 "${EXES[@]}" \
       && gzip -9f "$P.tar")

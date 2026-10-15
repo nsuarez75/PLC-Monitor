@@ -37,6 +37,7 @@ The full picture (agent, Avalonia app, historian, OPC UA, SSH) is in [docs/arqui
 | `src/PlcMonitor.Cli` | `plcmon` CLI (Spectre.Console). Direct PLC commands and `plcmon agent ...` as a gRPC client of the agent (`AgentCommands.cs`) |
 | `src/PlcMonitor.Engine` | Multi-device engine: `TagEngine` (cache, subscriptions, enable/disable, two-key writes with audit), `DeviceSupervisor` (connection, backoff reconnection, scan groups), `agent.json` configuration |
 | `src/PlcMonitor.Agent.Contracts` | `agent.proto` with generated gRPC client and server. Used by the app and other clients without depending on ASP.NET |
+| `src/PlcMonitor.App` | `plcmon-app` desktop app (Avalonia 12, MVVM with CommunityToolkit.Mvvm). gRPC client of the agent: `MainViewModel` (connection, subscription with resubscribe, tag index), `DeviceViewModel`, `TagViewModel`, `BrowseViewModel`, `DeviceEditorViewModel`. Services replaceable in tests: `IAgentConnector`, `IUiDispatcher`, `IDialogs`. See the [app manual](app.md) |
 | `src/PlcMonitor.Agent` | `plcmon-agent` service (ASP.NET Core, HTTP/2, Windows Service/systemd). See the [agent manual](agent.md) |
 | `tests/*` | xUnit v3 on Microsoft.Testing.Platform |
 
@@ -137,6 +138,7 @@ scripts/publish-release.sh linux-x64    # package with the CLI and the agent (in
 | `PlcMonitor.Drivers.S7Symbolic.Tests` | Type mapping on the real library tag classes, and the connection against a simulated CPU |
 | `PlcMonitor.Engine.Tests` | Configuration validation and loading, backoff, engine with a simulated driver (derived from `DeviceConnectionBase`) and a fake clock: reconnection, enable/disable, 4 independent PLCs, two-key writes, subscriptions and slow subscribers |
 | `PlcMonitor.Agent.Tests` | gRPC API against the in-memory agent (`WebApplicationFactory`) with a simulated driver; protobuf mapping |
+| `PlcMonitor.App.Tests` | View models against the in-memory agent (connection, live values, confirmed writes, enable, browse and add, editor with validation and rename, removals) and the real window with Avalonia Headless + Skia (PNG captures with `PLCMON_UI_CAPTURE_DIR`; against a real agent with `PLCMON_IT_AGENT_URL`) |
 | `PlcMonitor.Cli.Tests` | `plcmon agent ...` commands with the real CLI wiring (`CliApp`), against the in-memory agent and a test console (Spectre.Console.Testing) |
 | `PlcMonitor.IntegrationTests` | **Real PLC, read-only.** Skipped unless these environment variables are set: `PLCMON_IT_SYMBOLIC_HOST`, `PLCMON_IT_SECURITY`, `PLCMON_IT_EXPECTED_SECURITY`, `PLCMON_IT_PASSWORD`, `PLCMON_IT_SYMBOL`, `PLCMON_IT_ABSOLUTE_HOST`, `PLCMON_IT_ABSOLUTE_ADDR` |
 
@@ -159,5 +161,8 @@ Status on 2026-10-14 (branch `feature/fase2-agente`): 310 tests passing, 6 skipp
 | zlib.net-mutliplatform | BSD-3-Clause | Block decompression |
 | S7.Net Plus | MIT | NuGet package |
 | Spectre.Console | MIT | CLI |
+| Avalonia, SkiaSharp, HarfBuzzSharp | MIT | Desktop app |
+| CommunityToolkit.Mvvm | MIT | Desktop app |
+| Inter font | SIL OFL 1.1 | Desktop app (Avalonia.Fonts.Inter) |
 
 The AGLink library and the activation key bundled in Ignition's module are **not** used: they belong to Inductive Automation and DELTA LOGIC.

@@ -1,12 +1,13 @@
 # PLC-Monitor — Manual (castellano)
 
-> Versión 1.0.0 publicada (fase 1) · Fase 2 (agente) en desarrollo · Última actualización: 2026-10-14
+> Versión 1.0.0 publicada (fase 1) · Fases 2 y 3 (agente y app) en `main` · Última actualización: 2026-10-15
 
 PLC-Monitor es una herramienta propia y gratuita para pruebas y diagnóstico a pie de máquina con PLCs Siemens S7.
 
 | Documento | Para quién |
 |---|---|
 | [Manual de uso](usuario.md) | Técnicos que van a conectarse a un PLC, buscar variables, leer, vigilar o escribir valores |
+| [Aplicación de escritorio](app.md) | Uso diario: dispositivos, tags en vivo, explorar símbolos, escribir y editar la configuración |
 | [Agente](agente.md) | Quien instala y configura el servicio que vigila varios PLC y lo expone por gRPC |
 | [Manual técnico](tecnico.md) | Desarrolladores: arquitectura, drivers, cómo compilar, probar y añadir protocolos |
 
@@ -17,8 +18,8 @@ PLC-Monitor es una herramienta propia y gratuita para pruebas y diagnóstico a p
 | Driver **S7 simbólico** (S7-1200/1500, S7CommPlus con o sin TLS, contraseña; sin PUT/GET) | ✅ Disponible |
 | Driver **S7 absoluto** (S7-300/400/1200/1500, PUT/GET) | ✅ Disponible |
 | CLI `plcmon`: info, explorar, leer, vigilar, escribir | ✅ Disponible |
-| Agente (servicio) multi-PLC con API gRPC | 🚧 Fase 2, en desarrollo (rama `feature/fase2-agente`) |
-| Aplicación de escritorio (Avalonia) | ⏳ Fase 3 |
+| Agente (servicio) multi-PLC con API gRPC | ✅ Disponible (fase 2) |
+| Aplicación de escritorio (Avalonia) | ✅ Primera versión (fase 3) |
 | Historiador (SQLite / TimescaleDB) | ⏳ Fase 4 |
 | Servidor OPC UA | ⏳ Fase 5 |
 | Agentes remotos por SSH | ⏳ Fase 6 |
@@ -33,4 +34,5 @@ PLC-Monitor es una herramienta propia y gratuita para pruebas y diagnóstico a p
 | 2026-10-14 | Fase 2: manual del agente; error S7 0x8104 (PUT/GET deshabilitado) en solución de problemas |
 | 2026-10-15 | Órdenes `plcmon agent ...` (cliente del agente desde la consola) |
 | 2026-10-15 | API de configuración en caliente y exploración; `plcmon agent browse/config/device/tag` |
+| 2026-10-15 | Manual de la aplicación de escritorio |
 | 2026-10-15 | `s7-symbolic` con o sin TLS (`--security auto/tls/legacy`) sobre el fork de DotNetProjects.S7CommPlusDriver; sin OpenSSL nativo |

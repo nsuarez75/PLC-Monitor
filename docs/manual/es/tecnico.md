@@ -37,6 +37,7 @@ La visión completa (agente, app Avalonia, historiador, OPC UA, SSH) está en [d
 | `src/PlcMonitor.Cli` | CLI `plcmon` (Spectre.Console). Órdenes directas al PLC y `plcmon agent ...` como cliente gRPC del agente (`AgentCommands.cs`) |
 | `src/PlcMonitor.Engine` | Motor multi-dispositivo: `TagEngine` (caché, suscripciones, activar/desactivar, escritura con doble llave y auditoría), `DeviceSupervisor` (conexión, reconexión con backoff, grupos de escaneo), configuración `agent.json` |
 | `src/PlcMonitor.Agent.Contracts` | `agent.proto` con cliente y servidor gRPC generados. Lo usarán la app y otros clientes sin depender de ASP.NET |
+| `src/PlcMonitor.App` | App de escritorio `plcmon-app` (Avalonia 12, MVVM con CommunityToolkit.Mvvm). Cliente gRPC del agente: `MainViewModel` (conexión, suscripción con resuscripción, índice de tags), `DeviceViewModel`, `TagViewModel`, `BrowseViewModel`, `DeviceEditorViewModel`. Servicios sustituibles en tests: `IAgentConnector`, `IUiDispatcher`, `IDialogs`. Ver el [manual de la app](app.md) |
 | `src/PlcMonitor.Agent` | Servicio `plcmon-agent` (ASP.NET Core, HTTP/2, Windows Service/systemd). Ver el [manual del agente](agente.md) |
 | `tests/*` | xUnit v3 sobre Microsoft.Testing.Platform |
 
@@ -137,6 +138,7 @@ scripts/publish-release.sh linux-x64    # paquete con la CLI y el agente (en age
 | `PlcMonitor.Drivers.S7Symbolic.Tests` | Conversión de tipos sobre las clases reales de la librería y conexión contra una CPU simulada |
 | `PlcMonitor.Engine.Tests` | Validación y carga de la configuración, backoff, motor con driver simulado (que hereda de `DeviceConnectionBase`) y reloj controlado: reconexión, activar/desactivar, 4 PLC independientes, doble llave de escritura, suscripciones y suscriptor lento |
 | `PlcMonitor.Agent.Tests` | API gRPC contra el agente en memoria (`WebApplicationFactory`) con driver simulado; conversión a mensajes protobuf |
+| `PlcMonitor.App.Tests` | ViewModels contra el agente en memoria (conexión, valores en vivo, escritura con confirmación, activar, explorar y añadir, editor con validación y renombrado, bajas) y la ventana real con Avalonia Headless + Skia (capturas PNG con `PLCMON_UI_CAPTURE_DIR`; contra un agente real con `PLCMON_IT_AGENT_URL`) |
 | `PlcMonitor.Cli.Tests` | Órdenes `plcmon agent ...` con la configuración real de la CLI (`CliApp`), contra el agente en memoria y una consola de prueba (Spectre.Console.Testing) |
 | `PlcMonitor.IntegrationTests` | **PLC real, solo lectura.** Se omiten si no hay variables de entorno: `PLCMON_IT_SYMBOLIC_HOST`, `PLCMON_IT_SECURITY`, `PLCMON_IT_EXPECTED_SECURITY`, `PLCMON_IT_PASSWORD`, `PLCMON_IT_SYMBOL`, `PLCMON_IT_ABSOLUTE_HOST`, `PLCMON_IT_ABSOLUTE_ADDR` |
 
@@ -159,5 +161,8 @@ Estado a 2026-10-14 (rama `feature/fase2-agente`): 310 tests correctos y 6 omiti
 | zlib.net-mutliplatform | BSD-3-Clause | Descompresión de bloques |
 | S7.Net Plus | MIT | Paquete NuGet |
 | Spectre.Console | MIT | CLI |
+| Avalonia, SkiaSharp, HarfBuzzSharp | MIT | App de escritorio |
+| CommunityToolkit.Mvvm | MIT | App de escritorio |
+| Fuente Inter | SIL OFL 1.1 | App de escritorio (Avalonia.Fonts.Inter) |
 
 **No se usa** la librería AGLink ni su clave de activación incluidas en el módulo de Ignition: son de Inductive Automation y DELTA LOGIC.

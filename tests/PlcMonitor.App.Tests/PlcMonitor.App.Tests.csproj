@@ -1,0 +1,20 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <!-- FakeDriver.cs (enlazado): campos que solo usan los tests del motor -->
+    <NoWarn>$(NoWarn);CS0649</NoWarn>
+  </PropertyGroup>
+  <ItemGroup>
+    <PackageReference Include="Grpc.Net.Client" />
+    <PackageReference Include="Microsoft.AspNetCore.Mvc.Testing" />
+    <PackageReference Include="Avalonia.Headless" />
+    <PackageReference Include="Avalonia.Skia" />
+  </ItemGroup>
+  <ItemGroup>
+    <ProjectReference Include="..\..\src\PlcMonitor.App\PlcMonitor.App.csproj" />
+    <ProjectReference Include="..\..\src\PlcMonitor.Agent\PlcMonitor.Agent.csproj" />
+  </ItemGroup>
+  <ItemGroup>
+    <Compile Include="..\PlcMonitor.Engine.Tests\FakeDriver.cs" Link="FakeDriver.cs" />
+    <Compile Include="..\PlcMonitor.Agent.Tests\AgentFactory.cs" Link="AgentFactory.cs" />
+  </ItemGroup>
+</Project>

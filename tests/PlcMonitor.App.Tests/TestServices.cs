@@ -1,0 +1,63 @@
+using Grpc.Net.Client;
+using PlcMonitor.Agent.Contracts;
+using PlcMonitor.Agent.Tests;
+using PlcMonitor.App.Services;
+
+namespace PlcMonitor.App.Tests;
+
+/// <summary>Ejecuta las acciones "de la UI" bajo un candado: los tests leen el modelo con <see cref="Read{T}"/>.</summary>
+internal sealed class LockingDispatcher : IUiDispatcher
+{
+    private readonly Lock _gate = new();
+
+    public void Post(Action action)
+    {
+        lock (_gate)
+            action();
+    }
+
+    public T Read<T>(Func<T> read)
+    {
+        lock (_gate)
+            return read();
+    }
+}
+
+/// <summary>Diálogos con respuesta programada; guarda las preguntas.</summary>
+internal sealed class FakeDialogs : IDialogs
+{
+    public bool Answer { get; set; } = true;
+
+    public List<string> Questions { get; } = [];
+
+    public Task<bool> ConfirmAsync(string title, string message)
+    {
+        Questions.Add(message);
+        return Task.FromResult(Answer);
+    }
+}
+
+/// <summary>Conecta con el agente en memoria sea cual sea la URL.</summary>
+internal sealed class InMemoryConnector(AgentFactory agent) : IAgentConnector
+{
+    public (AgentService.AgentServiceClient Client, IDisposable Channel) Connect(string url)
+    {
+        var channel = GrpcChannel.ForAddress(agent.Server.BaseAddress, new GrpcChannelOptions { HttpHandler = agent.Server.CreateHandler() });
+        return (new AgentService.AgentServiceClient(channel), channel);
+    }
+}
+
+internal static class Wait
+{
+    /// <summary>Espera (tiempo real, máximo 10 s) a que se cumpla la condición.</summary>
+    public static async Task UntilAsync(Func<bool> condition, string? what = null)
+    {
+        var deadline = DateTime.UtcNow.AddSeconds(10);
+        while (!condition())
+        {
+            if (DateTime.UtcNow > deadline)
+                throw new TimeoutException($"No se cumplió: {what ?? "condición"}");
+            await Task.Delay(20);
+        }
+    }
+}
