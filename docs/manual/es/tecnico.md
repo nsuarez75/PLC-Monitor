@@ -164,5 +164,6 @@ Estado a 2026-10-14 (rama `feature/fase2-agente`): 310 tests correctos y 6 omiti
 | Avalonia, SkiaSharp, HarfBuzzSharp | MIT | App de escritorio |
 | CommunityToolkit.Mvvm | MIT | App de escritorio |
 | Fuente Inter | SIL OFL 1.1 | App de escritorio (Avalonia.Fonts.Inter) |
+| Iconos Lucide (trazados) | ISC | App de escritorio (`Controls/Icon.cs`) |
 
 **No se usa** la librería AGLink ni su clave de activación incluidas en el módulo de Ignition: son de Inductive Automation y DELTA LOGIC.

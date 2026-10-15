@@ -17,6 +17,41 @@ public sealed partial class DeviceViewModel : ObservableObject
         _context = context;
         Name = device?.Name ?? throw new ArgumentNullException(nameof(device));
         Apply(device);
+        Tags.CollectionChanged += (_, e) =>
+        {
+            foreach (var tag in e.NewItems?.OfType<TagViewModel>() ?? [])
+                tag.PropertyChanged += OnTagChanged;
+            foreach (var tag in e.OldItems?.OfType<TagViewModel>() ?? [])
+                tag.PropertyChanged -= OnTagChanged;
+            NotifyCounts();
+        };
+    }
+
+    /// <summary>Tags con calidad buena.</summary>
+    public int GoodCount => Tags.Count(t => t.IsGood);
+
+    /// <summary>Tags con calidad mala o incierta.</summary>
+    public int BadCount => Tags.Count(t => !t.IsGood);
+
+    public bool HasBadTags => BadCount > 0;
+
+    public bool HasTags => Tags.Count > 0;
+
+    public string TagCountText => Tags.Count == 1 ? "1 tag" : $"{Tags.Count} tags";
+
+    private void OnTagChanged(object? sender, System.ComponentModel.PropertyChangedEventArgs e)
+    {
+        if (e.PropertyName == nameof(TagViewModel.Quality))
+            NotifyCounts();
+    }
+
+    private void NotifyCounts()
+    {
+        OnPropertyChanged(nameof(GoodCount));
+        OnPropertyChanged(nameof(BadCount));
+        OnPropertyChanged(nameof(HasBadTags));
+        OnPropertyChanged(nameof(HasTags));
+        OnPropertyChanged(nameof(TagCountText));
     }
 
     public string Name { get; }

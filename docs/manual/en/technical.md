@@ -164,5 +164,6 @@ Status on 2026-10-14 (branch `feature/fase2-agente`): 310 tests passing, 6 skipp
 | Avalonia, SkiaSharp, HarfBuzzSharp | MIT | Desktop app |
 | CommunityToolkit.Mvvm | MIT | Desktop app |
 | Inter font | SIL OFL 1.1 | Desktop app (Avalonia.Fonts.Inter) |
+| Lucide icons (paths) | ISC | Desktop app (`Controls/Icon.cs`) |
 
 The AGLink library and the activation key bundled in Ignition's module are **not** used: they belong to Inductive Automation and DELTA LOGIC.

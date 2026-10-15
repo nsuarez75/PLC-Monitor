@@ -34,6 +34,7 @@ public sealed partial class MainViewModel : ObservableObject, IAgentContext, IAs
         _settings = settings;
         _settingsPath = settingsPath;
         AgentUrl = settings.AgentUrl;
+        Theme = settings.Theme is "light" or "dark" ? settings.Theme : "system";
         RecentAgents = [.. settings.RecentAgents];
         Browse = new BrowseViewModel(this, () => SelectedDevice);
     }
@@ -55,7 +56,7 @@ public sealed partial class MainViewModel : ObservableObject, IAgentContext, IAs
     public partial string AgentUrl { get; set; }
 
     [ObservableProperty]
-    [NotifyPropertyChangedFor(nameof(ConnectionText))]
+    [NotifyPropertyChangedFor(nameof(ConnectionText), nameof(IsReconnecting), nameof(IsOnline))]
     [NotifyCanExecuteChangedFor(nameof(ConnectCommand), nameof(DisconnectCommand), nameof(NewDeviceCommand), nameof(EditDeviceCommand), nameof(DeleteDeviceCommand))]
     public partial bool IsConnected { get; set; }
 
@@ -65,8 +66,22 @@ public sealed partial class MainViewModel : ObservableObject, IAgentContext, IAs
 
     /// <summary>La suscripción está viva (si es false con IsConnected, se está reintentando).</summary>
     [ObservableProperty]
-    [NotifyPropertyChangedFor(nameof(ConnectionText))]
+    [NotifyPropertyChangedFor(nameof(ConnectionText), nameof(IsReconnecting), nameof(IsOnline))]
     public partial bool IsLive { get; set; }
+
+    /// <summary>Tema elegido: "system", "light" o "dark". La vista lo aplica.</summary>
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(ThemeText), nameof(ThemeIcon))]
+    public partial string Theme { get; set; }
+
+    public string ThemeText => Theme switch { "light" => "Claro", "dark" => "Oscuro", _ => "Sistema" };
+
+    public string ThemeIcon => Theme == "dark" ? "moon" : "sun";
+
+    public bool IsReconnecting => IsConnected && !IsLive;
+
+    /// <summary>Conectado y recibiendo en vivo.</summary>
+    public bool IsOnline => IsConnected && IsLive;
 
     [ObservableProperty]
     public partial string AgentDescription { get; set; } = "";
@@ -96,6 +111,15 @@ public sealed partial class MainViewModel : ObservableObject, IAgentContext, IAs
     });
 
     public string Describe(Exception exception) => AgentErrors.Describe(exception, AgentUrl);
+
+    /// <summary>Alterna sistema → claro → oscuro y lo recuerda.</summary>
+    [RelayCommand]
+    private void ToggleTheme()
+    {
+        Theme = Theme switch { "system" => "light", "light" => "dark", _ => "system" };
+        _settings.Theme = Theme;
+        _settings.Save(_settingsPath);
+    }
 
     private bool CanConnect() => !IsConnected && !IsConnecting && !string.IsNullOrWhiteSpace(AgentUrl);
 

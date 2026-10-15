@@ -42,6 +42,7 @@ public class MainWindowTests
     [Fact]
     public Task Main_window_shows_devices_and_tags() => HeadlessApp.RunAsync(() =>
     {
+        Avalonia.Application.Current!.RequestedThemeVariant = Avalonia.Styling.ThemeVariant.Light;
         var window = new MainWindow { DataContext = ViewModelWithData() };
         window.Show();
 
@@ -52,10 +53,13 @@ public class MainWindowTests
         texts.ShouldContain("12.5");
         texts.ShouldContain("El símbolo 'NoExiste_DB.x' no existe en la CPU.");
         Capture(window, "main-window.png");
+        Avalonia.Application.Current!.RequestedThemeVariant = Avalonia.Styling.ThemeVariant.Dark;
+        Capture(window, "main-window-dark.png");
+        Avalonia.Application.Current.RequestedThemeVariant = Avalonia.Styling.ThemeVariant.Light;
     });
 
     [Fact]
-    public Task Device_editor_replaces_the_tabs() => HeadlessApp.RunAsync(() =>
+    public Task Device_editor_covers_the_content() => HeadlessApp.RunAsync(() =>
     {
         var vm = ViewModelWithData();
         var window = new MainWindow { DataContext = vm };
@@ -65,10 +69,13 @@ public class MainWindowTests
         vm.Editor = new DeviceEditorViewModel(vm, drivers, _ => { });
         window.UpdateLayout();
 
-        window.GetVisualDescendants().OfType<TabControl>().Single().IsVisible.ShouldBeFalse();
+        window.GetVisualDescendants().OfType<TextBlock>().Single(t => t.Text == "Nuevo dispositivo").IsEffectivelyVisible.ShouldBeTrue();
         window.GetVisualDescendants().OfType<TextBlock>().Select(t => t.Text).ShouldContain("Nuevo dispositivo");
         vm.Editor.SettingsJson.ShouldContain("security");
         Capture(window, "device-editor.png");
+        Avalonia.Application.Current!.RequestedThemeVariant = Avalonia.Styling.ThemeVariant.Dark;
+        Capture(window, "device-editor-dark.png");
+        Avalonia.Application.Current.RequestedThemeVariant = Avalonia.Styling.ThemeVariant.Light;
     });
 
     /// <summary>

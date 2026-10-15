@@ -15,6 +15,7 @@ public sealed partial class ConfirmWindow : Window
         : this()
     {
         Title = title;
+        this.FindControl<TextBlock>("TitleText")!.Text = title;
         this.FindControl<TextBlock>("MessageText")!.Text = message;
         this.FindControl<Button>("YesButton")!.Click += (_, _) => Close(true);
         this.FindControl<Button>("NoButton")!.Click += (_, _) => Close(false);
