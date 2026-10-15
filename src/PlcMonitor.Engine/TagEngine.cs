@@ -17,6 +17,10 @@ public sealed class TagEngine : IAsyncDisposable, IEngineSink
     private readonly Dictionary<string, DeviceStatus> _statuses = new(StringComparer.OrdinalIgnoreCase);
     private readonly List<Subscriber> _subscribers = [];
     private readonly Lock _sync = new();
+    // Serializa los cambios de configuración (alta, modificación, baja, activar/desactivar).
+    private readonly SemaphoreSlim _changes = new(1, 1);
+    private readonly DriverRegistry _registry;
+    private readonly ILoggerFactory _loggerFactory;
     private readonly ILogger _logger;
     private readonly TimeProvider _time;
     private int _disposed;
@@ -32,34 +36,40 @@ public sealed class TagEngine : IAsyncDisposable, IEngineSink
             throw new EngineConfigurationException(errors);
 
         Configuration = configuration;
+        _registry = registry;
+        _loggerFactory = loggerFactory;
         _time = timeProvider ?? TimeProvider.System;
         _logger = loggerFactory.CreateLogger<TagEngine>();
-        foreach (var device in configuration.Devices)
+        lock (_sync)
         {
-            var supervisor = new DeviceSupervisor(device, registry.Get(device.Driver), loggerFactory, _time, this);
-            _devices.Add(device.Name, supervisor);
-            _statuses[device.Name] = supervisor.Status;
-            var initial = TagValue.Bad(QualityCode.BadNotConnected, _time.GetUtcNow(), DeviceSupervisor.DisabledDetail);
-            foreach (var tag in supervisor.Tags)
-                _values[tag.Key] = new TagSnapshot(tag, initial);
+            foreach (var device in configuration.Devices)
+                AddSupervisorLocked(device);
         }
     }
 
-    /// <summary>Configuración en uso. Refleja los cambios hechos en caliente (p.ej. activar un dispositivo).</summary>
+    /// <summary>
+    /// Configuración en uso, con los cambios hechos en caliente. Es el objeto vivo: para leerla desde otro hilo
+    /// usa <see cref="SnapshotConfiguration"/>.
+    /// </summary>
     public AgentConfiguration Configuration { get; }
 
     /// <summary>Arranca los dispositivos que tienen Enabled.</summary>
     public async Task StartAsync()
     {
-        foreach (var device in Configuration.Devices.Where(d => d.Enabled))
-            await _devices[device.Name].StartAsync();
-        _logger.LogInformation("Motor arrancado: {Enabled} de {Total} dispositivos activos",
-            Configuration.Devices.Count(d => d.Enabled), Configuration.Devices.Count);
+        DeviceSupervisor[] enabled;
+        lock (_sync)
+            enabled = Configuration.Devices.Where(d => d.Enabled).Select(d => _devices[d.Name]).ToArray();
+        foreach (var supervisor in enabled)
+            await supervisor.StartAsync();
+        _logger.LogInformation("Motor arrancado: {Enabled} de {Total} dispositivos activos", enabled.Length, Configuration.Devices.Count);
     }
 
     public async Task StopAsync()
     {
-        await Task.WhenAll(_devices.Values.Select(d => d.StopAsync()));
+        DeviceSupervisor[] all;
+        lock (_sync)
+            all = [.. _devices.Values];
+        await Task.WhenAll(all.Select(d => d.StopAsync()));
         lock (_sync)
         {
             foreach (var subscriber in _subscribers)
@@ -83,22 +93,137 @@ public sealed class TagEngine : IAsyncDisposable, IEngineSink
     /// <summary>Activa o desactiva un dispositivo en caliente. El cambio queda en <see cref="Configuration"/>.</summary>
     public async Task<DeviceStatus> SetDeviceEnabledAsync(string device, bool enabled)
     {
-        var supervisor = Find(device);
-        Configuration.Devices.First(d => d.Name == supervisor.Name).Enabled = enabled;
-        if (enabled)
-            await supervisor.StartAsync();
-        else
-            await supervisor.StopAsync();
-        _logger.LogInformation("{Device}: {Action}", supervisor.Name, enabled ? "activado" : "desactivado");
-        return GetDevice(supervisor.Name);
+        await _changes.WaitAsync();
+        try
+        {
+            var supervisor = Find(device);
+            lock (_sync)
+                ConfigOf(supervisor.Name).Enabled = enabled;
+            if (enabled)
+                await supervisor.StartAsync();
+            else
+                await supervisor.StopAsync();
+            _logger.LogInformation("{Device}: {Action}", supervisor.Name, enabled ? "activado" : "desactivado");
+            return GetDevice(supervisor.Name);
+        }
+        finally
+        {
+            _changes.Release();
+        }
+    }
+
+    /// <summary>Copia independiente de la configuración en uso (para guardarla o enviarla).</summary>
+    public AgentConfiguration SnapshotConfiguration()
+    {
+        lock (_sync)
+            return ConfigurationFile.Parse(ConfigurationFile.Serialize(Configuration));
+    }
+
+    /// <summary>Copia independiente de la configuración de un dispositivo.</summary>
+    public DeviceConfiguration GetDeviceConfiguration(string device)
+    {
+        var name = Find(device).Name;
+        return SnapshotConfiguration().Devices.First(d => string.Equals(d.Name, name, StringComparison.OrdinalIgnoreCase));
+    }
+
+    /// <summary>
+    /// Da de alta o sustituye un dispositivo (con sus grupos y tags). Se valida la configuración completa resultante;
+    /// si hay errores lanza <see cref="EngineConfigurationException"/> y no cambia nada. Un dispositivo existente se
+    /// detiene y se vuelve a crear con la nueva configuración.
+    /// </summary>
+    /// <param name="device">Nueva configuración del dispositivo (se copia).</param>
+    /// <param name="originalName">Nombre actual si se renombra; null para alta o mismo nombre.</param>
+    public async Task<DeviceStatus> PutDeviceAsync(DeviceConfiguration device, string? originalName = null)
+    {
+        ArgumentNullException.ThrowIfNull(device);
+        await _changes.WaitAsync();
+        try
+        {
+            var copy = Clone(device);
+            var replaces = string.IsNullOrWhiteSpace(originalName) ? copy.Name : originalName;
+            var candidate = SnapshotConfiguration();
+            var index = candidate.Devices.FindIndex(d => string.Equals(d.Name, replaces, StringComparison.OrdinalIgnoreCase));
+            if (index < 0 && !string.IsNullOrWhiteSpace(originalName))
+                throw new KeyNotFoundException($"Dispositivo desconocido '{originalName}'.");
+            if (index >= 0)
+                candidate.Devices[index] = copy;
+            else
+                candidate.Devices.Add(copy);
+            var errors = ConfigurationValidator.Validate(candidate, _registry);
+            if (errors.Count > 0)
+                throw new EngineConfigurationException(errors);
+
+            DeviceSupervisor? old = null;
+            if (index >= 0)
+            {
+                lock (_sync)
+                    old = _devices[Configuration.Devices[index].Name];
+                await old.DisposeAsync();
+            }
+
+            DeviceSupervisor supervisor;
+            lock (_sync)
+            {
+                if (old is not null)
+                {
+                    RemoveSupervisorLocked(old);
+                    if (!string.Equals(old.Name, copy.Name, StringComparison.Ordinal))
+                        Broadcast(new DeviceRemoved(old.Name));
+                    Configuration.Devices[index] = copy;
+                }
+                else
+                {
+                    Configuration.Devices.Add(copy);
+                }
+                supervisor = AddSupervisorLocked(copy);
+                Broadcast(new DeviceConfigured(_statuses[copy.Name], supervisor.Tags.Select(t => _values[t.Key]).ToArray()));
+            }
+            if (copy.Enabled)
+                await supervisor.StartAsync();
+            _logger.LogInformation("{Device}: {Action} ({Tags} tags)", copy.Name, old is null ? "dado de alta" : "reconfigurado", supervisor.Tags.Count);
+            return GetDevice(copy.Name);
+        }
+        finally
+        {
+            _changes.Release();
+        }
+    }
+
+    /// <summary>Da de baja un dispositivo: lo detiene y lo quita de la configuración.</summary>
+    public async Task DeleteDeviceAsync(string device)
+    {
+        await _changes.WaitAsync();
+        try
+        {
+            var supervisor = Find(device);
+            await supervisor.DisposeAsync();
+            lock (_sync)
+            {
+                RemoveSupervisorLocked(supervisor);
+                Configuration.Devices.Remove(ConfigOf(supervisor.Name));
+                Broadcast(new DeviceRemoved(supervisor.Name));
+            }
+            _logger.LogInformation("{Device}: dado de baja", supervisor.Name);
+        }
+        finally
+        {
+            _changes.Release();
+        }
+    }
+
+    /// <summary>Explora las variables del dispositivo (debe estar conectado y su driver permitir exploración).</summary>
+    public Task<BrowseResult> BrowseAsync(string device, BrowseQuery query, CancellationToken cancellationToken = default)
+    {
+        ArgumentNullException.ThrowIfNull(query);
+        return Find(device).BrowseAsync(query, cancellationToken);
     }
 
     /// <summary>Tags con su último valor. Si se indica dispositivo, solo los suyos.</summary>
     public IReadOnlyList<TagSnapshot> GetTags(string? device = null)
     {
-        var supervisors = device is null ? _devices.Values.AsEnumerable() : [Find(device)];
+        var supervisors = device is null ? null : new[] { Find(device) };
         lock (_sync)
-            return supervisors.SelectMany(s => s.Tags).Select(t => _values[t.Key]).ToArray();
+            return (supervisors ?? _devices.Values.AsEnumerable()).SelectMany(s => s.Tags).Select(t => _values[t.Key]).ToArray();
     }
 
     /// <summary>Escribe un valor (en texto, cultura invariante) en un tag configurado.</summary>
@@ -142,7 +267,7 @@ public sealed class TagEngine : IAsyncDisposable, IEngineSink
         lock (_sync)
         {
             _subscribers.Add(subscriber);
-            var tags = _devices.Values.SelectMany(s => s.Tags).Select(t => _values[t.Key]).ToArray();
+            var tags = Configuration.Devices.SelectMany(d => _devices[d.Name].Tags).Select(t => _values[t.Key]).ToArray();
             var devices = Configuration.Devices.Select(d => _statuses[d.Name]).ToArray();
             return new EngineSubscription(this, subscriber, tags, devices);
         }
@@ -153,8 +278,12 @@ public sealed class TagEngine : IAsyncDisposable, IEngineSink
         if (Interlocked.Exchange(ref _disposed, 1) == 1)
             return;
         await StopAsync();
-        foreach (var supervisor in _devices.Values)
+        DeviceSupervisor[] all;
+        lock (_sync)
+            all = [.. _devices.Values];
+        foreach (var supervisor in all)
             await supervisor.DisposeAsync();
+        _changes.Dispose();
     }
 
     void IEngineSink.Publish(IReadOnlyList<TagUpdate> updates)
@@ -164,7 +293,9 @@ public sealed class TagEngine : IAsyncDisposable, IEngineSink
             var changed = new List<TagUpdate>(updates.Count);
             foreach (var update in updates)
             {
-                var current = _values[update.Key];
+                // Un dispositivo que se está dando de baja aún puede publicar sus últimos valores.
+                if (!_values.TryGetValue(update.Key, out var current))
+                    continue;
                 if (update.Value.HasSameValueAndQuality(current.Value) && update.Value.ErrorDetail == current.Value.ErrorDetail)
                     continue;
                 _values[update.Key] = current with { Value = update.Value };
@@ -179,6 +310,8 @@ public sealed class TagEngine : IAsyncDisposable, IEngineSink
     {
         lock (_sync)
         {
+            if (!_statuses.ContainsKey(status.Device))
+                return;
             _statuses[status.Device] = status;
             Broadcast(new DeviceStatusChanged(status));
         }
@@ -204,10 +337,40 @@ public sealed class TagEngine : IAsyncDisposable, IEngineSink
         }
     }
 
-    private DeviceSupervisor Find(string device) =>
-        _devices.TryGetValue(device, out var supervisor)
-            ? supervisor
-            : throw new KeyNotFoundException($"Dispositivo desconocido '{device}'.");
+    private DeviceSupervisor Find(string device)
+    {
+        lock (_sync)
+        {
+            return _devices.TryGetValue(device, out var supervisor)
+                ? supervisor
+                : throw new KeyNotFoundException($"Dispositivo desconocido '{device}'.");
+        }
+    }
+
+    private DeviceConfiguration ConfigOf(string device) =>
+        Configuration.Devices.First(d => string.Equals(d.Name, device, StringComparison.OrdinalIgnoreCase));
+
+    private DeviceSupervisor AddSupervisorLocked(DeviceConfiguration device)
+    {
+        var supervisor = new DeviceSupervisor(device, _registry.Get(device.Driver), _loggerFactory, _time, this);
+        _devices.Add(device.Name, supervisor);
+        _statuses[device.Name] = supervisor.Status;
+        var initial = TagValue.Bad(QualityCode.BadNotConnected, _time.GetUtcNow(), DeviceSupervisor.DisabledDetail);
+        foreach (var tag in supervisor.Tags)
+            _values[tag.Key] = new TagSnapshot(tag, initial);
+        return supervisor;
+    }
+
+    private void RemoveSupervisorLocked(DeviceSupervisor supervisor)
+    {
+        _devices.Remove(supervisor.Name);
+        _statuses.Remove(supervisor.Name);
+        foreach (var tag in supervisor.Tags)
+            _values.Remove(tag.Key);
+    }
+
+    private static DeviceConfiguration Clone(DeviceConfiguration device) =>
+        ConfigurationFile.Parse(ConfigurationFile.Serialize(new AgentConfiguration { Devices = [device] })).Devices[0];
 
     internal sealed record Subscriber(Channel<EngineEvent> Channel);
 }

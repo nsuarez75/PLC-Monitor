@@ -28,7 +28,7 @@ internal sealed class FakeDriverFactory : DriverFactoryBase<FakeSettings>
 
     public override string DisplayName => "Simulado";
 
-    public override DriverCapabilities Capabilities => DriverCapabilities.Read | DriverCapabilities.Write;
+    public override DriverCapabilities Capabilities => DriverCapabilities.Read | DriverCapabilities.Write | DriverCapabilities.Browse;
 
     public FakePlc Plc(string device) => Plcs.GetOrAdd(device, _ => new FakePlc());
 
@@ -63,9 +63,19 @@ internal sealed class FakePlc
     public ConcurrentQueue<WriteRequest> Writes { get; } = new();
 }
 
-internal sealed class FakeConnection(string name, FakePlc plc) : DeviceConnectionBase(name, NullLogger.Instance)
+internal sealed class FakeConnection(string name, FakePlc plc) : DeviceConnectionBase(name, NullLogger.Instance), IBrowsableConnection
 {
-    public override DriverCapabilities Capabilities => DriverCapabilities.Read | DriverCapabilities.Write;
+    public override DriverCapabilities Capabilities => DriverCapabilities.Read | DriverCapabilities.Write | DriverCapabilities.Browse;
+
+    /// <summary>Explora las direcciones que tienen valor en el PLC simulado.</summary>
+    public Task<BrowseResult> BrowseAsync(BrowseQuery query, CancellationToken cancellationToken = default) =>
+        RunExclusiveAsync(_ =>
+        {
+            var all = plc.Values.Keys.Order(StringComparer.Ordinal).ToArray();
+            var matches = all.Where(a => string.IsNullOrEmpty(query.Filter) || a.Contains(query.Filter, StringComparison.OrdinalIgnoreCase)).ToArray();
+            var items = matches.Take(query.MaxResults).Select(a => new BrowseItem(a, ValidateAddress(a).DataType, "Fake")).ToArray();
+            return Task.FromResult(new BrowseResult(items, matches.Length, all.Length));
+        }, cancellationToken);
 
     public override AddressValidation ValidateAddress(string address) =>
         address.StartsWith("BAD", StringComparison.Ordinal)

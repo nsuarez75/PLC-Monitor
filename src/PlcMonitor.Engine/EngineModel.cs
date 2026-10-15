@@ -43,3 +43,9 @@ public abstract record EngineEvent;
 public sealed record TagValuesChanged(IReadOnlyList<TagUpdate> Updates) : EngineEvent;
 
 public sealed record DeviceStatusChanged(DeviceStatus Status) : EngineEvent;
+
+/// <summary>Un dispositivo se ha dado de alta o se ha reconfigurado: sus tags pasan a ser estos.</summary>
+public sealed record DeviceConfigured(DeviceStatus Status, IReadOnlyList<TagSnapshot> Tags) : EngineEvent;
+
+/// <summary>Un dispositivo se ha dado de baja (o se ha renombrado).</summary>
+public sealed record DeviceRemoved(string Device) : EngineEvent;

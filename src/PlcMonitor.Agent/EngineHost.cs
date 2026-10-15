@@ -57,7 +57,7 @@ public sealed class EngineHost(IOptions<AgentOptions> options, DriverRegistry re
         await _saveLock.WaitAsync(cancellationToken);
         try
         {
-            await ConfigurationFile.SaveAsync(ConfigPath, Engine.Configuration, cancellationToken);
+            await ConfigurationFile.SaveAsync(ConfigPath, Engine.SnapshotConfiguration(), cancellationToken);
             logger.LogInformation("Configuración guardada en {Path}", ConfigPath);
         }
         finally

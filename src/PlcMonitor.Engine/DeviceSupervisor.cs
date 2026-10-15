@@ -117,6 +117,19 @@ internal sealed class DeviceSupervisor : IAsyncDisposable
         return await connection.ReadAsync(addresses, cancellationToken);
     }
 
+    /// <summary>Explora las variables del dispositivo con la conexión en uso.</summary>
+    public Task<BrowseResult> BrowseAsync(BrowseQuery query, CancellationToken cancellationToken)
+    {
+        var connection = _connection;
+        if (connection is not IBrowsableConnection browsable)
+        {
+            throw connection is null
+                ? new InvalidOperationException($"'{Name}' no está conectado.")
+                : new NotSupportedException($"El driver '{_config.Driver}' no permite explorar variables.");
+        }
+        return browsable.BrowseAsync(query, cancellationToken);
+    }
+
     public async Task<IReadOnlyDictionary<string, string>> GetDeviceInfoAsync(CancellationToken cancellationToken)
     {
         var connection = _connection;
