@@ -21,6 +21,7 @@ public sealed partial class AgentsViewModel : ObservableObject
     {
         _main = main ?? throw new ArgumentNullException(nameof(main));
         _sshFactory = sshFactory;
+        PackageFolder = main.AgentPackagesFolder;
         Selected = main.SelectedProfile ?? main.Profiles.FirstOrDefault();
     }
 
@@ -91,12 +92,20 @@ public sealed partial class AgentsViewModel : ObservableObject
 
     public bool IsManaged => !string.IsNullOrWhiteSpace(SshHost);
 
+    partial void OnPackageFolderChanged(string value) => _main.AgentPackagesFolder = value;
+
     partial void OnSelectedChanged(AgentProfile? value)
     {
         Log.Clear();
         SshPassword = "";
         SudoPassword = "";
         RegenerateCredentials = false;
+        LoadForm(value);
+    }
+
+    /// <summary>Carga el formulario desde el perfil (sin tocar el log ni las contraseñas).</summary>
+    private void LoadForm(AgentProfile? value)
+    {
         Name = value?.Name ?? "";
         Url = value?.Url ?? "";
         Token = value?.Token ?? "";
@@ -263,20 +272,9 @@ public sealed partial class AgentsViewModel : ObservableObject
         profile.AgentPort = AgentPort;
     }
 
-    /// <summary>Refresca la lista y el formulario con lo que hay en el perfil (tras guardar o instalar).</summary>
-    private void RefreshSelected()
-    {
-        if (Selected is not { } profile)
-            return;
-        var index = Profiles.IndexOf(profile);
-        if (index >= 0)
-            Profiles[index] = profile;
-        var log = Log.ToArray();
-        Selected = null;
-        Selected = profile;
-        foreach (var line in log)
-            Log.Add(line);
-    }
+    /// <summary>Refresca el formulario con lo que hay en el perfil (tras guardar o instalar). El perfil es observable:
+    /// las listas se actualizan solas y no se pierde la selección.</summary>
+    private void RefreshSelected() => LoadForm(Selected);
 
     private void AddLog(string line) => Log.Add(line);
 

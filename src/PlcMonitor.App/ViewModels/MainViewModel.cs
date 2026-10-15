@@ -80,6 +80,17 @@ public sealed partial class MainViewModel : ObservableObject, IAgentContext, IAs
             AgentUrl = value.Url;
     }
 
+    /// <summary>Carpeta de paquetes del agente recordada entre sesiones.</summary>
+    public string AgentPackagesFolder
+    {
+        get => _settings.AgentPackagesFolder ?? "";
+        set
+        {
+            _settings.AgentPackagesFolder = string.IsNullOrWhiteSpace(value) ? null : value.Trim();
+            _settings.Save(_settingsPath);
+        }
+    }
+
     /// <summary>Guarda los perfiles en disco.</summary>
     public void SaveProfiles() => AgentProfileStore.Save(_profilesPath, Profiles);
 
