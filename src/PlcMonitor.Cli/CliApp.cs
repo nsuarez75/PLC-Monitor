@@ -49,6 +49,26 @@ public static class CliApp
                 .WithExample("agent", "write", "prensa1", "marcha", "true");
             agent.AddCommand<AgentEnableCommand>("enable").WithDescription("Activa un dispositivo.");
             agent.AddCommand<AgentDisableCommand>("disable").WithDescription("Desactiva un dispositivo.");
+            agent.AddCommand<AgentBrowseCommand>("browse")
+                .WithDescription("Explora las variables de un dispositivo conectado.")
+                .WithExample("agent", "browse", "prensa1", "Motor", "-n", "50");
+            agent.AddCommand<AgentConfigCommand>("config").WithDescription("Configuración en árbol: dispositivos, grupos y tags.");
+            agent.AddBranch<AgentSettings>("device", device =>
+            {
+                device.SetDescription("Alta y baja de dispositivos (se guarda en agent.json salvo --no-persist).");
+                device.AddCommand<AgentDeviceAddCommand>("add")
+                    .WithDescription("Da de alta un dispositivo o cambia sus ajustes (conserva sus tags).")
+                    .WithExample("agent", "device", "add", "prensa1", "-d", "s7-symbolic", "-s", "{\"host\":\"192.168.0.10\"}");
+                device.AddCommand<AgentDeviceRemoveCommand>("remove").WithDescription("Da de baja un dispositivo y sus tags.");
+            });
+            agent.AddBranch<AgentSettings>("tag", tag =>
+            {
+                tag.SetDescription("Alta y baja de tags (se guarda en agent.json salvo --no-persist).");
+                tag.AddCommand<AgentTagAddCommand>("add")
+                    .WithDescription("Añade un tag a un grupo de escaneo (se crea si no existe).")
+                    .WithExample("agent", "tag", "add", "prensa1", "\"MiDB\".Velocidad", "--name", "velocidad", "-g", "rapido", "-i", "250");
+                tag.AddCommand<AgentTagRemoveCommand>("remove").WithDescription("Quita un tag.");
+            });
             agent.AddCommand<AgentWatchCommand>("watch")
                 .WithDescription("Cambios de valores y de estado en directo (Ctrl+C para salir).")
                 .WithExample("agent", "watch", "prensa1");

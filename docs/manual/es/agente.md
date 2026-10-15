@@ -129,14 +129,20 @@ el cliente generado.
 
 | Método | Qué hace |
 |---|---|
-| `GetInfo` | Versión, máquina, sistema, fichero de configuración y drivers |
+| `GetInfo` | Versión, máquina, sistema, fichero de configuración y drivers (con sus ajustes por defecto y si permiten explorar/escribir) |
 | `ListDevices` | Dispositivos con estado, motivo, próximo reintento y número de tags |
 | `SetDeviceEnabled` | Activa o desactiva un dispositivo (`persist` para guardarlo) |
 | `GetDeviceInfo` | Datos que da el propio PLC (modelo, estado de la CPU...) |
 | `ListTags` | Tags configurados con su último valor (de un dispositivo o de todos) |
 | `Read` | Lectura bajo demanda de direcciones cualesquiera |
 | `Write` | Escritura en un tag configurado (doble llave, auditoría) |
-| `Subscribe` | Stream: primero un `snapshot` completo y después `tag_updates` y `device_status` sin huecos |
+| `Subscribe` | Stream: primero un `snapshot` completo y después `tag_updates`, `device_status`, `device_configured` (alta o cambio: sustituye todos los tags del dispositivo) y `device_removed`, sin huecos |
+| `Browse` | Explora las variables de un dispositivo conectado (filtro, máximo, `refresh`). Si no está conectado: `FAILED_PRECONDITION` |
+| `GetConfiguration` / `GetDeviceConfig` | Configuración en uso, completa o de un dispositivo (los ajustes del driver van en JSON) |
+| `PutDevice` | Alta o modificación de un dispositivo con sus grupos y tags (`original_name` para renombrar). Se valida todo antes de aplicar: si hay errores, `INVALID_ARGUMENT` con la lista completa y no cambia nada. El dispositivo se reinicia con la nueva configuración |
+| `DeleteDevice` | Baja de un dispositivo |
+
+`SetDeviceEnabled`, `PutDevice` y `DeleteDevice` guardan en `agent.json` solo con `persist = true` (escritura atómica).
 
 Cada valor (`TagValue`) viaja en texto (`text`, cultura invariante) y tipado (`bool_value`, `int_value`,
 `double_value`...), con calidad, marca de tiempo y error. Si un dispositivo no existe, la llamada falla con `NOT_FOUND`.
@@ -144,7 +150,7 @@ Si un suscriptor no consume los eventos a tiempo, el agente cierra su stream con
 debe volver a suscribirse y recibirá una foto nueva.
 
 Para probar la API desde la consola está `plcmon agent ...` (`info`, `devices`, `tags`, `read`, `write`, `enable`, `disable`,
-`watch`): ver el [manual de uso](usuario.md#plcmon-agent--hablar-con-un-agente).
+`watch`, `browse`, `config`, `device add/remove`, `tag add/remove`): ver el [manual de uso](usuario.md#plcmon-agent--hablar-con-un-agente).
 
 Ejemplo mínimo en C#:
 

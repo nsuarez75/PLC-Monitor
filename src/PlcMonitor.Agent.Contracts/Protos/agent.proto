@@ -35,6 +35,22 @@ service AgentService {
   // Primero una foto completa (snapshot) y después los cambios de valores y de estado, sin huecos.
   // Si el cliente no consume a tiempo, el agente cierra el stream con RESOURCE_EXHAUSTED: hay que volver a suscribirse.
   rpc Subscribe(SubscribeRequest) returns (stream SubscribeEvent);
+
+  // Explora las variables del dispositivo (solo drivers con exploración, p.ej. s7-symbolic). Exige que esté conectado.
+  rpc Browse(BrowseRequest) returns (BrowseReply);
+
+  // Configuración completa en uso (dispositivos, grupos de escaneo y tags).
+  rpc GetConfiguration(google.protobuf.Empty) returns (Configuration);
+
+  // Configuración de un dispositivo.
+  rpc GetDeviceConfig(DeviceRequest) returns (DeviceConfig);
+
+  // Alta o modificación de un dispositivo con sus grupos y tags. Se valida todo antes de aplicar; si hay errores
+  // devuelve INVALID_ARGUMENT con la lista y no cambia nada. El dispositivo se reinicia con la nueva configuración.
+  rpc PutDevice(PutDeviceRequest) returns (Device);
+
+  // Baja de un dispositivo.
+  rpc DeleteDevice(DeleteDeviceRequest) returns (google.protobuf.Empty);
 }
 
 enum ConnectionState {
@@ -89,6 +105,10 @@ message AgentInfo {
 message Driver {
   string id = 1;
   string name = 2;
+  // Ajustes por defecto del driver en JSON (plantilla para formularios).
+  string default_settings_json = 3;
+  bool can_browse = 4;
+  bool can_write = 5;
 }
 
 message Device {
@@ -211,5 +231,89 @@ message SubscribeEvent {
     Snapshot snapshot = 1;
     TagUpdates tag_updates = 2;
     Device device_status = 3;
+    // El dispositivo se ha dado de alta o se ha reconfigurado: sustituye todos sus tags por estos.
+    DeviceConfigured device_configured = 4;
+    DeviceRemoved device_removed = 5;
   }
+}
+
+message DeviceConfigured {
+  Device device = 1;
+  repeated Tag tags = 2;
+}
+
+message DeviceRemoved {
+  string device = 1;
+}
+
+message BrowseRequest {
+  string device = 1;
+  // Texto que debe contener el nombre (sin distinguir mayúsculas); vacío = todo.
+  string filter = 2;
+  // Máximo de resultados (por defecto 100).
+  int32 max_results = 3;
+  // Volver a explorar la CPU en lugar de usar la caché.
+  bool refresh = 4;
+}
+
+message BrowseItem {
+  string address = 1;
+  DataType data_type = 2;
+  // Tipo nativo del PLC (Int, Real, String...).
+  string native_type = 3;
+}
+
+message BrowseReply {
+  repeated BrowseItem items = 1;
+  int32 total_matches = 2;
+  int32 total_symbols = 3;
+}
+
+message ReconnectConfig {
+  int32 initial_delay_ms = 1;
+  int32 max_delay_ms = 2;
+  double multiplier = 3;
+}
+
+message TagConfig {
+  // Vacío = se usa la dirección como nombre.
+  string name = 1;
+  string address = 2;
+  bool writable = 3;
+  // DATA_TYPE_UNKNOWN = lo deduce el driver.
+  DataType data_type = 4;
+}
+
+message ScanGroupConfig {
+  string name = 1;
+  int32 interval_ms = 2;
+  repeated TagConfig tags = 3;
+}
+
+message DeviceConfig {
+  string name = 1;
+  string driver = 2;
+  bool enabled = 3;
+  bool writes_enabled = 4;
+  // Ajustes del driver en JSON (los mismos que en agent.json).
+  string settings_json = 5;
+  ReconnectConfig reconnect = 6;
+  repeated ScanGroupConfig scan_groups = 7;
+}
+
+message Configuration {
+  repeated DeviceConfig devices = 1;
+}
+
+message PutDeviceRequest {
+  DeviceConfig device = 1;
+  // Nombre actual si se renombra el dispositivo; vacío = mismo nombre (o alta).
+  string original_name = 2;
+  // Guardar en agent.json.
+  bool persist = 3;
+}
+
+message DeleteDeviceRequest {
+  string device = 1;
+  bool persist = 2;
 }

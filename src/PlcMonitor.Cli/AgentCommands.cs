@@ -361,3 +361,271 @@ public sealed class AgentWatchCommand : AsyncCommand<AgentWatchSettings>
         console.MarkupLine(
             $"[grey]{AgentRuntime.Time(value?.Timestamp)}[/]  {Markup.Escape(device)}/{Markup.Escape(tag)} = {Markup.Escape(AgentRuntime.ValueText(value))}  {(value is null ? string.Empty : AgentRuntime.QualityMarkup(value.Quality))}");
 }
+
+public sealed class AgentBrowseSettings : AgentSettings
+{
+    [CommandArgument(0, "<DISPOSITIVO>")]
+    [Description("Dispositivo configurado en el agente (debe estar conectado).")]
+    public string Device { get; set; } = "";
+
+    [CommandArgument(1, "[FILTRO]")]
+    [Description("Texto que debe contener el nombre (sin distinguir mayúsculas).")]
+    public string? Filter { get; set; }
+
+    [CommandOption("-n|--max <N>")]
+    [Description("Máximo de resultados.")]
+    [DefaultValue(100)]
+    public int MaxResults { get; set; } = 100;
+
+    [CommandOption("--refresh")]
+    [Description("Vuelve a explorar la CPU en lugar de usar la caché del agente.")]
+    public bool Refresh { get; set; }
+}
+
+/// <summary>plcmon agent browse — explora las variables de un dispositivo a través del agente.</summary>
+public sealed class AgentBrowseCommand : AsyncCommand<AgentBrowseSettings>
+{
+    public override Task<int> ExecuteAsync(CommandContext context, AgentBrowseSettings settings, CancellationToken cancellationToken) =>
+        AgentRuntime.RunAsync(settings, async client =>
+        {
+            var reply = await client.BrowseAsync(new BrowseRequest
+            {
+                Device = settings.Device,
+                Filter = settings.Filter ?? string.Empty,
+                MaxResults = settings.MaxResults,
+                Refresh = settings.Refresh,
+            }, cancellationToken: cancellationToken);
+            var table = new Table().AddColumns("Símbolo", "Tipo PLC", "Tipo");
+            foreach (var item in reply.Items)
+                table.AddRow(Markup.Escape(item.Address), Markup.Escape(item.NativeType), item.DataType.ToString());
+            AgentRuntime.Console.Write(table);
+            AgentRuntime.Console.MarkupLine($"[grey]{reply.Items.Count} mostrados de {reply.TotalMatches} coincidencias · {reply.TotalSymbols} símbolos[/]");
+            return 0;
+        });
+}
+
+/// <summary>plcmon agent config — configuración del agente en árbol (dispositivos, grupos y tags).</summary>
+public sealed class AgentConfigCommand : AsyncCommand<AgentTagsSettings>
+{
+    public override Task<int> ExecuteAsync(CommandContext context, AgentTagsSettings settings, CancellationToken cancellationToken) =>
+        AgentRuntime.RunAsync(settings, async client =>
+        {
+            IEnumerable<DeviceConfig> devices = string.IsNullOrEmpty(settings.Device)
+                ? (await client.GetConfigurationAsync(new Empty(), cancellationToken: cancellationToken)).Devices
+                : [await client.GetDeviceConfigAsync(new DeviceRequest { Device = settings.Device }, cancellationToken: cancellationToken)];
+            var root = new Tree($"[bold]{Markup.Escape(settings.ResolveAgentUrl())}[/]");
+            foreach (var d in devices)
+            {
+                var flags = $"{(d.Enabled ? "activo" : "[grey]inactivo[/]")}{(d.WritesEnabled ? ", [yellow]escritura[/]" : string.Empty)}";
+                var node = root.AddNode($"[bold]{Markup.Escape(d.Name)}[/] ({Markup.Escape(d.Driver)}, {flags}) [grey]{Markup.Escape(d.SettingsJson)}[/]");
+                foreach (var g in d.ScanGroups)
+                {
+                    var group = node.AddNode($"{Markup.Escape(g.Name)} [grey]({g.IntervalMs} ms)[/]");
+                    foreach (var t in g.Tags)
+                    {
+                        var name = string.IsNullOrEmpty(t.Name) ? t.Address : t.Name;
+                        var type = t.DataType == DataType.Unknown ? string.Empty : $" [grey]{t.DataType}[/]";
+                        group.AddNode($"{Markup.Escape(name)} = {Markup.Escape(t.Address)}{type}{(t.Writable ? " [yellow]✎[/]" : string.Empty)}");
+                    }
+                }
+            }
+            AgentRuntime.Console.Write(root);
+            return 0;
+        });
+}
+
+public class AgentPersistSettings : AgentSettings
+{
+    [CommandOption("--no-persist")]
+    [Description("No guardar el cambio en agent.json (se pierde al reiniciar el agente).")]
+    public bool NoPersist { get; set; }
+}
+
+public sealed class AgentDeviceAddSettings : AgentPersistSettings
+{
+    [CommandArgument(0, "<NOMBRE>")]
+    [Description("Nombre del dispositivo (único, sin '/').")]
+    public string Name { get; set; } = "";
+
+    [CommandOption("-d|--driver <DRIVER>")]
+    [Description("Driver: s7-symbolic o s7-absolute.")]
+    public string Driver { get; set; } = "";
+
+    [CommandOption("-s|--settings <JSON>")]
+    [Description("Ajustes del driver en JSON, p.ej. '{\"host\":\"192.168.0.10\",\"security\":\"auto\"}'.")]
+    public string Settings { get; set; } = "{}";
+
+    [CommandOption("--disabled")]
+    [Description("Crear el dispositivo sin conectar.")]
+    public bool Disabled { get; set; }
+
+    [CommandOption("--writes")]
+    [Description("Habilitar escrituras (primera llave).")]
+    public bool WritesEnabled { get; set; }
+
+    public override ValidationResult Validate() =>
+        string.IsNullOrWhiteSpace(Driver) ? ValidationResult.Error("Falta --driver.") : base.Validate();
+}
+
+/// <summary>plcmon agent device add — da de alta un dispositivo sin tags (o reemplaza sus ajustes si ya existe).</summary>
+public sealed class AgentDeviceAddCommand : AsyncCommand<AgentDeviceAddSettings>
+{
+    public override Task<int> ExecuteAsync(CommandContext context, AgentDeviceAddSettings settings, CancellationToken cancellationToken) =>
+        AgentRuntime.RunAsync(settings, async client =>
+        {
+            DeviceConfig device;
+            try
+            {
+                device = await client.GetDeviceConfigAsync(new DeviceRequest { Device = settings.Name }, cancellationToken: cancellationToken);
+            }
+            catch (RpcException ex) when (ex.StatusCode == StatusCode.NotFound)
+            {
+                device = new DeviceConfig { Name = settings.Name, Reconnect = new ReconnectConfig { InitialDelayMs = 1000, MaxDelayMs = 30000, Multiplier = 2 } };
+            }
+            device.Driver = settings.Driver;
+            device.SettingsJson = settings.Settings;
+            device.Enabled = !settings.Disabled;
+            device.WritesEnabled = settings.WritesEnabled;
+            var status = await client.PutDeviceAsync(new PutDeviceRequest { Device = device, Persist = !settings.NoPersist }, cancellationToken: cancellationToken);
+            AgentRuntime.Console.MarkupLine($"[green]Guardado[/] {Markup.Escape(status.Name)} · {AgentRuntime.StateMarkup(status.State)}");
+            return 0;
+        });
+}
+
+public sealed class AgentDeviceRemoveSettings : AgentPersistSettings
+{
+    [CommandArgument(0, "<DISPOSITIVO>")]
+    public string Device { get; set; } = "";
+
+    [CommandOption("-y|--yes")]
+    [Description("No pedir confirmación.")]
+    public bool Yes { get; set; }
+}
+
+/// <summary>plcmon agent device remove — da de baja un dispositivo.</summary>
+public sealed class AgentDeviceRemoveCommand : AsyncCommand<AgentDeviceRemoveSettings>
+{
+    public override Task<int> ExecuteAsync(CommandContext context, AgentDeviceRemoveSettings settings, CancellationToken cancellationToken) =>
+        AgentRuntime.RunAsync(settings, async client =>
+        {
+            if (!settings.Yes && !await AgentRuntime.Console.ConfirmAsync(
+                    $"¿Dar de baja [bold]{Markup.Escape(settings.Device)}[/] y todos sus tags?", defaultValue: false, cancellationToken))
+            {
+                AgentRuntime.Console.MarkupLine("[grey]Cancelado.[/]");
+                return 2;
+            }
+            await client.DeleteDeviceAsync(new DeleteDeviceRequest { Device = settings.Device, Persist = !settings.NoPersist }, cancellationToken: cancellationToken);
+            AgentRuntime.Console.MarkupLine($"[green]Eliminado[/] {Markup.Escape(settings.Device)}");
+            return 0;
+        });
+}
+
+public sealed class AgentTagAddSettings : AgentPersistSettings
+{
+    [CommandArgument(0, "<DISPOSITIVO>")]
+    public string Device { get; set; } = "";
+
+    [CommandArgument(1, "<DIRECCION>")]
+    [Description("Dirección en la sintaxis del driver.")]
+    public string Address { get; set; } = "";
+
+    [CommandOption("--name <NOMBRE>")]
+    [Description("Nombre del tag. Por defecto, la dirección.")]
+    public string? Name { get; set; }
+
+    [CommandOption("-g|--group <GRUPO>")]
+    [Description("Grupo de escaneo. Se crea si no existe.")]
+    [DefaultValue("default")]
+    public string Group { get; set; } = "default";
+
+    [CommandOption("-i|--interval <MS>")]
+    [Description("Periodo del grupo si se crea nuevo.")]
+    [DefaultValue(1000)]
+    public int IntervalMs { get; set; } = 1000;
+
+    [CommandOption("--writable")]
+    [Description("Tag escribible (segunda llave).")]
+    public bool Writable { get; set; }
+
+    [CommandOption("--type <TIPO>")]
+    [Description("Tipo para interpretar las escrituras si el driver no lo deduce (Boolean, Int16, Float...).")]
+    public string? Type { get; set; }
+}
+
+/// <summary>plcmon agent tag add — añade (o sustituye) un tag en un grupo de escaneo del dispositivo.</summary>
+public sealed class AgentTagAddCommand : AsyncCommand<AgentTagAddSettings>
+{
+    public override Task<int> ExecuteAsync(CommandContext context, AgentTagAddSettings settings, CancellationToken cancellationToken) =>
+        AgentRuntime.RunAsync(settings, async client =>
+        {
+            var dataType = DataType.Unknown;
+            if (settings.Type is { Length: > 0 } type && !System.Enum.TryParse(type, ignoreCase: true, out dataType))
+            {
+                AgentRuntime.Console.MarkupLine($"[red]Error:[/] tipo desconocido '{Markup.Escape(type)}'. Valores: {string.Join(", ", System.Enum.GetNames<DataType>().Skip(1))}");
+                return 1;
+            }
+
+            var device = await client.GetDeviceConfigAsync(new DeviceRequest { Device = settings.Device }, cancellationToken: cancellationToken);
+            var name = string.IsNullOrWhiteSpace(settings.Name) ? settings.Address : settings.Name;
+            // Si ya había un tag con ese nombre se sustituye (puede cambiar de grupo).
+            foreach (var g in device.ScanGroups)
+            {
+                var existing = g.Tags.FirstOrDefault(t => (string.IsNullOrEmpty(t.Name) ? t.Address : t.Name) == name);
+                if (existing is not null)
+                    g.Tags.Remove(existing);
+            }
+            var group = device.ScanGroups.FirstOrDefault(g => string.Equals(g.Name, settings.Group, StringComparison.OrdinalIgnoreCase));
+            if (group is null)
+                device.ScanGroups.Add(group = new ScanGroupConfig { Name = settings.Group, IntervalMs = settings.IntervalMs });
+            group.Tags.Add(new TagConfig
+            {
+                Name = settings.Name ?? string.Empty,
+                Address = settings.Address,
+                Writable = settings.Writable,
+                DataType = dataType,
+            });
+
+            await client.PutDeviceAsync(new PutDeviceRequest { Device = device, Persist = !settings.NoPersist }, cancellationToken: cancellationToken);
+            AgentRuntime.Console.MarkupLine($"[green]Tag guardado[/] {Markup.Escape(device.Name)}/{Markup.Escape(name)} en el grupo {Markup.Escape(group.Name)} ({group.IntervalMs} ms)");
+            return 0;
+        });
+}
+
+public sealed class AgentTagRemoveSettings : AgentPersistSettings
+{
+    [CommandArgument(0, "<DISPOSITIVO>")]
+    public string Device { get; set; } = "";
+
+    [CommandArgument(1, "<TAG>")]
+    [Description("Nombre del tag.")]
+    public string Tag { get; set; } = "";
+}
+
+/// <summary>plcmon agent tag remove — quita un tag del dispositivo (los grupos que se quedan vacíos se eliminan).</summary>
+public sealed class AgentTagRemoveCommand : AsyncCommand<AgentTagRemoveSettings>
+{
+    public override Task<int> ExecuteAsync(CommandContext context, AgentTagRemoveSettings settings, CancellationToken cancellationToken) =>
+        AgentRuntime.RunAsync(settings, async client =>
+        {
+            var device = await client.GetDeviceConfigAsync(new DeviceRequest { Device = settings.Device }, cancellationToken: cancellationToken);
+            var removed = 0;
+            foreach (var g in device.ScanGroups.ToArray())
+            {
+                foreach (var t in g.Tags.Where(t => (string.IsNullOrEmpty(t.Name) ? t.Address : t.Name) == settings.Tag).ToArray())
+                {
+                    g.Tags.Remove(t);
+                    removed++;
+                }
+                if (g.Tags.Count == 0)
+                    device.ScanGroups.Remove(g);
+            }
+            if (removed == 0)
+            {
+                AgentRuntime.Console.MarkupLine($"[red]Error:[/] el tag '{Markup.Escape(settings.Tag)}' no existe en '{Markup.Escape(device.Name)}'.");
+                return 1;
+            }
+            await client.PutDeviceAsync(new PutDeviceRequest { Device = device, Persist = !settings.NoPersist }, cancellationToken: cancellationToken);
+            AgentRuntime.Console.MarkupLine($"[green]Tag eliminado[/] {Markup.Escape(device.Name)}/{Markup.Escape(settings.Tag)}");
+            return 0;
+        });
+}

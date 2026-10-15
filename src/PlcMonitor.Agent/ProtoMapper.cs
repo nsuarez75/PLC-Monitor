@@ -1,7 +1,9 @@
+using System.Text.Json;
 using Google.Protobuf;
 using Google.Protobuf.WellKnownTypes;
 using PlcMonitor.Core;
 using PlcMonitor.Engine;
+using PlcMonitor.Engine.Configuration;
 using Abs = PlcMonitor.Abstractions;
 using Api = PlcMonitor.Agent.Contracts;
 
@@ -73,6 +75,91 @@ internal static class ProtoMapper
         Quality = ToProto(result.Quality),
         Error = result.ErrorDetail ?? "",
     };
+
+    public static Abs.TagDataType FromProto(Api.DataType type) => System.Enum.Parse<Abs.TagDataType>(type.ToString());
+
+    public static Api.BrowseReply ToProto(Abs.BrowseResult result)
+    {
+        var reply = new Api.BrowseReply { TotalMatches = result.TotalMatches, TotalSymbols = result.TotalSymbols };
+        reply.Items.AddRange(result.Items.Select(i => new Api.BrowseItem
+        {
+            Address = i.Address,
+            DataType = ToProto(i.DataType),
+            NativeType = i.NativeType ?? "",
+        }));
+        return reply;
+    }
+
+    public static Api.DeviceConfig ToProto(DeviceConfiguration device)
+    {
+        var pb = new Api.DeviceConfig
+        {
+            Name = device.Name,
+            Driver = device.Driver,
+            Enabled = device.Enabled,
+            WritesEnabled = device.WritesEnabled,
+            SettingsJson = device.Settings.ValueKind == JsonValueKind.Undefined ? "{}" : JsonSerializer.Serialize(device.Settings),
+            Reconnect = new Api.ReconnectConfig
+            {
+                InitialDelayMs = device.Reconnect.InitialDelayMs,
+                MaxDelayMs = device.Reconnect.MaxDelayMs,
+                Multiplier = device.Reconnect.Multiplier,
+            },
+        };
+        foreach (var group in device.ScanGroups)
+        {
+            var g = new Api.ScanGroupConfig { Name = group.Name, IntervalMs = group.IntervalMs };
+            g.Tags.AddRange(group.Tags.Select(t => new Api.TagConfig
+            {
+                Name = t.Name ?? "",
+                Address = t.Address,
+                Writable = t.Writable,
+                DataType = t.DataType is { } type ? ToProto(type) : Api.DataType.Unknown,
+            }));
+            pb.ScanGroups.Add(g);
+        }
+        return pb;
+    }
+
+    /// <summary>Convierte la configuración recibida. Lanza <see cref="ArgumentException"/> si los ajustes no son JSON válido.</summary>
+    public static DeviceConfiguration FromProto(Api.DeviceConfig pb)
+    {
+        JsonElement settings;
+        try
+        {
+            using var doc = JsonDocument.Parse(string.IsNullOrWhiteSpace(pb.SettingsJson) ? "{}" : pb.SettingsJson);
+            settings = doc.RootElement.Clone();
+        }
+        catch (JsonException ex)
+        {
+            throw new ArgumentException($"Los ajustes de '{pb.Name}' no son JSON válido: {ex.Message}", nameof(pb), ex);
+        }
+
+        var device = new DeviceConfiguration
+        {
+            Name = pb.Name.Trim(),
+            Driver = pb.Driver.Trim(),
+            Enabled = pb.Enabled,
+            WritesEnabled = pb.WritesEnabled,
+            Settings = settings,
+            Reconnect = pb.Reconnect is null
+                ? new ReconnectSettings()
+                : new ReconnectSettings { InitialDelayMs = pb.Reconnect.InitialDelayMs, MaxDelayMs = pb.Reconnect.MaxDelayMs, Multiplier = pb.Reconnect.Multiplier },
+        };
+        foreach (var g in pb.ScanGroups)
+        {
+            var group = new ScanGroupConfiguration { Name = g.Name.Trim(), IntervalMs = g.IntervalMs };
+            group.Tags.AddRange(g.Tags.Select(t => new TagConfiguration
+            {
+                Name = string.IsNullOrWhiteSpace(t.Name) ? null : t.Name.Trim(),
+                Address = t.Address.Trim(),
+                Writable = t.Writable,
+                DataType = t.DataType == Api.DataType.Unknown ? null : FromProto(t.DataType),
+            }));
+            device.ScanGroups.Add(group);
+        }
+        return device;
+    }
 
     private static void SetTyped(Api.TagValue pb, object? value)
     {

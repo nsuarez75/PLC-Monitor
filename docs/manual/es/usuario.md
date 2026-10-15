@@ -111,12 +111,23 @@ La URL se indica con `-a, --agent` o con la variable `PLCMON_AGENT`; por defecto
 | `plcmon agent read DISPOSITIVO DIRECCION...` | Lee direcciones cualesquiera a través del agente (no hace falta que estén configuradas) |
 | `plcmon agent write DISPOSITIVO TAG VALOR [-y] [--user U]` | Escribe un tag configurado. Pide confirmación; el agente aplica la doble llave y lo anota en su log de auditoría con el usuario |
 | `plcmon agent enable/disable DISPOSITIVO [--persist]` | Activa o desactiva un dispositivo en caliente. Con `--persist` se guarda en `agent.json` |
+| `plcmon agent browse DISPOSITIVO [FILTRO] [-n N] [--refresh]` | Explora las variables de un dispositivo conectado a través del agente |
+| `plcmon agent config [DISPOSITIVO]` | Configuración en árbol: dispositivos, ajustes, grupos y tags |
+| `plcmon agent device add NOMBRE -d DRIVER -s JSON [--disabled] [--writes]` | Da de alta un dispositivo o cambia sus ajustes (conserva sus tags) |
+| `plcmon agent device remove DISPOSITIVO [-y]` | Da de baja un dispositivo y sus tags (pide confirmación) |
+| `plcmon agent tag add DISPOSITIVO DIRECCION [--name N] [-g GRUPO] [-i MS] [--writable] [--type T]` | Añade un tag (o lo sustituye si ya existe ese nombre). El grupo se crea si no existe, con el periodo `-i` |
+| `plcmon agent tag remove DISPOSITIVO TAG` | Quita un tag; los grupos vacíos se eliminan |
 | `plcmon agent watch [DISPOSITIVO...]` | Foto inicial y después los cambios de valores y de estado en directo (Ctrl+C para salir). Si el agente corta la suscripción por lentitud, se vuelve a suscribir sola |
+
+Los cambios de configuración (`device`, `tag`) se guardan en el `agent.json` del agente salvo con `--no-persist`.
 
 ```
 plcmon agent devices
 plcmon agent watch prensa1 -a http://192.168.0.5:5310
 plcmon agent write prensa1 marcha true
+plcmon agent device add prensa1 -d s7-symbolic -s '{"host":"192.168.0.10","security":"auto"}' --writes
+plcmon agent browse prensa1 Motor
+plcmon agent tag add prensa1 "MiDB".Velocidad --name velocidad -g rapido -i 250
 ```
 
 ## 4. Sintaxis de direcciones

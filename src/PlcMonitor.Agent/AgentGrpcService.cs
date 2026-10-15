@@ -2,6 +2,7 @@ using System.Reflection;
 using System.Runtime.InteropServices;
 using Google.Protobuf.WellKnownTypes;
 using Grpc.Core;
+using PlcMonitor.Abstractions;
 using PlcMonitor.Core;
 using PlcMonitor.Engine;
 using Api = PlcMonitor.Agent.Contracts;
@@ -23,7 +24,14 @@ public sealed class AgentGrpcService(EngineHost host, DriverRegistry registry, I
             Started = Timestamp.FromDateTimeOffset(host.Started),
             ConfigPath = host.ConfigPath,
         };
-        info.Drivers.AddRange(registry.Factories.Select(f => new Api.Driver { Id = f.TypeId, Name = f.DisplayName }));
+        info.Drivers.AddRange(registry.Factories.Select(f => new Api.Driver
+        {
+            Id = f.TypeId,
+            Name = f.DisplayName,
+            DefaultSettingsJson = f.DefaultSettings().GetRawText(),
+            CanBrowse = f.Capabilities.HasFlag(DriverCapabilities.Browse),
+            CanWrite = f.Capabilities.HasFlag(DriverCapabilities.Write),
+        }));
         return Task.FromResult(info);
     }
 
@@ -105,6 +113,15 @@ public sealed class AgentGrpcService(EngineHost host, DriverRegistry registry, I
                     case DeviceStatusChanged status when Wanted(status.Status.Device):
                         await responseStream.WriteAsync(new Api.SubscribeEvent { DeviceStatus = ToProto(status.Status) }, context.CancellationToken);
                         break;
+                    case DeviceConfigured configured when Wanted(configured.Status.Device):
+                        var pb = new Api.DeviceConfigured { Device = ProtoMapper.ToProto(configured.Status, configured.Tags.Count) };
+                        pb.Tags.AddRange(configured.Tags.Select(ProtoMapper.ToProto));
+                        await responseStream.WriteAsync(new Api.SubscribeEvent { DeviceConfigured = pb }, context.CancellationToken);
+                        break;
+                    case DeviceRemoved removed when Wanted(removed.Device):
+                        await responseStream.WriteAsync(
+                            new Api.SubscribeEvent { DeviceRemoved = new Api.DeviceRemoved { Device = removed.Device } }, context.CancellationToken);
+                        break;
                 }
             }
         }
@@ -119,6 +136,51 @@ public sealed class AgentGrpcService(EngineHost host, DriverRegistry registry, I
         }
     }
 
+    public override async Task<Api.BrowseReply> Browse(Api.BrowseRequest request, ServerCallContext context)
+    {
+        var query = new BrowseQuery(
+            string.IsNullOrWhiteSpace(request.Filter) ? null : request.Filter,
+            request.MaxResults > 0 ? request.MaxResults : 100,
+            request.Refresh);
+        var result = await Guard(() => Engine.BrowseAsync(request.Device, query, context.CancellationToken));
+        return ProtoMapper.ToProto(result);
+    }
+
+    public override Task<Api.Configuration> GetConfiguration(Empty request, ServerCallContext context)
+    {
+        var pb = new Api.Configuration();
+        pb.Devices.AddRange(Engine.SnapshotConfiguration().Devices.Select(ProtoMapper.ToProto));
+        return Task.FromResult(pb);
+    }
+
+    public override Task<Api.DeviceConfig> GetDeviceConfig(Api.DeviceRequest request, ServerCallContext context) =>
+        Task.FromResult(ProtoMapper.ToProto(Guard(() => Engine.GetDeviceConfiguration(request.Device))));
+
+    public override async Task<Api.Device> PutDevice(Api.PutDeviceRequest request, ServerCallContext context)
+    {
+        if (request.Device is null)
+            throw new RpcException(new Status(StatusCode.InvalidArgument, "Falta el dispositivo."));
+        var device = Guard(() => ProtoMapper.FromProto(request.Device));
+        var status = await Guard(() => Engine.PutDeviceAsync(device, string.IsNullOrWhiteSpace(request.OriginalName) ? null : request.OriginalName));
+        if (request.Persist)
+            await host.SaveConfigurationAsync(context.CancellationToken);
+        logger.LogInformation("Configuración de {Device} cambiada desde {Peer}", status.Device, context.Peer);
+        return ToProto(status);
+    }
+
+    public override async Task<Empty> DeleteDevice(Api.DeleteDeviceRequest request, ServerCallContext context)
+    {
+        await Guard(async () =>
+        {
+            await Engine.DeleteDeviceAsync(request.Device);
+            return true;
+        });
+        if (request.Persist)
+            await host.SaveConfigurationAsync(context.CancellationToken);
+        logger.LogInformation("Dispositivo {Device} dado de baja desde {Peer}", request.Device, context.Peer);
+        return new Empty();
+    }
+
     private Api.Device ToProto(DeviceStatus status) => ProtoMapper.ToProto(status, Engine.GetTags(status.Device).Count);
 
     /// <summary>Traduce las excepciones del motor a códigos gRPC.</summary>
@@ -128,9 +190,9 @@ public sealed class AgentGrpcService(EngineHost host, DriverRegistry registry, I
         {
             return action();
         }
-        catch (KeyNotFoundException ex)
+        catch (Exception ex) when (Translate(ex) is { } rpc)
         {
-            throw new RpcException(new Status(StatusCode.NotFound, ex.Message));
+            throw rpc;
         }
     }
 
@@ -140,9 +202,19 @@ public sealed class AgentGrpcService(EngineHost host, DriverRegistry registry, I
         {
             return await action();
         }
-        catch (KeyNotFoundException ex)
+        catch (Exception ex) when (Translate(ex) is { } rpc)
         {
-            throw new RpcException(new Status(StatusCode.NotFound, ex.Message));
+            throw rpc;
         }
     }
+
+    private static RpcException? Translate(Exception ex) => ex switch
+    {
+        KeyNotFoundException => new RpcException(new Status(StatusCode.NotFound, ex.Message)),
+        EngineConfigurationException config => new RpcException(new Status(StatusCode.InvalidArgument,
+            config.Errors.Count > 0 ? string.Join(Environment.NewLine, config.Errors) : config.Message)),
+        ArgumentException => new RpcException(new Status(StatusCode.InvalidArgument, ex.Message)),
+        InvalidOperationException or NotSupportedException => new RpcException(new Status(StatusCode.FailedPrecondition, ex.Message)),
+        _ => null,
+    };
 }
