@@ -15,7 +15,7 @@ namespace PlcMonitor.Cli.Tests;
 public sealed class AgentCommandsTests : IDisposable
 {
     private readonly TestConsole _console = new();
-    private readonly Func<string, GrpcChannel> _originalFactory = AgentRuntime.ChannelFactory;
+    private readonly Func<PlcMonitor.Agent.Contracts.Client.AgentEndpoint, GrpcChannel> _originalFactory = AgentRuntime.ChannelFactory;
     private readonly Spectre.Console.IAnsiConsole _originalConsole = AgentRuntime.Console;
 
     public AgentCommandsTests()
@@ -262,11 +262,30 @@ public sealed class AgentCommandsTests : IDisposable
     [Fact]
     public async Task Unreachable_agent_gives_a_readable_error()
     {
-        AgentRuntime.ChannelFactory = url => GrpcChannel.ForAddress(url);
+        AgentRuntime.ChannelFactory = e => GrpcChannel.ForAddress(e.Url);
 
         (await RunAsync("agent", "devices", "-a", "http://127.0.0.1:1")).ShouldBe(1);
 
         Output.ShouldContain("No se puede conectar con el agente en http://127.0.0.1:1");
+    }
+
+    [Fact]
+    public async Task Token_option_is_sent_to_a_protected_agent()
+    {
+        var token = PlcMonitor.Agent.Contracts.Client.AgentSecurity.NewToken();
+        await using var agent = new AgentFactory();
+        agent.Settings["Agent:Security:TokenSha256"] = PlcMonitor.Agent.Contracts.Client.AgentSecurity.HashToken(token);
+        AgentRuntime.ChannelFactory = e => GrpcChannel.ForAddress(agent.Server.BaseAddress, new GrpcChannelOptions
+        {
+            HttpHandler = agent.Server.CreateHandler(),
+            Credentials = e.Token is null ? null : Grpc.Core.ChannelCredentials.Create(Grpc.Core.ChannelCredentials.Insecure,
+                Grpc.Core.CallCredentials.FromInterceptor((_, m) => { m.Add("authorization", $"Bearer {e.Token}"); return Task.CompletedTask; })),
+            UnsafeUseInsecureChannelCallCredentials = true,
+        });
+
+        (await RunAsync("agent", "info")).ShouldBe(1);
+        Output.ShouldContain("rechaza el token");
+        (await RunAsync("agent", "info", "--token", token)).ShouldBe(0);
     }
 
     [Fact]
@@ -277,6 +296,8 @@ public sealed class AgentCommandsTests : IDisposable
         new AgentSettings { Agent = "http://pc:1" }.ResolveAgentUrl(_ => "http://10.0.0.5:5310").ShouldBe("http://pc:1");
         new AgentSettings { Agent = "ftp://pc" }.Validate().Successful.ShouldBeFalse();
         new AgentSettings { Agent = "http://pc:5310" }.Validate().Successful.ShouldBeTrue();
+        var endpoint = new AgentSettings { Token = "t" }.ResolveEndpoint(v => v == AgentSettings.CertEnvironmentVariable ? "AB:CD" : null);
+        (endpoint.Token, endpoint.CertificateThumbprint).ShouldBe(("t", "AB:CD"));
     }
 
     public void Dispose()

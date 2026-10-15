@@ -5,6 +5,7 @@ using Google.Protobuf.WellKnownTypes;
 using Grpc.Core;
 using PlcMonitor.Agent.Contracts;
 using PlcMonitor.App.Services;
+using PlcMonitor.Agent.Contracts.Client;
 
 namespace PlcMonitor.App.ViewModels;
 
