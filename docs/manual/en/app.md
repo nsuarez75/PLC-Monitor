@@ -1,6 +1,6 @@
 # PLC-Monitor — Desktop application
 
-> Version 1.0.0 · Last updated: 2026-10-15 · [Castellano](../es/app.md)
+> Version 1.1.0 · Last updated: 2026-10-15 · [Castellano](../es/app.md)
 
 `plcmon-app` is the desktop application (Windows and Linux). **It does not talk to the PLCs**: it connects to an
 [agent](agent.md) (local or remote) and works through it. Closing the app does not stop data collection.
