@@ -16,6 +16,10 @@
 ### Añadido / Added
 - **`plcmon agent ...`**: la CLI como cliente gRPC del agente, local o remoto (`-a URL` o `PLCMON_AGENT`): `info`, `devices`, `tags`, `read`, `write` (con confirmación y usuario para la auditoría), `enable`/`disable` (`--persist`) y `watch` en directo con resuscripción automática. / *The CLI as a gRPC client of the agent.*
 - Proyecto de tests `PlcMonitor.Cli.Tests` (órdenes contra el agente en memoria).
+- **Agentes remotos (fase 6 adelantada)**: la app gestiona una lista de agentes (perfiles con URL, token y huella; token protegido con DPAPI en Windows o fichero 0600 en Linux) y los **instala, actualiza, consulta, muestra su log y desinstala por SSH** en equipos Linux (systemd, sudo) y Windows (OpenSSH, servicio). Proyecto `PlcMonitor.Deploy` (SSH.NET). / *Remote agents managed and installed from the app over SSH.*
+- **Seguridad del agente**: token de acceso (`Agent:Security:TokenSha256`) y TLS con certificado propio fijado por huella; `agent.settings.json` junto al ejecutable. CLI `--token` / `--cert`. / *Agent token and TLS with certificate pinning.*
+- La release incluye `agents/plcmon-agent-<versión>-<rid>` (paquete del agente que sube la app).
+- **Rediseño de la app**: tema claro/oscuro, tarjetas, pastillas de estado e iconos de línea.
 - **Aplicación de escritorio `plcmon-app` (fase 3)**, Avalonia 12, Windows y Linux: conexión a un agente local o remoto (recuerda las URL), dispositivos con estado en color y activar/desactivar, tags en vivo por suscripción (con resuscripción automática), escritura con confirmación, explorador de símbolos con alta de tags, editor de dispositivos (ajustes JSON con valores por defecto del driver, llaves de escritura, reconexión) y bajas. Incluida en el paquete de la release (`app/`). Manual ES/EN. / *Desktop application.*
 - **API del agente para la app (fase 3)**: `Browse`, `GetConfiguration`, `GetDeviceConfig`, `PutDevice` (alta, edición y renombrado validados) y `DeleteDevice`, con `persist` en `agent.json`; eventos `device_configured` y `device_removed`; drivers con ajustes por defecto y capacidades. En la CLI: `plcmon agent browse`, `config`, `device add/remove`, `tag add/remove`. / *Live configuration and browse API.*
 - **Motor** `PlcMonitor.Engine`: varios dispositivos a la vez, cada uno con su supervisor; reconexión con espera exponencial; grupos de escaneo; caché del último valor; activar/desactivar en caliente; lectura bajo demanda; escritura con doble llave (`writesEnabled` + `writable`) y log de auditoría; suscripciones con foto inicial y eventos sin huecos. Configuración en `agent.json` validada al arrancar.
@@ -25,6 +29,7 @@
 - El paquete de la release incluye el agente en `agent/`.
 
 ### Corregido / Fixed
+- App: pulsar Intro en el buscador de símbolos cerraba la aplicación.
 - `s7-symbolic`: un valor que la librería rechaza al asignarlo (p. ej. STRING más largo que su longitud) daba «Exception has been thrown by the target of an invocation»; ahora `BadTypeMismatch` con el motivo.
 - `s7-absolute`: el error S7 0x8104 (PUT/GET deshabilitado) se daba como `BadAddressInvalid` con los bytes de la respuesta; ahora es `BadAccessDenied` con la indicación de habilitar PUT/GET.
 - Paquetes Linux (`publish-release.sh`): los directorios se empaquetaban sin permiso de ejecución (`drw-r--r--`) y un usuario normal no podía entrar en ellos tras descomprimir. Afecta a los `.tar.gz` de la v1.0.0.

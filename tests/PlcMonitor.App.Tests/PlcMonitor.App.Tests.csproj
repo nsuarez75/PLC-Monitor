@@ -16,5 +16,6 @@
   <ItemGroup>
     <Compile Include="..\PlcMonitor.Engine.Tests\FakeDriver.cs" Link="FakeDriver.cs" />
     <Compile Include="..\PlcMonitor.Agent.Tests\AgentFactory.cs" Link="AgentFactory.cs" />
+    <Compile Include="..\PlcMonitor.Deploy.Tests\FakeSsh.cs" Link="FakeSsh.cs" />
   </ItemGroup>
 </Project>

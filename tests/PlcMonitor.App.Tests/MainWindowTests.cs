@@ -14,7 +14,7 @@ public class MainWindowTests
 {
     private static MainViewModel ViewModelWithData()
     {
-        var vm = new MainViewModel(new GrpcAgentConnector(), new ImmediateDispatcher(), new FakeDialogs(), new AppSettings(), Path.GetTempFileName());
+        var vm = new MainViewModel(new GrpcAgentConnector(), new ImmediateDispatcher(), new FakeDialogs(), new AppSettings(), Path.GetTempFileName(), Path.Combine(Path.GetTempPath(), $"plcmon-agents-{Guid.NewGuid():N}.json"));
         var now = Timestamp.FromDateTime(DateTime.UtcNow);
         var snapshot = new Snapshot();
         snapshot.Devices.Add(new Device { Name = "casa1200", Driver = "s7-symbolic", Enabled = true, WritesEnabled = true, State = ConnectionState.Connected, Since = now, TagCount = 3 });
@@ -95,6 +95,36 @@ public class MainWindowTests
         vm.Browse.SearchCommand.CanExecute(null).ShouldBeTrue();
     });
 
+    [Fact]
+    public Task Agents_panel_shows_profiles_and_activity() => HeadlessApp.RunAsync(() =>
+    {
+        Avalonia.Application.Current!.RequestedThemeVariant = Avalonia.Styling.ThemeVariant.Light;
+        var vm = ViewModelWithData();
+        var window = new MainWindow { DataContext = vm };
+        window.Show();
+        vm.OpenAgentsCommand.Execute(null);
+        var agents = vm.Agents!;
+        agents.NewCommand.Execute(null);
+        agents.Name = "Línea 3";
+        agents.Url = "https://192.168.0.20:5311";
+        agents.Thumbprint = "9F2C4A7E1B3D5F60718293A4B5C6D7E8F90A1B2C3D4E5F60718293A4B5C6D7E8";
+        agents.Token = "token-de-ejemplo";
+        agents.SshHost = "192.168.0.20";
+        agents.SshUser = "tecnico";
+        agents.Log.Add("Instalando: conectando por SSH con tecnico@192.168.0.20:22…");
+        agents.Log.Add("Equipo: Linux x86_64 (paquete linux-x64)");
+        agents.Log.Add("Subiendo plcmon-agent-1.0.0-linux-x64.tar.gz (49 MB)…");
+        agents.Log.Add("Agente en marcha: https://192.168.0.20:5311");
+        agents.Log.Add("✔ Hecho");
+        window.UpdateLayout();
+
+        window.GetVisualDescendants().OfType<TextBlock>().Select(t => t.Text).ShouldContain("EQUIPO (SSH)");
+        Capture(window, "agents.png");
+        Avalonia.Application.Current.RequestedThemeVariant = Avalonia.Styling.ThemeVariant.Dark;
+        Capture(window, "agents-dark.png");
+        Avalonia.Application.Current.RequestedThemeVariant = Avalonia.Styling.ThemeVariant.Light;
+    });
+
     /// <summary>
     /// Integración: la ventana real conectada a un agente real (PLCMON_IT_AGENT_URL). Se omite si no está definida.
     /// Con PLCMON_UI_CAPTURE_DIR guarda la captura.
@@ -107,7 +137,7 @@ public class MainWindowTests
         await HeadlessApp.RunAsync(async () =>
         {
             var vm = new MainViewModel(new GrpcAgentConnector(), new AvaloniaDispatcher(), new FakeDialogs(),
-                new AppSettings { AgentUrl = url! }, Path.GetTempFileName());
+                new AppSettings { AgentUrl = url! }, Path.GetTempFileName(), Path.Combine(Path.GetTempPath(), $"plcmon-agents-{Guid.NewGuid():N}.json"));
             var window = new MainWindow { DataContext = vm };
             window.Show();
 

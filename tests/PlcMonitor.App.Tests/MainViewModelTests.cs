@@ -11,6 +11,7 @@ namespace PlcMonitor.App.Tests;
 public sealed class MainViewModelTests : IDisposable
 {
     private readonly string _settingsPath = Path.Combine(Path.GetTempPath(), $"plcmon-app-{Guid.NewGuid():N}.json");
+    private readonly string _profilesPath = Path.Combine(Path.GetTempPath(), $"plcmon-agents-{Guid.NewGuid():N}.json");
     private readonly LockingDispatcher _ui = new();
     private readonly FakeDialogs _dialogs = new();
 
@@ -22,7 +23,7 @@ public sealed class MainViewModelTests : IDisposable
     private static Tag T(string address, string? name = null, bool writable = false) => new() { Address = address, Name = name, Writable = writable };
 
     private MainViewModel Create(AgentFactory agent, AppSettings? settings = null) =>
-        new(new InMemoryConnector(agent), _ui, _dialogs, settings ?? new AppSettings(), _settingsPath);
+        new(new InMemoryConnector(agent), _ui, _dialogs, settings ?? new AppSettings(), _settingsPath, _profilesPath);
 
     private async Task<MainViewModel> ConnectAsync(AgentFactory agent)
     {
@@ -70,13 +71,14 @@ public sealed class MainViewModelTests : IDisposable
 
         AppSettings.Load(_settingsPath).AgentUrl.ShouldBe("http://pc-linea:5310");
         vm.RecentAgents.ShouldContain("http://pc-linea:5310");
+        AgentProfileStore.Load(_profilesPath).Select(p => p.Url).ShouldContain("http://pc-linea:5310");
     }
 
     [Fact]
     public async Task Unreachable_agent_reports_an_error()
     {
         var settings = new AppSettings { AgentUrl = "http://127.0.0.1:1" };
-        await using var vm = new MainViewModel(new GrpcAgentConnector(), _ui, _dialogs, settings, _settingsPath);
+        await using var vm = new MainViewModel(new GrpcAgentConnector(), _ui, _dialogs, settings, _settingsPath, _profilesPath);
 
         await vm.ConnectCommand.ExecuteAsync(null);
 
@@ -245,5 +247,9 @@ public sealed class MainViewModelTests : IDisposable
     private static Task<Engine.Configuration.AgentConfiguration> ConfigurationFileLoad(AgentFactory agent) =>
         Engine.Configuration.ConfigurationFile.LoadAsync(agent.ConfigPath);
 
-    public void Dispose() => File.Delete(_settingsPath);
+    public void Dispose()
+    {
+        File.Delete(_settingsPath);
+        File.Delete(_profilesPath);
+    }
 }

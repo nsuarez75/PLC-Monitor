@@ -15,9 +15,11 @@
     <PackageReference Include="Avalonia.Fonts.Inter" />
     <PackageReference Include="CommunityToolkit.Mvvm" />
     <PackageReference Include="Grpc.Net.Client" />
+    <PackageReference Include="System.Security.Cryptography.ProtectedData" />
   </ItemGroup>
   <ItemGroup>
     <ProjectReference Include="..\PlcMonitor.Agent.Contracts\PlcMonitor.Agent.Contracts.csproj" />
+    <ProjectReference Include="..\PlcMonitor.Deploy\PlcMonitor.Deploy.csproj" />
   </ItemGroup>
   <ItemGroup>
     <InternalsVisibleTo Include="PlcMonitor.App.Tests" />

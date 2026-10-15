@@ -2,6 +2,8 @@
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
         xmlns:vm="using:PlcMonitor.App.ViewModels"
         xmlns:c="using:PlcMonitor.App.Controls"
+        xmlns:svc="using:PlcMonitor.App.Services"
+        xmlns:v="using:PlcMonitor.App.Views"
         x:Class="PlcMonitor.App.Views.MainWindow"
         x:DataType="vm:MainViewModel"
         Title="PLC-Monitor" Width="1320" Height="820" MinWidth="980" MinHeight="600">
@@ -22,8 +24,18 @@
         </StackPanel>
 
         <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="8" HorizontalAlignment="Center" VerticalAlignment="Center">
-          <AutoCompleteBox Text="{Binding AgentUrl}" ItemsSource="{Binding RecentAgents}" Width="320"
-                           IsEnabled="{Binding !IsConnected}" PlaceholderText="http://127.0.0.1:5310" MinimumPrefixLength="0" />
+          <ComboBox ItemsSource="{Binding Profiles}" SelectedItem="{Binding SelectedProfile}" Width="320"
+                    IsEnabled="{Binding !IsConnected}" PlaceholderText="Elige un agente">
+            <ComboBox.ItemTemplate>
+              <DataTemplate x:DataType="svc:AgentProfile">
+                <StackPanel Orientation="Horizontal" Spacing="8">
+                  <c:Icon Kind="server" Width="14" Height="14" Foreground="{DynamicResource App.TextMuted}" />
+                  <TextBlock Text="{Binding Name}" FontWeight="SemiBold" />
+                  <TextBlock Text="{Binding Url}" Classes="muted" FontSize="12" />
+                </StackPanel>
+              </DataTemplate>
+            </ComboBox.ItemTemplate>
+          </ComboBox>
           <Button Classes="accent" Command="{Binding ConnectCommand}" IsVisible="{Binding !IsConnected}">
             <StackPanel Orientation="Horizontal" Spacing="6">
               <c:Icon Kind="link" />
@@ -46,9 +58,17 @@
           </StackPanel>
         </Border>
 
-        <Button Grid.Column="3" Classes="ghost" Command="{Binding ToggleThemeCommand}" ToolTip.Tip="{Binding ThemeText, StringFormat='Tema: {0}'}">
+        <StackPanel Grid.Column="3" Orientation="Horizontal" Spacing="2">
+        <Button Classes="ghost" Command="{Binding OpenAgentsCommand}" ToolTip.Tip="Gestionar agentes (instalar en equipos por SSH)">
+          <StackPanel Orientation="Horizontal" Spacing="6">
+            <c:Icon Kind="server" Width="16" Height="16" />
+            <TextBlock Text="Agentes" />
+          </StackPanel>
+        </Button>
+        <Button Classes="ghost" Command="{Binding ToggleThemeCommand}" ToolTip.Tip="{Binding ThemeText, StringFormat='Tema: {0}'}">
           <c:Icon Kind="{Binding ThemeIcon}" Width="18" Height="18" />
         </Button>
+        </StackPanel>
       </Grid>
     </Border>
 
@@ -291,6 +311,9 @@
             </TabItem>
           </TabControl>
         </DockPanel>
+
+        <!-- Gestión de agentes (por encima del contenido) -->
+        <v:AgentsView DataContext="{Binding Agents}" IsVisible="{Binding $parent[Window].((vm:MainViewModel)DataContext).Agents, Converter={x:Static ObjectConverters.IsNotNull}}" />
 
         <!-- Editor de dispositivo (por encima del contenido) -->
         <Border Background="{DynamicResource App.Background}" IsVisible="{Binding Editor, Converter={x:Static ObjectConverters.IsNotNull}}">

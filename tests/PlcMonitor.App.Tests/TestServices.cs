@@ -40,7 +40,7 @@ internal sealed class FakeDialogs : IDialogs
 /// <summary>Conecta con el agente en memoria sea cual sea la URL.</summary>
 internal sealed class InMemoryConnector(AgentFactory agent) : IAgentConnector
 {
-    public (AgentService.AgentServiceClient Client, IDisposable Channel) Connect(string url)
+    public (AgentService.AgentServiceClient Client, IDisposable Channel) Connect(PlcMonitor.Agent.Contracts.Client.AgentEndpoint endpoint)
     {
         var channel = GrpcChannel.ForAddress(agent.Server.BaseAddress, new GrpcChannelOptions { HttpHandler = agent.Server.CreateHandler() });
         return (new AgentService.AgentServiceClient(channel), channel);

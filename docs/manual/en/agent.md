@@ -94,10 +94,49 @@ By default it listens **locally only**, on `http://127.0.0.1:5310` (HTTP/2 witho
 other machines change the URL in `appsettings.json` (`Kestrel:Endpoints:Grpc:Url`, e.g. `http://0.0.0.0:5310`) or start
 with `--Kestrel:Endpoints:Grpc:Url=http://0.0.0.0:5310`.
 
-> ⚠️ The API has **no authentication or encryption yet** (they come with remote agents, phase 6). If you expose it,
-> do so only on a trusted network and keep `writesEnabled: false` on PLCs that must not be written.
+### Security: token and TLS
 
-### Installing as a Linux service (systemd)
+To expose the agent on the network it must be protected. If present, the agent reads `agent.settings.json` next to the
+executable (updates never touch it):
+
+```json
+{
+  "Agent": { "Security": { "TokenSha256": "<hex SHA-256 of the token>" } },
+  "Kestrel": { "Endpoints": { "Grpc": {
+    "Url": "https://0.0.0.0:5311",
+    "Certificate": { "Path": "agent.pfx", "Password": "<PFX password>" } } } }
+}
+```
+
+- With `TokenSha256`, every call requires `authorization: Bearer <token>`; missing or wrong gives `UNAUTHENTICATED`.
+  The agent only stores the hash.
+- The certificate is self-signed. Clients do not trust an authority: they **pin its SHA-256 thumbprint**.
+- **The easiest way is to install from the app** (next section): it generates token and certificate, leaves them on the
+  machine and stores the URL, token and thumbprint in the app's agent profile. In the CLI: `--token` and `--cert` (or
+  `PLCMON_AGENT_TOKEN` and `PLCMON_AGENT_CERT`).
+
+Without `agent.settings.json` the agent only listens on `127.0.0.1:5310` without a token: local use.
+
+### Installing from the app (recommended)
+
+In the app, **Agentes** button → pick or create an agent → fill in the **SSH machine** (IP, port, user; key from `~/.ssh`
+or a password, which is not stored) → **Instalar / actualizar**. The app:
+
+1. Detects the system (Linux via `uname`, Windows via PowerShell) and the architecture (x64 / arm64).
+2. Uploads the `agents/plcmon-agent-<version>-<rid>` package (shipped with the release; another folder can be given).
+3. Installs the service:
+   - **Linux** (as root, with `sudo -n` or `sudo` and the password): `plcmon` user, `/opt/plc-monitor/agent`, hardened
+     `plcmon-agent` systemd unit, port opened in ufw/firewalld if active.
+   - **Windows** (OpenSSH Server enabled and an administrator user): `%ProgramFiles%\PLC-Monitor\agent`,
+     `PLCMonitorAgent` service with automatic restart and a firewall rule.
+4. The first time it generates token and certificate; an **update** keeps them (unless "Regenerar token y certificado").
+5. Pins the machine's SSH host key: if it changes, the app refuses to connect (possible spoofing or reinstalled machine).
+
+Also: **Estado** (status), **Ver log** (Linux: journald) and **Desinstalar** (keeping a copy of `agent.json` if ticked).
+
+To try it without another machine: a container with systemd and SSH (see the [technical manual](technical.md#testing-ssh-deployment)).
+
+### Installing as a Linux service by hand (systemd)
 
 ```bash
 sudo useradd --system --no-create-home plcmon
@@ -109,7 +148,7 @@ sudo systemctl daemon-reload && sudo systemctl enable --now plcmon-agent
 journalctl -u plcmon-agent -f
 ```
 
-### Installing as a Windows service
+### Installing as a Windows service by hand
 
 From an administrator console:
 
