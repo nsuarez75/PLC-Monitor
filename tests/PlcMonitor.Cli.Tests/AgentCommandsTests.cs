@@ -1,0 +1,228 @@
+using Grpc.Net.Client;
+using PlcMonitor.Agent.Contracts;
+using PlcMonitor.Agent.Tests;
+using Spectre.Console.Cli;
+using Spectre.Console.Testing;
+using static PlcMonitor.Agent.Tests.AgentFactory;
+using Tag = PlcMonitor.Engine.Configuration.TagConfiguration;
+
+namespace PlcMonitor.Cli.Tests;
+
+/// <summary>
+/// Órdenes <c>plcmon agent ...</c> contra el agente en memoria con driver simulado.
+/// Una sola clase: <see cref="AgentRuntime"/> es estático y los tests no deben ir en paralelo entre sí.
+/// </summary>
+public sealed class AgentCommandsTests : IDisposable
+{
+    private readonly TestConsole _console = new();
+    private readonly Func<string, GrpcChannel> _originalFactory = AgentRuntime.ChannelFactory;
+    private readonly Spectre.Console.IAnsiConsole _originalConsole = AgentRuntime.Console;
+
+    public AgentCommandsTests()
+    {
+        _console.Profile.Width = 250;
+        AgentRuntime.Console = _console;
+    }
+
+    private static CancellationToken Ct => TestContext.Current.CancellationToken;
+
+    private static Tag T(string address, string? name = null, bool writable = false) => new() { Address = address, Name = name, Writable = writable };
+
+    private string Output => _console.Output;
+
+    private static void UseAgent(AgentFactory agent) =>
+        AgentRuntime.ChannelFactory = _ => GrpcChannel.ForAddress(agent.Server.BaseAddress, new GrpcChannelOptions { HttpHandler = agent.Server.CreateHandler() });
+
+    private Task<int> RunAsync(params string[] args) => RunAsync(Ct, args);
+
+    private Task<int> RunAsync(CancellationToken cancellationToken, params string[] args)
+    {
+        var app = new CommandApp();
+        app.Configure(config =>
+        {
+            CliApp.Configure(config);
+            config.ConfigureConsole(_console);
+        });
+        return app.RunAsync(args, cancellationToken);
+    }
+
+    private static async Task WaitForGoodValuesAsync(AgentFactory agent)
+    {
+        var client = agent.CreateGrpcClient();
+        await EventuallyAsync(
+            async () => await client.ListTagsAsync(new ListTagsRequest()),
+            t => t.Tags.Count > 0 && t.Tags.All(x => x.Value.Quality == Quality.Good));
+    }
+
+    [Fact]
+    public async Task Info_shows_agent_and_drivers()
+    {
+        await using var agent = new AgentFactory();
+        UseAgent(agent);
+
+        (await RunAsync("agent", "info")).ShouldBe(0);
+
+        Output.ShouldContain(Environment.MachineName);
+        Output.ShouldContain("fake");
+        Output.ShouldContain(agent.ConfigPath);
+    }
+
+    [Fact]
+    public async Task Devices_show_state_and_tag_count()
+    {
+        await using var agent = new AgentFactory(Device("plc1", tags: [T("DB1.DBW0", "v")]), Device("plc2", enabled: false));
+        agent.Driver.Plc("plc1").Values["DB1.DBW0"] = 1;
+        UseAgent(agent);
+        await WaitForGoodValuesAsync(agent);
+
+        (await RunAsync("agent", "devices")).ShouldBe(0);
+
+        Output.ShouldContain("plc1");
+        Output.ShouldContain("Connected");
+        Output.ShouldContain("plc2");
+        Output.ShouldContain("Disconnected");
+    }
+
+    [Fact]
+    public async Task Tags_show_last_value_and_can_filter_by_device()
+    {
+        await using var agent = new AgentFactory(
+            Device("plc1", tags: [T("DB1.DBW0", "velocidad", writable: true)]),
+            Device("plc2", tags: [T("DB2.DBW0", "presion")]));
+        agent.Driver.Plc("plc1").Values["DB1.DBW0"] = 1500;
+        agent.Driver.Plc("plc2").Values["DB2.DBW0"] = 7;
+        UseAgent(agent);
+        await WaitForGoodValuesAsync(agent);
+
+        (await RunAsync("agent", "tags", "plc1")).ShouldBe(0);
+
+        Output.ShouldContain("velocidad");
+        Output.ShouldContain("1500");
+        Output.ShouldContain("✎");
+        Output.ShouldNotContain("presion");
+    }
+
+    [Fact]
+    public async Task Read_returns_values_and_fails_on_bad_quality()
+    {
+        await using var agent = new AgentFactory(Device("plc1"));
+        agent.Driver.Plc("plc1").Values["DB1.DBW4"] = 42;
+        UseAgent(agent);
+        await EventuallyAsync(
+            async () => (await agent.CreateGrpcClient().ListDevicesAsync(new())).Devices[0].State,
+            s => s == ConnectionState.Connected);
+
+        (await RunAsync("agent", "read", "plc1", "DB1.DBW4")).ShouldBe(0);
+        Output.ShouldContain("42");
+
+        (await RunAsync("agent", "read", "plc1", "DB1.DBW4", "DB9.DBW0")).ShouldBe(1);
+    }
+
+    [Fact]
+    public async Task Unknown_device_is_reported_as_error()
+    {
+        await using var agent = new AgentFactory();
+        UseAgent(agent);
+
+        (await RunAsync("agent", "read", "noexiste", "DB1.DBW0")).ShouldBe(1);
+
+        Output.ShouldContain("Error:");
+        Output.ShouldContain("noexiste");
+    }
+
+    [Fact]
+    public async Task Write_with_yes_goes_through_the_agent_double_key()
+    {
+        await using var agent = new AgentFactory(Device("plc1", writesEnabled: true, tags: [T("DB1.DBW0", "ro"), T("DB1.DBW2", "rw", writable: true)]));
+        agent.Driver.Plc("plc1").Values["DB1.DBW0"] = 0;
+        agent.Driver.Plc("plc1").Values["DB1.DBW2"] = 0;
+        UseAgent(agent);
+        await WaitForGoodValuesAsync(agent);
+
+        (await RunAsync("agent", "write", "plc1", "rw", "7", "-y", "--user", "tester")).ShouldBe(0);
+        Output.ShouldContain("Escrito");
+        agent.Driver.Plc("plc1").Writes.ShouldHaveSingleItem().Value.ShouldBe(7);
+
+        (await RunAsync("agent", "write", "plc1", "ro", "7", "-y")).ShouldBe(1);
+        Output.ShouldContain("BadWriteDisabled");
+    }
+
+    [Fact]
+    public async Task Write_asks_for_confirmation()
+    {
+        await using var agent = new AgentFactory(Device("plc1", writesEnabled: true, tags: [T("DB1.DBW2", "rw", writable: true)]));
+        agent.Driver.Plc("plc1").Values["DB1.DBW2"] = 0;
+        UseAgent(agent);
+        await WaitForGoodValuesAsync(agent);
+        _console.Interactive();
+        _console.Input.PushTextWithEnter("n");
+
+        (await RunAsync("agent", "write", "plc1", "rw", "7")).ShouldBe(2);
+
+        Output.ShouldContain("Cancelado");
+        agent.Driver.Plc("plc1").Writes.ShouldBeEmpty();
+    }
+
+    [Fact]
+    public async Task Enable_and_disable_change_the_device()
+    {
+        await using var agent = new AgentFactory(Device("plc1", enabled: false));
+        UseAgent(agent);
+        var client = agent.CreateGrpcClient();
+
+        (await RunAsync("agent", "enable", "plc1")).ShouldBe(0);
+        Output.ShouldContain("activado");
+        (await client.ListDevicesAsync(new())).Devices[0].Enabled.ShouldBeTrue();
+
+        (await RunAsync("agent", "disable", "plc1")).ShouldBe(0);
+        Output.ShouldContain("desactivado");
+        (await client.ListDevicesAsync(new())).Devices[0].Enabled.ShouldBeFalse();
+    }
+
+    [Fact]
+    public async Task Watch_prints_snapshot_and_live_changes_until_cancelled()
+    {
+        await using var agent = new AgentFactory(Device("plc1", tags: [T("DB1.DBW0", "contador")]));
+        var plc = agent.Driver.Plc("plc1");
+        plc.Values["DB1.DBW0"] = 1;
+        UseAgent(agent);
+        await WaitForGoodValuesAsync(agent);
+        using var cts = CancellationTokenSource.CreateLinkedTokenSource(Ct);
+
+        var run = RunAsync(cts.Token, "agent", "watch", "plc1");
+        await EventuallyAsync(() => Task.FromResult(Output), o => o.Contains("Cambios en directo", StringComparison.Ordinal));
+        plc.Values["DB1.DBW0"] = 99;
+        await EventuallyAsync(() => Task.FromResult(Output), o => o.Contains("plc1/contador = 99", StringComparison.Ordinal));
+        await cts.CancelAsync();
+
+        (await run).ShouldBe(0);
+        Output.ShouldContain("plc1/contador = 1");
+    }
+
+    [Fact]
+    public async Task Unreachable_agent_gives_a_readable_error()
+    {
+        AgentRuntime.ChannelFactory = url => GrpcChannel.ForAddress(url);
+
+        (await RunAsync("agent", "devices", "-a", "http://127.0.0.1:1")).ShouldBe(1);
+
+        Output.ShouldContain("No se puede conectar con el agente en http://127.0.0.1:1");
+    }
+
+    [Fact]
+    public void Agent_url_comes_from_option_environment_or_default()
+    {
+        new AgentSettings().ResolveAgentUrl(_ => null).ShouldBe("http://127.0.0.1:5310");
+        new AgentSettings().ResolveAgentUrl(_ => "http://10.0.0.5:5310").ShouldBe("http://10.0.0.5:5310");
+        new AgentSettings { Agent = "http://pc:1" }.ResolveAgentUrl(_ => "http://10.0.0.5:5310").ShouldBe("http://pc:1");
+        new AgentSettings { Agent = "ftp://pc" }.Validate().Successful.ShouldBeFalse();
+        new AgentSettings { Agent = "http://pc:5310" }.Validate().Successful.ShouldBeTrue();
+    }
+
+    public void Dispose()
+    {
+        AgentRuntime.ChannelFactory = _originalFactory;
+        AgentRuntime.Console = _originalConsole;
+        _console.Dispose();
+    }
+}

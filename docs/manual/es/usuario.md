@@ -99,6 +99,26 @@ plcmon write DB1.DBX0.3 true -d s7-absolute -H 192.168.0.10
   - Bytes en hexadecimal: `01 0A FF`.
 - ⚠️ **Se escribe en un PLC real.** Ten especial cuidado en CPUs de seguridad (F). Las variables de seguridad no se pueden escribir desde fuera.
 
+### `plcmon agent ...` — hablar con un agente
+Estas órdenes no conectan con el PLC: hablan con un agente `plcmon-agent` (ver el [manual del agente](agente.md)), local o remoto.
+La URL se indica con `-a, --agent` o con la variable `PLCMON_AGENT`; por defecto `http://127.0.0.1:5310`.
+
+| Orden | Qué hace |
+|---|---|
+| `plcmon agent info` | Versión, máquina, fichero de configuración y drivers del agente |
+| `plcmon agent devices` | Dispositivos configurados: activo, escritura habilitada, estado, desde cuándo, nº de tags, último error y próximo reintento |
+| `plcmon agent tags [DISPOSITIVO]` | Tags configurados con su último valor, calidad y grupo de escaneo (✎ = escribible) |
+| `plcmon agent read DISPOSITIVO DIRECCION...` | Lee direcciones cualesquiera a través del agente (no hace falta que estén configuradas) |
+| `plcmon agent write DISPOSITIVO TAG VALOR [-y] [--user U]` | Escribe un tag configurado. Pide confirmación; el agente aplica la doble llave y lo anota en su log de auditoría con el usuario |
+| `plcmon agent enable/disable DISPOSITIVO [--persist]` | Activa o desactiva un dispositivo en caliente. Con `--persist` se guarda en `agent.json` |
+| `plcmon agent watch [DISPOSITIVO...]` | Foto inicial y después los cambios de valores y de estado en directo (Ctrl+C para salir). Si el agente corta la suscripción por lentitud, se vuelve a suscribir sola |
+
+```
+plcmon agent devices
+plcmon agent watch prensa1 -a http://192.168.0.5:5310
+plcmon agent write prensa1 marcha true
+```
+
 ## 4. Sintaxis de direcciones
 
 ### Simbólico (`s7-symbolic`)

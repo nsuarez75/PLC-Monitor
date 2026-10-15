@@ -34,7 +34,7 @@ The full picture (agent, Avalonia app, historian, OPC UA, SSH) is in [docs/arqui
 | `src/PlcMonitor.Drivers.S7Symbolic` | `s7-symbolic` driver on top of S7CommPlus |
 | `src/PlcMonitor.Drivers.S7Absolute` | `s7-absolute` driver on top of S7.Net Plus |
 | `external/S7CommPlusDriver` | Git submodule: [own fork](https://github.com/nsuarez75/S7CommPlusDriver) (branch `plcmonitor`) of [DotNetProjects.S7CommPlusDriver](https://github.com/dotnetprojects/S7CommPlusDriver), **LGPL-3**. Separate assembly (`S7CommPlusDriver.dll`); changes listed in `PLCMONITOR-NOTICE.md` |
-| `src/PlcMonitor.Cli` | `plcmon` CLI (Spectre.Console) |
+| `src/PlcMonitor.Cli` | `plcmon` CLI (Spectre.Console). Direct PLC commands and `plcmon agent ...` as a gRPC client of the agent (`AgentCommands.cs`) |
 | `src/PlcMonitor.Engine` | Multi-device engine: `TagEngine` (cache, subscriptions, enable/disable, two-key writes with audit), `DeviceSupervisor` (connection, backoff reconnection, scan groups), `agent.json` configuration |
 | `src/PlcMonitor.Agent.Contracts` | `agent.proto` with generated gRPC client and server. Used by the app and other clients without depending on ASP.NET |
 | `src/PlcMonitor.Agent` | `plcmon-agent` service (ASP.NET Core, HTTP/2, Windows Service/systemd). See the [agent manual](agent.md) |
@@ -137,6 +137,7 @@ scripts/publish-release.sh linux-x64    # package with the CLI and the agent (in
 | `PlcMonitor.Drivers.S7Symbolic.Tests` | Type mapping on the real library tag classes, and the connection against a simulated CPU |
 | `PlcMonitor.Engine.Tests` | Configuration validation and loading, backoff, engine with a simulated driver (derived from `DeviceConnectionBase`) and a fake clock: reconnection, enable/disable, 4 independent PLCs, two-key writes, subscriptions and slow subscribers |
 | `PlcMonitor.Agent.Tests` | gRPC API against the in-memory agent (`WebApplicationFactory`) with a simulated driver; protobuf mapping |
+| `PlcMonitor.Cli.Tests` | `plcmon agent ...` commands with the real CLI wiring (`CliApp`), against the in-memory agent and a test console (Spectre.Console.Testing) |
 | `PlcMonitor.IntegrationTests` | **Real PLC, read-only.** Skipped unless these environment variables are set: `PLCMON_IT_SYMBOLIC_HOST`, `PLCMON_IT_SECURITY`, `PLCMON_IT_EXPECTED_SECURITY`, `PLCMON_IT_PASSWORD`, `PLCMON_IT_SYMBOL`, `PLCMON_IT_ABSOLUTE_HOST`, `PLCMON_IT_ABSOLUTE_ADDR` |
 
 Status on 2026-10-15 (branch `feature/s7plus-legacy`): 312 tests passing, 6 skipped without a PLC. Against the real S7-1200 (10.225.188.120, no TLS, no PUT/GET): `auto` connection → `legacy`, browse (1463 symbols), reads and polling; integration 4 passed, 2 skipped (password and absolute). Still to repeat against the S7-1517F (TLS + password).

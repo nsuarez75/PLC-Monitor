@@ -143,6 +143,9 @@ Cada valor (`TagValue`) viaja en texto (`text`, cultura invariante) y tipado (`b
 Si un suscriptor no consume los eventos a tiempo, el agente cierra su stream con `RESOURCE_EXHAUSTED`; el cliente
 debe volver a suscribirse y recibirá una foto nueva.
 
+Para probar la API desde la consola está `plcmon agent ...` (`info`, `devices`, `tags`, `read`, `write`, `enable`, `disable`,
+`watch`): ver el [manual de uso](usuario.md#plcmon-agent--hablar-con-un-agente).
+
 Ejemplo mínimo en C#:
 
 ```csharp

@@ -31,4 +31,5 @@ PLC-Monitor es una herramienta propia y gratuita para pruebas y diagnóstico a p
 |---|---|
 | 2026-10-14 | Primera versión: drivers S7 simbólico y absoluto, CLI `plcmon` |
 | 2026-10-14 | Fase 2: manual del agente; error S7 0x8104 (PUT/GET deshabilitado) en solución de problemas |
+| 2026-10-15 | Órdenes `plcmon agent ...` (cliente del agente desde la consola) |
 | 2026-10-15 | `s7-symbolic` con o sin TLS (`--security auto/tls/legacy`) sobre el fork de DotNetProjects.S7CommPlusDriver; sin OpenSSL nativo |

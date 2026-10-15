@@ -34,7 +34,7 @@ La visión completa (agente, app Avalonia, historiador, OPC UA, SSH) está en [d
 | `src/PlcMonitor.Drivers.S7Symbolic` | Driver `s7-symbolic` sobre S7CommPlus |
 | `src/PlcMonitor.Drivers.S7Absolute` | Driver `s7-absolute` sobre S7.Net Plus |
 | `external/S7CommPlusDriver` | Submódulo git: [fork propio](https://github.com/nsuarez75/S7CommPlusDriver) (rama `plcmonitor`) de [DotNetProjects.S7CommPlusDriver](https://github.com/dotnetprojects/S7CommPlusDriver), **LGPL-3**. Ensamblado separado (`S7CommPlusDriver.dll`). Modificaciones en `PLCMONITOR-NOTICE.md` |
-| `src/PlcMonitor.Cli` | CLI `plcmon` (Spectre.Console) |
+| `src/PlcMonitor.Cli` | CLI `plcmon` (Spectre.Console). Órdenes directas al PLC y `plcmon agent ...` como cliente gRPC del agente (`AgentCommands.cs`) |
 | `src/PlcMonitor.Engine` | Motor multi-dispositivo: `TagEngine` (caché, suscripciones, activar/desactivar, escritura con doble llave y auditoría), `DeviceSupervisor` (conexión, reconexión con backoff, grupos de escaneo), configuración `agent.json` |
 | `src/PlcMonitor.Agent.Contracts` | `agent.proto` con cliente y servidor gRPC generados. Lo usarán la app y otros clientes sin depender de ASP.NET |
 | `src/PlcMonitor.Agent` | Servicio `plcmon-agent` (ASP.NET Core, HTTP/2, Windows Service/systemd). Ver el [manual del agente](agente.md) |
@@ -137,6 +137,7 @@ scripts/publish-release.sh linux-x64    # paquete con la CLI y el agente (en age
 | `PlcMonitor.Drivers.S7Symbolic.Tests` | Conversión de tipos sobre las clases reales de la librería y conexión contra una CPU simulada |
 | `PlcMonitor.Engine.Tests` | Validación y carga de la configuración, backoff, motor con driver simulado (que hereda de `DeviceConnectionBase`) y reloj controlado: reconexión, activar/desactivar, 4 PLC independientes, doble llave de escritura, suscripciones y suscriptor lento |
 | `PlcMonitor.Agent.Tests` | API gRPC contra el agente en memoria (`WebApplicationFactory`) con driver simulado; conversión a mensajes protobuf |
+| `PlcMonitor.Cli.Tests` | Órdenes `plcmon agent ...` con la configuración real de la CLI (`CliApp`), contra el agente en memoria y una consola de prueba (Spectre.Console.Testing) |
 | `PlcMonitor.IntegrationTests` | **PLC real, solo lectura.** Se omiten si no hay variables de entorno: `PLCMON_IT_SYMBOLIC_HOST`, `PLCMON_IT_SECURITY`, `PLCMON_IT_EXPECTED_SECURITY`, `PLCMON_IT_PASSWORD`, `PLCMON_IT_SYMBOL`, `PLCMON_IT_ABSOLUTE_HOST`, `PLCMON_IT_ABSOLUTE_ADDR` |
 
 Estado a 2026-10-15 (rama `feature/s7plus-legacy`): 312 tests correctos y 6 omitidos sin PLC. Contra el S7-1200 real (10.225.188.120, sin TLS y sin PUT/GET): conexión `auto` → `legacy`, exploración (1463 símbolos), lectura y sondeo; integración 4 correctos y 2 omitidos (contraseña y absoluto). Pendiente repetir contra el S7-1517F (TLS + contraseña).

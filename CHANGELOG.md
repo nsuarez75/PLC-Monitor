@@ -14,6 +14,8 @@
 - S7-1200: un símbolo cuyo primer nivel no era un DB (o no existía) tiraba la sesión con "Could not get type info": la CPU no tiene áreas de temporizadores/contadores S7.
 
 ### Añadido / Added
+- **`plcmon agent ...`**: la CLI como cliente gRPC del agente, local o remoto (`-a URL` o `PLCMON_AGENT`): `info`, `devices`, `tags`, `read`, `write` (con confirmación y usuario para la auditoría), `enable`/`disable` (`--persist`) y `watch` en directo con resuscripción automática. / *The CLI as a gRPC client of the agent.*
+- Proyecto de tests `PlcMonitor.Cli.Tests` (órdenes contra el agente en memoria).
 - **Motor** `PlcMonitor.Engine`: varios dispositivos a la vez, cada uno con su supervisor; reconexión con espera exponencial; grupos de escaneo; caché del último valor; activar/desactivar en caliente; lectura bajo demanda; escritura con doble llave (`writesEnabled` + `writable`) y log de auditoría; suscripciones con foto inicial y eventos sin huecos. Configuración en `agent.json` validada al arrancar.
 - **Agente** `plcmon-agent`: servicio (Windows Service / systemd) con API gRPC (`agent.proto`, paquete `plcmonitor.agent.v1`) y streaming en vivo. Por defecto solo escucha en `127.0.0.1:5310`.
 - `PlcMonitor.Agent.Contracts`: cliente y servidor gRPC generados, para la app de escritorio.
