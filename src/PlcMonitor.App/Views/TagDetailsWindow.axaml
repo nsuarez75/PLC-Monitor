@@ -69,16 +69,35 @@
         </StackPanel>
       </Border>
 
-      <!-- Histórico (fase 4) -->
-      <Border Classes="card" Padding="20" Opacity="0.6">
-        <StackPanel Spacing="10">
+      <!-- Histórico -->
+      <Border Classes="card" Padding="20">
+        <StackPanel Spacing="12">
           <StackPanel Orientation="Horizontal" Spacing="8">
             <TextBlock Text="HISTÓRICO" Classes="caption" VerticalAlignment="Center" />
-            <Border Classes="pill accent"><TextBlock Text="Próximamente" /></Border>
+            <c:Icon Kind="history" Width="14" Height="14" Foreground="{DynamicResource App.Accent}" />
           </StackPanel>
-          <CheckBox Content="Historizar este tag" IsEnabled="False" />
-          <TextBlock Classes="muted" FontSize="12" TextWrapping="Wrap"
-                     Text="Con el historiador (fase 4) se podrá activar por tag con frecuencia mínima, banda muerta y tiempo máximo entre muestras." />
+          <TextBlock Classes="muted" FontSize="12" TextWrapping="Wrap" IsVisible="{Binding !HistorianEnabled}"
+                     Text="El historiador está desactivado en este agente (historian.enabled en agent.json): la configuración se guarda, pero no se registrará nada." />
+          <CheckBox Content="Guardar este tag en el histórico" IsChecked="{Binding HistoryEnabled}" />
+          <Grid ColumnDefinitions="150,*" RowDefinitions="Auto,Auto,Auto" RowSpacing="10" ColumnSpacing="16" IsEnabled="{Binding HistoryEnabled}">
+            <TextBlock Text="Frecuencia mínima" VerticalAlignment="Center" />
+            <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="8">
+              <NumericUpDown Value="{Binding HistoryMinIntervalMs}" Minimum="0" Increment="500" FormatString="0" Width="140" />
+              <TextBlock Text="ms entre muestras (0 = cada cambio)" Classes="muted" VerticalAlignment="Center" />
+            </StackPanel>
+            <TextBlock Grid.Row="1" Text="Banda muerta" VerticalAlignment="Center" />
+            <StackPanel Grid.Row="1" Grid.Column="1" Orientation="Horizontal" Spacing="8">
+              <NumericUpDown Value="{Binding HistoryDeadband}" Minimum="0" Increment="0.1" FormatString="0.###" Width="140" />
+              <CheckBox Content="en % del último valor" IsChecked="{Binding HistoryDeadbandPercent}" />
+            </StackPanel>
+            <TextBlock Grid.Row="2" Text="Tiempo máximo" VerticalAlignment="Center" />
+            <StackPanel Grid.Row="2" Grid.Column="1" Orientation="Horizontal" Spacing="8">
+              <NumericUpDown Value="{Binding HistoryMaxIntervalMs}" Minimum="0" Increment="1000" FormatString="0" Width="140" />
+              <TextBlock Text="ms sin guardar como mucho (0 = nunca)" Classes="muted" VerticalAlignment="Center" />
+            </StackPanel>
+          </Grid>
+          <TextBlock Classes="muted" FontSize="11.5" TextWrapping="Wrap"
+                     Text="Los cambios de calidad (p.ej. pérdida de conexión) se guardan siempre. Si cambia más rápido que la frecuencia mínima, se guarda el último valor al cumplirse el intervalo." />
         </StackPanel>
       </Border>
 

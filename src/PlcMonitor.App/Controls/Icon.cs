@@ -41,6 +41,8 @@ public sealed class Icon : Control
         ["info"] = "M12 2a10 10 0 1 0 0 20a10 10 0 1 0 0-20z M12 16v-4 M12 8h.01",
         ["save"] = "M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z M17 21v-8H7v8 M7 3v5h8",
         ["chevron-down"] = "M6 9l6 6 6-6",
+        ["history"] = "M3 12a9 9 0 1 0 3-6.7L3 8 M3 3v5h5 M12 7v5l4 2",
+        ["download"] = "M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4 M7 10l5 5 5-5 M12 15V3",
     };
 
     private static readonly Dictionary<string, Geometry> Cache = new(StringComparer.OrdinalIgnoreCase);

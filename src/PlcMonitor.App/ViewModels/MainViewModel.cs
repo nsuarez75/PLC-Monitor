@@ -52,6 +52,7 @@ public sealed partial class MainViewModel : ObservableObject, IAgentContext, IAs
         Theme = settings.Theme is "light" or "dark" ? settings.Theme : "system";
         RecentAgents = [.. settings.RecentAgents];
         Browse = new BrowseViewModel(this, () => SelectedDevice);
+        History = new HistoryViewModel(this, () => SelectedDevice);
     }
 
     public AgentService.AgentServiceClient? Client { get; private set; }
@@ -101,6 +102,13 @@ public sealed partial class MainViewModel : ObservableObject, IAgentContext, IAs
     private void CloseAgents() => Agents = null;
 
     public BrowseViewModel Browse { get; }
+
+    /// <summary>Consulta del histórico del dispositivo seleccionado.</summary>
+    public HistoryViewModel History { get; }
+
+    /// <summary>El agente conectado tiene el historiador activado.</summary>
+    [ObservableProperty]
+    public partial bool HistorianEnabled { get; set; }
 
     public IReadOnlyList<Driver> Drivers { get; private set; } = [];
 
@@ -155,7 +163,11 @@ public sealed partial class MainViewModel : ObservableObject, IAgentContext, IAs
 
     public string ConnectionText => !IsConnected ? "Sin conexión" : IsLive ? "En vivo" : "Reconectando…";
 
-    partial void OnSelectedDeviceChanged(DeviceViewModel? value) => Browse.Clear();
+    partial void OnSelectedDeviceChanged(DeviceViewModel? value)
+    {
+        Browse.Clear();
+        History.Reset();
+    }
 
     public void Report(string message, bool isError = false) => _ui.Post(() =>
     {
@@ -201,6 +213,7 @@ public sealed partial class MainViewModel : ObservableObject, IAgentContext, IAs
             Client = client;
             _channel = channel;
             Drivers = [.. info.Drivers];
+            HistorianEnabled = info.Historian?.Enabled ?? false;
             AgentDescription = $"{info.Machine} · {info.Os} · v{info.Version.Split('+')[0]}";
             IsConnected = true;
             _settings.Remember(url);
@@ -278,7 +291,7 @@ public sealed partial class MainViewModel : ObservableObject, IAgentContext, IAs
         try
         {
             var config = await client.GetDeviceConfigAsync(new DeviceRequest { Device = tag.Device });
-            await Dialogs.ShowTagDetailsAsync(new TagDetailsViewModel(this, tag, config));
+            await Dialogs.ShowTagDetailsAsync(new TagDetailsViewModel(this, tag, config, HistorianEnabled));
         }
         catch (RpcException ex)
         {
@@ -422,6 +435,8 @@ public sealed partial class MainViewModel : ObservableObject, IAgentContext, IAs
             device.Tags.Clear();
         }
         AddTags(device, configured.Tags);
+        if (device == SelectedDevice)
+            History.RefreshTags();
         if (_pendingSelection == device.Name)
         {
             SelectedDevice = device;

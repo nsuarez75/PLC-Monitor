@@ -20,6 +20,7 @@ public sealed partial class TagViewModel : ObservableObject
         Address = tag.Address;
         Group = $"{tag.Group} ({tag.IntervalMs} ms)";
         Writable = tag.Writable;
+        Historized = tag.Historized;
         if (tag.Value is not null)
             Apply(tag.Value);
     }
@@ -33,6 +34,9 @@ public sealed partial class TagViewModel : ObservableObject
     public string Group { get; }
 
     public bool Writable { get; }
+
+    /// <summary>El agente guarda este tag en el histórico.</summary>
+    public bool Historized { get; }
 
     [ObservableProperty]
     public partial string ValueText { get; set; } = "";

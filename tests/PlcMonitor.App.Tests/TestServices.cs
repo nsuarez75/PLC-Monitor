@@ -38,6 +38,11 @@ internal sealed class FakeDialogs : IDialogs
 
     public List<PlcMonitor.App.ViewModels.TagDetailsViewModel> TagDetails { get; } = [];
 
+    /// <summary>Ruta que devuelve el diálogo de guardar (null = cancelar).</summary>
+    public string? SavePath { get; set; }
+
+    public Task<string?> SaveFileAsync(string title, string suggestedName, string extension) => Task.FromResult(SavePath);
+
     public Task ShowTagDetailsAsync(PlcMonitor.App.ViewModels.TagDetailsViewModel details)
     {
         TagDetails.Add(details);
