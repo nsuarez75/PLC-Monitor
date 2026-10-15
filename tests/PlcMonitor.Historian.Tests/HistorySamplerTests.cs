@@ -86,4 +86,7 @@ public class HistorySamplerTests
 
     [Fact]
     public void Text_is_not_a_number() => HistorySampler.ToNumber("x").ShouldBeNull();
+
+    [Fact]
+    public void Floats_keep_their_shortest_decimal_form() => HistorySampler.ToNumber(516.32196f).ShouldBe(516.32196);
 }

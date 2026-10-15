@@ -72,6 +72,8 @@ internal sealed class HistorySampler(TagKey key, TagHistorySettings settings)
     public static double? ToNumber(object? value) => value switch
     {
         bool b => b ? 1 : 0,
+        // Un REAL (float) se pasa por su texto más corto para no arrastrar decimales espurios (516.32196, no 516.321960449219).
+        float f => double.Parse(f.ToString("R", CultureInfo.InvariantCulture), CultureInfo.InvariantCulture),
         sbyte or byte or short or ushort or int or uint or long or ulong or float or double or decimal => Convert.ToDouble(value, CultureInfo.InvariantCulture),
         _ => null,
     };
