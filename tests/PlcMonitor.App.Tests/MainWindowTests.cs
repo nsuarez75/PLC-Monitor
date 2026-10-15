@@ -1,0 +1,111 @@
+using Avalonia.Controls;
+using Avalonia.Headless;
+using Avalonia.VisualTree;
+using Google.Protobuf.WellKnownTypes;
+using PlcMonitor.Agent.Contracts;
+using PlcMonitor.App.Services;
+using PlcMonitor.App.ViewModels;
+using PlcMonitor.App.Views;
+
+namespace PlcMonitor.App.Tests;
+
+/// <summary>La ventana principal se construye y enlaza con el ViewModel (sin agente: eventos sintéticos).</summary>
+public class MainWindowTests
+{
+    private static MainViewModel ViewModelWithData()
+    {
+        var vm = new MainViewModel(new GrpcAgentConnector(), new ImmediateDispatcher(), new FakeDialogs(), new AppSettings(), Path.GetTempFileName());
+        var now = Timestamp.FromDateTime(DateTime.UtcNow);
+        var snapshot = new Snapshot();
+        snapshot.Devices.Add(new Device { Name = "casa1200", Driver = "s7-symbolic", Enabled = true, WritesEnabled = true, State = ConnectionState.Connected, Since = now, TagCount = 3 });
+        snapshot.Devices.Add(new Device { Name = "prensa2", Driver = "s7-absolute", Enabled = true, State = ConnectionState.Faulted, Detail = "TCP : Unreachable peer", Since = now, NextRetry = now });
+        snapshot.Devices.Add(new Device { Name = "linea3", Driver = "s7-symbolic", Enabled = false, State = ConnectionState.Disconnected, Detail = "Dispositivo deshabilitado", Since = now });
+        snapshot.Tags.Add(Tag("clock", "Maquinas_Transfer_DB.Maquina_9.Clock_1s", "true", DataType.Boolean, Quality.Good, now, false));
+        snapshot.Tags.Add(Tag("peso", "Viruta_Datos.Viruta.Peso", "12.5", DataType.Float, Quality.Good, now, true));
+        snapshot.Tags.Add(Tag("malo", "NoExiste_DB.x", "", DataType.Unknown, Quality.BadAddressInvalid, now, false, "El símbolo 'NoExiste_DB.x' no existe en la CPU."));
+        vm.Apply(new SubscribeEvent { Snapshot = snapshot });
+        vm.Message = "Conectado a http://127.0.0.1:5310";
+        return vm;
+    }
+
+    private static Tag Tag(string name, string address, string text, DataType type, Quality quality, Timestamp time, bool writable, string error = "") => new()
+    {
+        Device = "casa1200",
+        Name = name,
+        Address = address,
+        Group = "rapido",
+        IntervalMs = 250,
+        Writable = writable,
+        Value = new TagValue { Text = text, DataType = type, Quality = quality, Timestamp = time, Error = error },
+    };
+
+    [Fact]
+    public Task Main_window_shows_devices_and_tags() => HeadlessApp.RunAsync(() =>
+    {
+        var window = new MainWindow { DataContext = ViewModelWithData() };
+        window.Show();
+
+        var texts = window.GetVisualDescendants().OfType<TextBlock>().Select(t => t.Text).Where(t => t is not null).ToArray();
+        texts.ShouldContain("casa1200");
+        texts.ShouldContain("prensa2");
+        texts.ShouldContain("Viruta_Datos.Viruta.Peso");
+        texts.ShouldContain("12.5");
+        texts.ShouldContain("El símbolo 'NoExiste_DB.x' no existe en la CPU.");
+        Capture(window, "main-window.png");
+    });
+
+    [Fact]
+    public Task Device_editor_replaces_the_tabs() => HeadlessApp.RunAsync(() =>
+    {
+        var vm = ViewModelWithData();
+        var window = new MainWindow { DataContext = vm };
+        window.Show();
+        var drivers = new[] { new Driver { Id = "s7-symbolic", DefaultSettingsJson = """{"host":"","security":"Auto"}""" }, new Driver { Id = "s7-absolute", DefaultSettingsJson = """{"host":""}""" } };
+
+        vm.Editor = new DeviceEditorViewModel(vm, drivers, _ => { });
+        window.UpdateLayout();
+
+        window.GetVisualDescendants().OfType<TabControl>().Single().IsVisible.ShouldBeFalse();
+        window.GetVisualDescendants().OfType<TextBlock>().Select(t => t.Text).ShouldContain("Nuevo dispositivo");
+        vm.Editor.SettingsJson.ShouldContain("security");
+        Capture(window, "device-editor.png");
+    });
+
+    /// <summary>
+    /// Integración: la ventana real conectada a un agente real (PLCMON_IT_AGENT_URL). Se omite si no está definida.
+    /// Con PLCMON_UI_CAPTURE_DIR guarda la captura.
+    /// </summary>
+    [Fact]
+    public async Task Main_window_against_a_real_agent()
+    {
+        var url = Environment.GetEnvironmentVariable("PLCMON_IT_AGENT_URL");
+        Assert.SkipWhen(string.IsNullOrEmpty(url), "PLCMON_IT_AGENT_URL no definida");
+        await HeadlessApp.RunAsync(async () =>
+        {
+            var vm = new MainViewModel(new GrpcAgentConnector(), new AvaloniaDispatcher(), new FakeDialogs(),
+                new AppSettings { AgentUrl = url! }, Path.GetTempFileName());
+            var window = new MainWindow { DataContext = vm };
+            window.Show();
+
+            await vm.ConnectCommand.ExecuteAsync(null);
+            vm.IsConnected.ShouldBeTrue(vm.Message);
+            var deadline = DateTime.UtcNow.AddSeconds(10);
+            while (!(vm.IsLive && vm.SelectedDevice?.Tags.Count > 0 && vm.SelectedDevice.Tags.All(t => t.IsGood)) && DateTime.UtcNow < deadline)
+                await Task.Delay(100);
+            vm.SelectedDevice.ShouldNotBeNull();
+            Capture(window, "real-agent.png");
+            await vm.DisposeAsync();
+        });
+    }
+
+    /// <summary>Si PLCMON_UI_CAPTURE_DIR está definida, guarda una captura para revisarla.</summary>
+    private static void Capture(Window window, string file)
+    {
+        if (Environment.GetEnvironmentVariable("PLCMON_UI_CAPTURE_DIR") is not { Length: > 0 } dir)
+            return;
+        Directory.CreateDirectory(dir);
+        using var frame = window.CaptureRenderedFrame();
+        using var stream = File.Create(Path.Combine(dir, file));
+        frame?.Save(stream, Avalonia.Media.Imaging.PngBitmapEncoderOptions.Default);
+    }
+}

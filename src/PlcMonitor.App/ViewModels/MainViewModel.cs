@@ -1,0 +1,373 @@
+using System.Collections.ObjectModel;
+using CommunityToolkit.Mvvm.ComponentModel;
+using CommunityToolkit.Mvvm.Input;
+using Google.Protobuf.WellKnownTypes;
+using Grpc.Core;
+using PlcMonitor.Agent.Contracts;
+using PlcMonitor.App.Services;
+
+namespace PlcMonitor.App.ViewModels;
+
+/// <summary>
+/// Ventana principal: conexión con un agente, dispositivos con sus tags en vivo (por suscripción), explorador de
+/// símbolos y editor de dispositivos.
+/// </summary>
+public sealed partial class MainViewModel : ObservableObject, IAgentContext, IAsyncDisposable
+{
+    /// <summary>Espera antes de volver a suscribirse si se pierde la conexión con el agente.</summary>
+    internal static TimeSpan ResubscribeDelay { get; set; } = TimeSpan.FromSeconds(2);
+
+    private readonly IAgentConnector _connector;
+    private readonly IUiDispatcher _ui;
+    private readonly AppSettings _settings;
+    private readonly string _settingsPath;
+    private readonly Dictionary<(string Device, string Tag), TagViewModel> _tagIndex = [];
+    private IDisposable? _channel;
+    private CancellationTokenSource? _subscriptionCts;
+    private Task _subscription = Task.CompletedTask;
+
+    public MainViewModel(IAgentConnector connector, IUiDispatcher ui, IDialogs dialogs, AppSettings settings, string settingsPath)
+    {
+        _connector = connector;
+        _ui = ui;
+        Dialogs = dialogs;
+        _settings = settings;
+        _settingsPath = settingsPath;
+        AgentUrl = settings.AgentUrl;
+        RecentAgents = [.. settings.RecentAgents];
+        Browse = new BrowseViewModel(this, () => SelectedDevice);
+    }
+
+    public AgentService.AgentServiceClient? Client { get; private set; }
+
+    public IDialogs Dialogs { get; }
+
+    public ObservableCollection<DeviceViewModel> Devices { get; } = [];
+
+    public ObservableCollection<string> RecentAgents { get; }
+
+    public BrowseViewModel Browse { get; }
+
+    public IReadOnlyList<Driver> Drivers { get; private set; } = [];
+
+    [ObservableProperty]
+    [NotifyCanExecuteChangedFor(nameof(ConnectCommand))]
+    public partial string AgentUrl { get; set; }
+
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(ConnectionText))]
+    [NotifyCanExecuteChangedFor(nameof(ConnectCommand), nameof(DisconnectCommand), nameof(NewDeviceCommand), nameof(EditDeviceCommand), nameof(DeleteDeviceCommand))]
+    public partial bool IsConnected { get; set; }
+
+    [ObservableProperty]
+    [NotifyCanExecuteChangedFor(nameof(ConnectCommand))]
+    public partial bool IsConnecting { get; set; }
+
+    /// <summary>La suscripción está viva (si es false con IsConnected, se está reintentando).</summary>
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(ConnectionText))]
+    public partial bool IsLive { get; set; }
+
+    [ObservableProperty]
+    public partial string AgentDescription { get; set; } = "";
+
+    [ObservableProperty]
+    [NotifyCanExecuteChangedFor(nameof(EditDeviceCommand), nameof(DeleteDeviceCommand))]
+    public partial DeviceViewModel? SelectedDevice { get; set; }
+
+    /// <summary>Formulario de dispositivo abierto (alta o edición); null si no hay.</summary>
+    [ObservableProperty]
+    public partial DeviceEditorViewModel? Editor { get; set; }
+
+    [ObservableProperty]
+    public partial string Message { get; set; } = "";
+
+    [ObservableProperty]
+    public partial bool IsMessageError { get; set; }
+
+    public string ConnectionText => !IsConnected ? "Sin conexión" : IsLive ? "En vivo" : "Reconectando…";
+
+    partial void OnSelectedDeviceChanged(DeviceViewModel? value) => Browse.Clear();
+
+    public void Report(string message, bool isError = false) => _ui.Post(() =>
+    {
+        Message = message;
+        IsMessageError = isError;
+    });
+
+    public string Describe(Exception exception) => AgentErrors.Describe(exception, AgentUrl);
+
+    private bool CanConnect() => !IsConnected && !IsConnecting && !string.IsNullOrWhiteSpace(AgentUrl);
+
+    [RelayCommand(CanExecute = nameof(CanConnect))]
+    private async Task ConnectAsync()
+    {
+        var url = AgentUrl.Trim();
+        IsConnecting = true;
+        Report($"Conectando con {url}…");
+        try
+        {
+            var (client, channel) = _connector.Connect(url);
+            AgentInfo info;
+            try
+            {
+                info = await client.GetInfoAsync(new Empty(), deadline: DateTime.UtcNow.AddSeconds(10));
+            }
+            catch
+            {
+                channel.Dispose();
+                throw;
+            }
+            Client = client;
+            _channel = channel;
+            Drivers = [.. info.Drivers];
+            AgentDescription = $"{info.Machine} · {info.Os} · v{info.Version.Split('+')[0]}";
+            IsConnected = true;
+            _settings.Remember(url);
+            _settings.Save(_settingsPath);
+            if (!RecentAgents.Contains(url))
+                RecentAgents.Insert(0, url);
+            _subscriptionCts = new CancellationTokenSource();
+            _subscription = RunSubscriptionAsync(client, _subscriptionCts.Token);
+            Report($"Conectado a {url}");
+        }
+        catch (Exception ex) when (ex is RpcException or UriFormatException or InvalidOperationException)
+        {
+            Report(AgentErrors.Describe(ex, url), isError: true);
+        }
+        finally
+        {
+            IsConnecting = false;
+        }
+    }
+
+    [RelayCommand(CanExecute = nameof(IsConnected))]
+    private async Task DisconnectAsync()
+    {
+        await StopSubscriptionAsync();
+        _channel?.Dispose();
+        _channel = null;
+        Client = null;
+        IsConnected = false;
+        IsLive = false;
+        Editor = null;
+        Devices.Clear();
+        _tagIndex.Clear();
+        SelectedDevice = null;
+        AgentDescription = "";
+        Report("Desconectado");
+    }
+
+    [RelayCommand(CanExecute = nameof(IsConnected))]
+    private void NewDevice() => Editor = new DeviceEditorViewModel(this, Drivers, OnEditorSaved);
+
+    private bool CanEditDevice() => IsConnected && SelectedDevice is not null;
+
+    [RelayCommand(CanExecute = nameof(CanEditDevice))]
+    private async Task EditDeviceAsync()
+    {
+        if (Client is not { } client || SelectedDevice is not { } device)
+            return;
+        try
+        {
+            var config = await client.GetDeviceConfigAsync(new DeviceRequest { Device = device.Name });
+            Editor = new DeviceEditorViewModel(this, Drivers, config, OnEditorSaved);
+        }
+        catch (RpcException ex)
+        {
+            Report(Describe(ex), isError: true);
+        }
+    }
+
+    [RelayCommand]
+    private void CloseEditor() => Editor = null;
+
+    [RelayCommand(CanExecute = nameof(CanEditDevice))]
+    private async Task DeleteDeviceAsync()
+    {
+        if (Client is not { } client || SelectedDevice is not { } device)
+            return;
+        if (!await Dialogs.ConfirmAsync("Eliminar dispositivo", $"¿Dar de baja {device.Name} y sus {device.Tags.Count} tags?\nSe guarda en la configuración del agente."))
+            return;
+        try
+        {
+            await client.DeleteDeviceAsync(new DeleteDeviceRequest { Device = device.Name, Persist = true });
+            Report($"{device.Name} eliminado");
+        }
+        catch (RpcException ex)
+        {
+            Report(Describe(ex), isError: true);
+        }
+    }
+
+    private void OnEditorSaved(string device)
+    {
+        Editor = null;
+        // El evento device_configured puede llegar antes o después; si ya está, se selecciona.
+        if (Devices.FirstOrDefault(d => d.Name == device) is { } vm)
+            SelectedDevice = vm;
+        else
+            _pendingSelection = device;
+    }
+
+    private string? _pendingSelection;
+
+    /// <summary>Recibe los eventos del agente hasta que se cancela; si se corta, vuelve a suscribirse.</summary>
+    private async Task RunSubscriptionAsync(AgentService.AgentServiceClient client, CancellationToken token)
+    {
+        while (!token.IsCancellationRequested)
+        {
+            try
+            {
+                using var call = client.Subscribe(new SubscribeRequest(), cancellationToken: token);
+                await foreach (var ev in call.ResponseStream.ReadAllAsync(token))
+                    _ui.Post(() => Apply(ev));
+                _ui.Post(() => IsLive = false);
+            }
+            catch (OperationCanceledException) when (token.IsCancellationRequested)
+            {
+                break;
+            }
+            catch (RpcException ex) when (ex.StatusCode == StatusCode.Cancelled && token.IsCancellationRequested)
+            {
+                break;
+            }
+            catch (RpcException ex) when (ex.StatusCode == StatusCode.ResourceExhausted)
+            {
+                // Esta app no consumió a tiempo: nueva suscripción y nueva foto.
+                Report("Suscripción reiniciada (demasiados cambios a la vez)");
+                continue;
+            }
+            catch (RpcException ex)
+            {
+                _ui.Post(() => IsLive = false);
+                Report($"Conexión con el agente perdida: {Describe(ex)}. Reintentando…", isError: true);
+            }
+            try
+            {
+                await Task.Delay(ResubscribeDelay, token);
+            }
+            catch (OperationCanceledException)
+            {
+                break;
+            }
+        }
+    }
+
+    /// <summary>Aplica un evento del agente al modelo (en el hilo de la UI).</summary>
+    internal void Apply(SubscribeEvent ev)
+    {
+        switch (ev.EventCase)
+        {
+            case SubscribeEvent.EventOneofCase.Snapshot:
+                ApplySnapshot(ev.Snapshot);
+                break;
+            case SubscribeEvent.EventOneofCase.TagUpdates:
+                foreach (var update in ev.TagUpdates.Updates)
+                {
+                    if (_tagIndex.TryGetValue((update.Device, update.Tag), out var tag))
+                        tag.Apply(update.Value);
+                }
+                break;
+            case SubscribeEvent.EventOneofCase.DeviceStatus:
+                if (Find(ev.DeviceStatus.Name) is { } device)
+                    device.Apply(ev.DeviceStatus);
+                else
+                    Devices.Add(new DeviceViewModel(this, ev.DeviceStatus));
+                break;
+            case SubscribeEvent.EventOneofCase.DeviceConfigured:
+                ApplyConfigured(ev.DeviceConfigured);
+                break;
+            case SubscribeEvent.EventOneofCase.DeviceRemoved:
+                Remove(ev.DeviceRemoved.Device);
+                break;
+            default:
+                break;
+        }
+    }
+
+    private void ApplySnapshot(Snapshot snapshot)
+    {
+        var selected = SelectedDevice?.Name;
+        Devices.Clear();
+        _tagIndex.Clear();
+        var tagsByDevice = snapshot.Tags.ToLookup(t => t.Device);
+        foreach (var d in snapshot.Devices)
+        {
+            var device = new DeviceViewModel(this, d);
+            AddTags(device, tagsByDevice[d.Name]);
+            Devices.Add(device);
+        }
+        SelectedDevice = Find(selected) ?? Devices.FirstOrDefault();
+        IsLive = true;
+    }
+
+    private void ApplyConfigured(DeviceConfigured configured)
+    {
+        var device = Find(configured.Device.Name);
+        if (device is null)
+        {
+            device = new DeviceViewModel(this, configured.Device);
+            Devices.Add(device);
+        }
+        else
+        {
+            device.Apply(configured.Device);
+            foreach (var tag in device.Tags)
+                _tagIndex.Remove((tag.Device, tag.Name));
+            device.Tags.Clear();
+        }
+        AddTags(device, configured.Tags);
+        if (_pendingSelection == device.Name)
+        {
+            SelectedDevice = device;
+            _pendingSelection = null;
+        }
+    }
+
+    private void Remove(string name)
+    {
+        if (Find(name) is not { } device)
+            return;
+        foreach (var tag in device.Tags)
+            _tagIndex.Remove((tag.Device, tag.Name));
+        var wasSelected = SelectedDevice == device;
+        Devices.Remove(device);
+        if (wasSelected)
+            SelectedDevice = Devices.FirstOrDefault();
+    }
+
+    private void AddTags(DeviceViewModel device, IEnumerable<Tag> tags)
+    {
+        foreach (var t in tags)
+        {
+            var tag = new TagViewModel(this, t);
+            device.Tags.Add(tag);
+            _tagIndex[(t.Device, t.Name)] = tag;
+        }
+    }
+
+    private DeviceViewModel? Find(string? name) => name is null ? null : Devices.FirstOrDefault(d => d.Name == name);
+
+    private async Task StopSubscriptionAsync()
+    {
+        if (_subscriptionCts is null)
+            return;
+        await _subscriptionCts.CancelAsync();
+        try
+        {
+            await _subscription;
+        }
+        catch (OperationCanceledException)
+        {
+        }
+        _subscriptionCts.Dispose();
+        _subscriptionCts = null;
+    }
+
+    public async ValueTask DisposeAsync()
+    {
+        await StopSubscriptionAsync();
+        _channel?.Dispose();
+    }
+}

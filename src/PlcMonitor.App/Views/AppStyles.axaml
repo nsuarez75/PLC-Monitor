@@ -1,0 +1,40 @@
+<Styles xmlns="https://github.com/avaloniaui"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
+  <!-- Indicadores de estado y calidad -->
+  <Style Selector="Ellipse.state">
+    <Setter Property="Width" Value="10" />
+    <Setter Property="Height" Value="10" />
+    <Setter Property="Fill" Value="Gray" />
+  </Style>
+  <Style Selector="Ellipse.state.connected">
+    <Setter Property="Fill" Value="#2E9E44" />
+  </Style>
+  <Style Selector="Ellipse.state.connecting">
+    <Setter Property="Fill" Value="#D8A000" />
+  </Style>
+  <Style Selector="Ellipse.state.faulted">
+    <Setter Property="Fill" Value="#D13438" />
+  </Style>
+  <Style Selector="TextBlock.quality">
+    <Setter Property="FontWeight" Value="SemiBold" />
+  </Style>
+  <Style Selector="TextBlock.quality.good">
+    <Setter Property="Foreground" Value="#2E9E44" />
+  </Style>
+  <Style Selector="TextBlock.quality.uncertain">
+    <Setter Property="Foreground" Value="#D8A000" />
+  </Style>
+  <Style Selector="TextBlock.quality.bad">
+    <Setter Property="Foreground" Value="#D13438" />
+  </Style>
+  <Style Selector="TextBlock.header">
+    <Setter Property="FontWeight" Value="SemiBold" />
+    <Setter Property="Opacity" Value="0.7" />
+  </Style>
+  <Style Selector="TextBlock.muted">
+    <Setter Property="Opacity" Value="0.65" />
+  </Style>
+  <Style Selector="TextBlock.error">
+    <Setter Property="Foreground" Value="#D13438" />
+  </Style>
+</Styles>
