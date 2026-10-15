@@ -231,18 +231,18 @@
                           <c:Icon Kind="search" Margin="10,0,2,0" Foreground="{DynamicResource App.TextMuted}" />
                         </TextBox.InnerLeftContent>
                         <TextBox.KeyBindings>
-                          <KeyBinding Gesture="Enter" Command="{Binding SearchCommand}" CommandParameter="False" />
+                          <KeyBinding Gesture="Enter" Command="{Binding SearchCommand}" />
                         </TextBox.KeyBindings>
                       </TextBox>
                       <NumericUpDown Grid.Column="1" Value="{Binding MaxResults}" Minimum="10" Maximum="100000" Increment="100" FormatString="0" Width="130"
                                      ToolTip.Tip="Máximo de resultados" />
-                      <Button Grid.Column="2" Classes="accent" Command="{Binding SearchCommand}" CommandParameter="False">
+                      <Button Grid.Column="2" Classes="accent" Command="{Binding SearchCommand}">
                         <StackPanel Orientation="Horizontal" Spacing="6">
                           <c:Icon Kind="search" />
                           <TextBlock Text="Buscar" />
                         </StackPanel>
                       </Button>
-                      <Button Grid.Column="3" Classes="secondary" Command="{Binding SearchCommand}" CommandParameter="True" ToolTip.Tip="Volver a explorar la CPU (tras cargar un programa nuevo)">
+                      <Button Grid.Column="3" Classes="secondary" Command="{Binding RefreshCommand}" ToolTip.Tip="Volver a explorar la CPU (tras cargar un programa nuevo)">
                         <c:Icon Kind="refresh" />
                       </Button>
                     </Grid>

@@ -148,7 +148,7 @@ public sealed class MainViewModelTests : IDisposable
         await Wait.UntilAsync(() => _ui.Read(() => vm.Devices[0].IsConnected));
 
         vm.Browse.Filter = "motor";
-        await vm.Browse.SearchCommand.ExecuteAsync(false);
+        await vm.Browse.SearchCommand.ExecuteAsync(null);
         vm.Browse.Results.ShouldHaveSingleItem().Address.ShouldBe("DB1.Motor");
         vm.Browse.Summary.ShouldContain("1 mostrados de 1 coincidencias · 2 símbolos");
 

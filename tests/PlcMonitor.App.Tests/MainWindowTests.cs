@@ -78,6 +78,23 @@ public class MainWindowTests
         Avalonia.Application.Current.RequestedThemeVariant = Avalonia.Styling.ThemeVariant.Light;
     });
 
+    [Fact]
+    public Task Enter_in_the_browse_box_runs_the_search() => HeadlessApp.RunAsync(() =>
+    {
+        var vm = ViewModelWithData();
+        var window = new MainWindow { DataContext = vm };
+        window.Show();
+        window.GetVisualDescendants().OfType<TabControl>().Single().SelectedIndex = 1;
+        window.UpdateLayout();
+        var box = window.GetVisualDescendants().OfType<TextBox>().First(t => t.PlaceholderText?.StartsWith("Buscar", StringComparison.Ordinal) == true);
+        box.Focus();
+
+        // Antes lanzaba ArgumentException ("False" como texto a un comando de bool) y cerraba la app.
+        window.KeyPressQwerty(Avalonia.Input.PhysicalKey.Enter, Avalonia.Input.RawInputModifiers.None);
+
+        vm.Browse.SearchCommand.CanExecute(null).ShouldBeTrue();
+    });
+
     /// <summary>
     /// Integración: la ventana real conectada a un agente real (PLCMON_IT_AGENT_URL). Se omite si no está definida.
     /// Con PLCMON_UI_CAPTURE_DIR guarda la captura.
