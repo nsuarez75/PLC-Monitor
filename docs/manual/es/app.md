@@ -72,8 +72,10 @@ La pestaña **Tags** muestra los tags del PLC seleccionado con su valor, tipo, c
 - **Quitar**: elimina el tag de la configuración (pide confirmación).
 - **Doble clic** en un tag abre su ventana de detalle: valor, calidad, tipo y hora en vivo, y su configuración
   (nombre, dirección, grupo de escaneo y periodo, escribible, tipo para escribir). Al cambiar el periodo de un grupo
-  existente se avisa de que afecta a todos sus tags. **Guardar** lo valida en el agente. La sección «Histórico» se
-  activará con el historiador (fase 4).
+  existente se avisa de que afecta a todos sus tags. **Guardar** lo valida en el agente.
+- En esa ventana, la sección **Histórico** activa el guardado del tag y su muestreo: frecuencia mínima, banda muerta
+  (absoluta o %) y tiempo máximo (ver [Histórico en el agente](agente.md#histórico)). Los tags historizados llevan un
+  icono de reloj en la tabla.
 
 ## 5. Explorar y añadir tags
 
@@ -85,7 +87,19 @@ En la pestaña **Explorar** (con el PLC conectado y un driver que lo permita, co
 3. Pulsa **Añadir** en el símbolo. Aparece en la pestaña Tags con su valor en cuanto el agente lo lee. Los símbolos que
    ya son tags del dispositivo salen marcados como **Añadido**.
 
-## 6. Solución de problemas
+## 6. Histórico
+
+La pestaña **Histórico** consulta lo que el agente ha guardado del dispositivo seleccionado:
+
+1. Marca los tags (solo aparecen los historizados).
+2. Elige el periodo (de 15 min a 30 días) y si lo quieres **en bruto** o **agregado** (media, mínimo, máximo, primero o
+   último) cada 1 s … 1 día.
+3. **Consultar** muestra la tabla (lo más reciente arriba). **CSV** la guarda en un fichero (dispositivo, tag, hora UTC
+   ISO 8601, valor, calidad), que se abre con Excel o LibreOffice.
+
+Si sale «hay más puntos», usa un agregado o un periodo más corto (máximo 20 000 puntos por tag).
+
+## 7. Solución de problemas
 
 | Síntoma | Causa y solución |
 |---|---|

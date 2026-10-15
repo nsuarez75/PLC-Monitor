@@ -42,12 +42,15 @@ Junto al ejecutable hay un ejemplo, `agent.sample.json`. El JSON admite comentar
           "intervalMs": 500,              // mínimo 50
           "tags": [
             { "name": "velocidad", "address": "DB10.DBW0" },
-            { "name": "marcha", "address": "DB10.DBX2.0", "writable": true, "dataType": "Boolean" }
+            { "name": "marcha", "address": "DB10.DBX2.0", "writable": true, "dataType": "Boolean" },
+            { "name": "presion", "address": "DB10.REAL4",
+              "history": { "enabled": true, "minIntervalMs": 1000, "deadband": 0.5, "deadbandMode": "Absolute", "maxIntervalMs": 60000 } }
           ]
         }
       ]
     }
-  ]
+  ],
+  "historian": { "enabled": true, "path": "history", "retentionDays": 90, "flushIntervalMs": 1000 }
 }
 ```
 
@@ -60,12 +63,33 @@ Junto al ejecutable hay un ejemplo, `agent.sample.json`. El JSON admite comentar
 | `tags[].address` | Dirección en la sintaxis del driver |
 | `tags[].writable` | 2.ª llave de escritura |
 | `tags[].dataType` | Tipo con el que se interpretan los valores escritos, si el driver no lo deduce de la dirección |
+| `tags[].history` | Historización del tag (ver [Histórico](#histórico)). Sin ella, el tag no se guarda |
+| `historian` | Ajustes globales del historiador: activo, carpeta, días de retención y cada cuánto se vuelca a disco |
 
 Al arrancar se valida toda la configuración. Si algo está mal, el agente no arranca y muestra todos los errores juntos.
 Las direcciones con sintaxis incorrecta no impiden arrancar: esos tags quedan con calidad `BadConfiguration`.
 
 > ⚠️ En esta versión la contraseña de los PLC simbólicos se guarda en claro en `agent.json`. Protege el fichero
 > (permisos solo para el usuario del servicio). Está previsto cifrarla.
+
+### Histórico
+
+El agente guarda en disco los tags con `history.enabled`, aunque la app esté cerrada.
+
+| Campo de `history` | Significado |
+|---|---|
+| `minIntervalMs` | Intervalo mínimo entre muestras (0 = cada cambio). Si el valor cambia más rápido, se guarda el **último** al cumplirse el intervalo: no se pierde |
+| `deadband` / `deadbandMode` | Banda muerta: no se guardan cambios numéricos menores (`Absolute`) o menores en % del último valor guardado (`Percent`). 0 = cualquier cambio |
+| `maxIntervalMs` | Tiempo máximo sin guardar: se repite el valor actual aunque no cambie (0 = nunca). Útil para saber que el dato sigue vivo |
+
+- Los **cambios de calidad** (pérdida de conexión, error de lectura) se guardan siempre: así se ven los huecos.
+- Ficheros: SQLite en `historian.path` (por defecto `history/` junto a `agent.json`), **uno por mes**
+  (`history-AAAA-MM.db`), con las tablas `tags` y `samples` (`t` en milisegundos Unix UTC, `num`, `txt`, `q` = calidad).
+  Se pueden copiar o abrir con cualquier visor de SQLite.
+- **Retención**: cada 6 h se borran los meses enteros anteriores a `retentionDays` y las muestras viejas del mes frontera.
+  `0` = sin límite.
+- Si se **renombra** un tag, el histórico anterior se queda con el nombre antiguo.
+- Consulta: en la app (pestaña **Histórico**), en la consola (`plcmon agent history`) o por la API (`QueryHistory`).
 
 ## 2. Comportamiento
 
@@ -180,6 +204,7 @@ el cliente generado.
 | `GetConfiguration` / `GetDeviceConfig` | Configuración en uso, completa o de un dispositivo (los ajustes del driver van en JSON) |
 | `PutDevice` | Alta o modificación de un dispositivo con sus grupos y tags (`original_name` para renombrar). Se valida todo antes de aplicar: si hay errores, `INVALID_ARGUMENT` con la lista completa y no cambia nada. El dispositivo se reinicia con la nueva configuración |
 | `DeleteDevice` | Baja de un dispositivo |
+| `QueryHistory` | Histórico de uno o varios tags entre dos instantes (por defecto la última hora), en bruto o agregado por intervalo (media, mín., máx., primero, último). Con el historiador desactivado: `FAILED_PRECONDITION`. `GetInfo` incluye el estado del historiador (carpeta, tamaño, ficheros, tags historizados) |
 
 `SetDeviceEnabled`, `PutDevice` y `DeleteDevice` guardan en `agent.json` solo con `persist = true` (escritura atómica).
 
