@@ -1,54 +1,132 @@
+using Microsoft.Extensions.Logging;
 using S7CommPlusDriver;
 using S7CommPlusDriver.ClientApi;
+using LibException = S7CommPlusDriver.S7CommPlusException;
 
 namespace PlcMonitor.Drivers.S7Symbolic;
 
 /// <summary>Símbolo descubierto al explorar la CPU.</summary>
 internal readonly record struct SymbolEntry(string Name, uint Softdatatype);
 
-/// <summary>Operaciones de la librería S7CommPlus que usa el driver (sustituible en tests). Llamadas bloqueantes.</summary>
-internal interface ISymbolicClient : IDisposable
+/// <summary>
+/// Operaciones de la librería S7CommPlus que usa el driver (sustituible en tests).
+/// Los errores de la librería se lanzan como <see cref="S7SymbolicException"/>.
+/// </summary>
+internal interface ISymbolicClient : IAsyncDisposable
 {
-    /// <summary>Devuelve 0 si conecta; si no, el código de error de S7Consts.</summary>
-    int Connect(string host, string password, string username, int timeoutMs);
+    /// <summary>Seguridad negociada tras conectar (TLS o legacy), o null si no se sabe.</summary>
+    string? NegotiatedSecurity { get; }
 
-    void Disconnect();
+    Task ConnectAsync(CancellationToken cancellationToken);
 
-    /// <summary>Resuelve un símbolo a un tag listo para leer/escribir. null si no existe.</summary>
-    PlcTag? ResolveTag(string symbol);
+    /// <summary>Resuelve un símbolo a un tag nuevo listo para leer/escribir. null si no existe.</summary>
+    Task<PlcTag?> ResolveTagAsync(string symbol, CancellationToken cancellationToken);
 
-    int ReadTags(IReadOnlyList<PlcTag> tags);
+    /// <summary>Lee los tags: cada uno queda con su valor y su error de lectura.</summary>
+    Task ReadTagsAsync(IReadOnlyList<PlcTag> tags, CancellationToken cancellationToken);
 
-    int WriteTags(IReadOnlyList<PlcTag> tags);
+    /// <summary>Escribe los tags: cada uno queda con su error de escritura.</summary>
+    Task WriteTagsAsync(IReadOnlyList<PlcTag> tags, CancellationToken cancellationToken);
 
     /// <summary>Explora todas las variables de la CPU.</summary>
-    int Browse(out IReadOnlyList<SymbolEntry> symbols);
+    Task<IReadOnlyList<SymbolEntry>> BrowseAsync(CancellationToken cancellationToken);
 }
 
-/// <summary>Implementación real sobre <see cref="S7CommPlusConnection"/>.</summary>
-internal sealed class S7CommPlusClient : ISymbolicClient
+/// <summary>Implementación real sobre <see cref="S7CommPlusClient"/> (fork de DotNetProjects.S7CommPlusDriver).</summary>
+internal sealed class S7CommPlusSymbolicClient : ISymbolicClient
 {
-    private readonly S7CommPlusConnection _connection = new();
+    private readonly S7CommPlusClient _client;
 
-    public int Connect(string host, string password, string username, int timeoutMs) =>
-        _connection.Connect(host, password, username, timeoutMs);
-
-    public void Disconnect() => _connection.Disconnect();
-
-    public PlcTag? ResolveTag(string symbol) => _connection.getPlcTagBySymbol(symbol);
-
-    public int ReadTags(IReadOnlyList<PlcTag> tags) => _connection.ReadTags(tags);
-
-    public int WriteTags(IReadOnlyList<PlcTag> tags) => _connection.WriteTags(tags);
-
-    public int Browse(out IReadOnlyList<SymbolEntry> symbols)
+    public S7CommPlusSymbolicClient(S7SymbolicSettings settings, ILogger logger)
     {
-        var result = _connection.Browse(out var vars);
-        symbols = result == 0 && vars is not null
-            ? vars.Select(v => new SymbolEntry(v.Name, v.Softdatatype)).ToArray()
-            : [];
-        return result;
+        var timeout = TimeSpan.FromMilliseconds(settings.TimeoutMs);
+        _client = new S7CommPlusClient(new S7CommPlusClientOptions
+        {
+            Address = settings.Host,
+            Password = settings.Password,
+            Username = settings.Username,
+            ConnectTimeout = timeout,
+            RequestTimeout = timeout,
+            SecurityMode = settings.Security switch
+            {
+                S7SymbolicSecurity.Tls => S7CommPlusSecurityMode.Tls,
+                S7SymbolicSecurity.Legacy => S7CommPlusSecurityMode.LegacyChallenge,
+                _ => S7CommPlusSecurityMode.Auto,
+            },
+            // La reconexión la hace el supervisor del motor y la doble llave de escritura la aplica el motor.
+            AutoReconnect = false,
+            WriteEnabled = true,
+            Logger = logger,
+        });
     }
 
-    public void Dispose() => _connection.Disconnect();
+    public string? NegotiatedSecurity => _client.Options.NegotiatedSecurityMode switch
+    {
+        S7CommPlusSecurityMode.Tls => "TLS",
+        S7CommPlusSecurityMode.LegacyChallenge => "legacy (sin TLS)",
+        _ => null,
+    };
+
+    public Task ConnectAsync(CancellationToken cancellationToken) =>
+        TranslateAsync("Conexión", () => _client.ConnectAsync(cancellationToken));
+
+    public async Task<PlcTag?> ResolveTagAsync(string symbol, CancellationToken cancellationToken)
+    {
+        try
+        {
+            return await _client.GetTagBySymbolAsync(symbol, cancellationToken);
+        }
+        catch (LibException ex) when (ex.ErrorCode == S7Consts.errCliItemNotAvailable && !ex.IsTransient)
+        {
+            // Sintaxis de array no válida: la librería envuelve una ArgumentException.
+            if (ex.InnerException is ArgumentException inner)
+                throw new ArgumentException(inner.Message, nameof(symbol), ex);
+            return null;
+        }
+        catch (LibException ex)
+        {
+            throw Wrap("Resolución de símbolo", ex);
+        }
+    }
+
+    public Task ReadTagsAsync(IReadOnlyList<PlcTag> tags, CancellationToken cancellationToken) =>
+        TranslateAsync("Lectura", () => _client.ReadAsync(tags, cancellationToken));
+
+    public Task WriteTagsAsync(IReadOnlyList<PlcTag> tags, CancellationToken cancellationToken) =>
+        TranslateAsync("Escritura", () => _client.WriteAsync(tags, cancellationToken));
+
+    public async Task<IReadOnlyList<SymbolEntry>> BrowseAsync(CancellationToken cancellationToken)
+    {
+        IReadOnlyList<VarInfo> vars = [];
+        await TranslateAsync("Exploración", async () => vars = await _client.BrowseAsync(cancellationToken));
+        return vars.Select(v => new SymbolEntry(v.Name, v.Softdatatype)).ToArray();
+    }
+
+    public async ValueTask DisposeAsync()
+    {
+        try
+        {
+            await _client.DisconnectAsync();
+        }
+        catch (Exception ex) when (ex is LibException or IOException or ObjectDisposedException or TimeoutException)
+        {
+            // Al cerrar una sesión ya rota no hay nada útil que hacer con el error.
+        }
+        await _client.DisposeAsync();
+    }
+
+    private static async Task TranslateAsync(string operation, Func<Task> action)
+    {
+        try
+        {
+            await action();
+        }
+        catch (LibException ex)
+        {
+            throw Wrap(operation, ex);
+        }
+    }
+
+    private static S7SymbolicException Wrap(string operation, LibException ex) =>
+        new(operation, ex.ErrorCode, ex.IsTransient || ex is S7CommPlusTimeoutException, ex);
 }

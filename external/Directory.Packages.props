@@ -1,0 +1,6 @@
+<Project>
+  <!-- Los submódulos fijan sus propias versiones de paquetes: sin gestión central. -->
+  <PropertyGroup>
+    <ManagePackageVersionsCentrally>false</ManagePackageVersionsCentrally>
+  </PropertyGroup>
+</Project>

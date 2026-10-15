@@ -1,6 +1,19 @@
 namespace PlcMonitor.Drivers.S7Symbolic;
 
-/// <summary>Ajustes del driver S7 simbólico (S7CommPlus con TLS).</summary>
+/// <summary>Seguridad de la sesión S7CommPlus.</summary>
+public enum S7SymbolicSecurity
+{
+    /// <summary>Intenta TLS y, si la CPU lo rechaza, autenticación clásica por challenge (equivale a "Preferred" en Ignition).</summary>
+    Auto,
+
+    /// <summary>Solo TLS (S7-1200 FW ≥ 4.5 / S7-1500 FW ≥ 2.9 con comunicación PG/HMI segura).</summary>
+    Tls,
+
+    /// <summary>Solo autenticación clásica por challenge, sin TLS (proyectos TIA ≤ V16 o comunicación segura desactivada).</summary>
+    Legacy,
+}
+
+/// <summary>Ajustes del driver S7 simbólico (S7CommPlus).</summary>
 public sealed class S7SymbolicSettings
 {
     public string Host { get; set; } = "";
@@ -13,9 +26,5 @@ public sealed class S7SymbolicSettings
 
     public int TimeoutMs { get; set; } = 10000;
 
-    /// <summary>
-    /// Solo para diagnóstico: si se indica, los secretos TLS de cada sesión se guardan en este directorio
-    /// (key_*.log) para poder descifrar capturas con Wireshark. No usar en producción.
-    /// </summary>
-    public string? TlsKeyLogDirectory { get; set; }
+    public S7SymbolicSecurity Security { get; set; } = S7SymbolicSecurity.Auto;
 }

@@ -15,9 +15,13 @@ public class S7SymbolicConnectionTests
 
         public Dictionary<string, ulong> WriteErrors { get; } = new(StringComparer.Ordinal);
 
-        public int ConnectResult { get; set; }
+        /// <summary>Si no es null, ConnectAsync lanza este error.</summary>
+        public S7SymbolicException? ConnectError { get; set; }
 
-        public int NextReadResult { get; set; }
+        /// <summary>Si no es null, la siguiente lectura lanza este error.</summary>
+        public S7SymbolicException? NextReadError { get; set; }
+
+        public string? NegotiatedSecurity { get; set; } = "TLS";
 
         public int ResolveCalls { get; private set; }
 
@@ -27,35 +31,35 @@ public class S7SymbolicConnectionTests
 
         public bool Disposed { get; private set; }
 
-        public int Connect(string host, string password, string username, int timeoutMs) => ConnectResult;
+        public Task ConnectAsync(CancellationToken cancellationToken) =>
+            ConnectError is { } error ? Task.FromException(error) : Task.CompletedTask;
 
-        public void Disconnect()
-        {
-        }
-
-        public PlcTag? ResolveTag(string symbol)
+        public Task<PlcTag?> ResolveTagAsync(string symbol, CancellationToken cancellationToken)
         {
             ResolveCalls++;
             if (symbol.Contains('?', StringComparison.Ordinal))
-                throw new InvalidOperationException("Symbol syntax error");
-            return Symbols.TryGetValue(symbol, out var s) ? PlcTags.TagFactory(symbol, new ItemAddress(), s.Type, s.Value is Array) : null;
+                throw new ArgumentException("Symbol syntax error");
+            return Task.FromResult(Symbols.TryGetValue(symbol, out var s) ? PlcTags.TagFactory(symbol, new ItemAddress(), s.Type, s.Value is Array) : null);
         }
 
-        public int ReadTags(IReadOnlyList<PlcTag> tags)
+        public Task ReadTagsAsync(IReadOnlyList<PlcTag> tags, CancellationToken cancellationToken)
         {
             ReadBatches.Add(tags.Select(t => t.Name).ToList());
-            if (NextReadResult != 0)
-                return NextReadResult;
+            if (NextReadError is { } error)
+            {
+                NextReadError = null;
+                return Task.FromException(error);
+            }
             foreach (var tag in tags)
             {
                 PlcTagValueMapper.TrySetValue(tag, Symbols[tag.Name].Value, out _).ShouldBeTrue();
                 tag.Quality = PlcTagQC.TAG_QUALITY_GOOD;
                 tag.LastReadError = 0;
             }
-            return 0;
+            return Task.CompletedTask;
         }
 
-        public int WriteTags(IReadOnlyList<PlcTag> tags)
+        public Task WriteTagsAsync(IReadOnlyList<PlcTag> tags, CancellationToken cancellationToken)
         {
             foreach (var tag in tags)
             {
@@ -64,17 +68,20 @@ public class S7SymbolicConnectionTests
                 if (error == 0)
                     Symbols[tag.Name] = (tag.Datatype, PlcTagValueMapper.GetValue(tag).Value!);
             }
-            return 0;
+            return Task.CompletedTask;
         }
 
-        public int Browse(out IReadOnlyList<SymbolEntry> symbols)
+        public Task<IReadOnlyList<SymbolEntry>> BrowseAsync(CancellationToken cancellationToken)
         {
             BrowseCalls++;
-            symbols = Symbols.Select(s => new SymbolEntry(s.Key, s.Value.Type)).ToArray();
-            return 0;
+            return Task.FromResult<IReadOnlyList<SymbolEntry>>(Symbols.Select(s => new SymbolEntry(s.Key, s.Value.Type)).ToArray());
         }
 
-        public void Dispose() => Disposed = true;
+        public ValueTask DisposeAsync()
+        {
+            Disposed = true;
+            return ValueTask.CompletedTask;
+        }
     }
 
     private static (S7SymbolicConnection Conn, FakeClient Cpu) Create()
@@ -97,24 +104,36 @@ public class S7SymbolicConnectionTests
     public async Task Connect_failure_reports_readable_error_and_faults()
     {
         var (conn, cpu) = Create();
-        cpu.ConnectResult = S7Consts.errCliInvalidPassword;
+        cpu.ConnectError = new S7SymbolicException("Conexión", S7Consts.errCliInvalidPassword);
 
-        var ex = await Should.ThrowAsync<S7CommPlusException>(() => conn.ConnectAsync());
+        var ex = await Should.ThrowAsync<S7SymbolicException>(() => conn.ConnectAsync());
         ex.Message.ShouldContain("Contraseña incorrecta");
         conn.State.ShouldBe(ConnectionState.Faulted);
         cpu.Disposed.ShouldBeTrue();
     }
 
     [Fact]
-    public async Task Cpu_without_secure_communication_suggests_the_absolute_driver()
+    public async Task Cpu_without_tls_in_tls_mode_suggests_auto_or_legacy()
     {
         var (conn, cpu) = Create();
-        cpu.ConnectResult = S7Consts.errSecureCommNotAvailable;
+        cpu.ConnectError = new S7SymbolicException("Conexión", S7Consts.errInitSslResponse);
 
-        var ex = await Should.ThrowAsync<S7CommPlusException>(() => conn.ConnectAsync());
+        var ex = await Should.ThrowAsync<S7SymbolicException>(() => conn.ConnectAsync());
         ex.Message.ShouldContain("comunicación segura (TLS)");
-        ex.Message.ShouldContain("s7-absolute");
+        ex.Message.ShouldContain("legacy");
         conn.State.ShouldBe(ConnectionState.Faulted);
+    }
+
+    [Fact]
+    public async Task Device_info_reports_negotiated_security()
+    {
+        var (conn, cpu) = Create();
+        cpu.NegotiatedSecurity = "legacy (sin TLS)";
+        await conn.ConnectAsync();
+
+        var info = await conn.GetDeviceInfoAsync();
+
+        info["Security"].ShouldBe("legacy (sin TLS)");
     }
 
     [Fact]
@@ -163,7 +182,7 @@ public class S7SymbolicConnectionTests
     {
         var (conn, cpu) = Create();
         await conn.ConnectAsync();
-        cpu.NextReadResult = S7Consts.errTCPDataReceive;
+        cpu.NextReadError = new S7SymbolicException("Lectura", S7Consts.errTCPDataReceive);
 
         var values = await conn.ReadAsync(["Motor.Speed"]);
 
@@ -176,7 +195,7 @@ public class S7SymbolicConnectionTests
     {
         var (conn, cpu) = Create();
         await conn.ConnectAsync();
-        cpu.NextReadResult = S7Consts.errCliItemNotAvailable;
+        cpu.NextReadError = new S7SymbolicException("Lectura", S7Consts.errCliItemNotAvailable);
 
         var values = await conn.ReadAsync(["Motor.Speed"]);
 
@@ -250,17 +269,21 @@ public class S7SymbolicConnectionTests
         factory.Capabilities.HasFlag(DriverCapabilities.Browse).ShouldBeTrue();
         factory.ValidateSettings(JsonSerializer.SerializeToElement(new { host = "", timeoutMs = 10, username = "u" })).Count.ShouldBe(3);
         factory.ValidateSettings(JsonSerializer.SerializeToElement(new { host = "192.168.2.1", password = "p" })).ShouldBeEmpty();
+        factory.ValidateSettings(JsonSerializer.SerializeToElement(new { host = "10.0.0.1", security = "legacy" })).ShouldBeEmpty();
     }
 
     [Fact]
     public void Communication_codes_are_classified()
     {
-        S7CommPlusException.IsCommunicationCode(S7Consts.errTCPConnectionReset).ShouldBeTrue();
-        S7CommPlusException.IsCommunicationCode(S7Consts.errTCPUnreachableHost).ShouldBeTrue();
-        S7CommPlusException.IsCommunicationCode(S7Consts.errIsoInvalidPDU).ShouldBeTrue();
-        S7CommPlusException.IsCommunicationCode(S7Consts.errCliJobTimeout).ShouldBeTrue();
-        S7CommPlusException.IsCommunicationCode(S7Consts.errOpenSSL).ShouldBeTrue();
-        S7CommPlusException.IsCommunicationCode(S7Consts.errCliInvalidPassword).ShouldBeFalse();
-        S7CommPlusException.IsCommunicationCode(S7Consts.errCliItemNotAvailable).ShouldBeFalse();
+        S7SymbolicException.IsCommunicationCode(S7Consts.errTCPConnectionReset).ShouldBeTrue();
+        S7SymbolicException.IsCommunicationCode(S7Consts.errTCPUnreachableHost).ShouldBeTrue();
+        S7SymbolicException.IsCommunicationCode(S7Consts.errIsoInvalidPDU).ShouldBeTrue();
+        S7SymbolicException.IsCommunicationCode(S7Consts.errCliJobTimeout).ShouldBeTrue();
+        S7SymbolicException.IsCommunicationCode(S7Consts.errOpenSSL).ShouldBeTrue();
+        S7SymbolicException.IsCommunicationCode(S7Consts.errS7CommPlusDigestMismatch).ShouldBeTrue();
+        S7SymbolicException.IsCommunicationCode(S7Consts.errCliInvalidPassword).ShouldBeFalse();
+        S7SymbolicException.IsCommunicationCode(S7Consts.errCliItemNotAvailable).ShouldBeFalse();
+        S7SymbolicException.IsCommunicationCode(S7Consts.errS7CommPlusLegacyAuthentication).ShouldBeFalse();
+        new S7SymbolicException("Lectura", S7Consts.errCliFunctionRefused, isCommunicationError: true).IsCommunicationError.ShouldBeTrue();
     }
 }

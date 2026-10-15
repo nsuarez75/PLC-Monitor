@@ -14,7 +14,7 @@ PLC-Monitor es una herramienta propia y gratuita para pruebas y diagnóstico a p
 
 | Funcionalidad | Estado |
 |---|---|
-| Driver **S7 simbólico** (S7-1200/1500, S7CommPlus con TLS y contraseña) | ✅ Disponible |
+| Driver **S7 simbólico** (S7-1200/1500, S7CommPlus con o sin TLS, contraseña; sin PUT/GET) | ✅ Disponible |
 | Driver **S7 absoluto** (S7-300/400/1200/1500, PUT/GET) | ✅ Disponible |
 | CLI `plcmon`: info, explorar, leer, vigilar, escribir | ✅ Disponible |
 | Agente (servicio) multi-PLC con API gRPC | 🚧 Fase 2, en desarrollo (rama `feature/fase2-agente`) |
@@ -31,3 +31,4 @@ PLC-Monitor es una herramienta propia y gratuita para pruebas y diagnóstico a p
 |---|---|
 | 2026-10-14 | Primera versión: drivers S7 simbólico y absoluto, CLI `plcmon` |
 | 2026-10-14 | Fase 2: manual del agente; error S7 0x8104 (PUT/GET deshabilitado) en solución de problemas |
+| 2026-10-15 | `s7-symbolic` con o sin TLS (`--security auto/tls/legacy`) sobre el fork de DotNetProjects.S7CommPlusDriver; sin OpenSSL nativo |

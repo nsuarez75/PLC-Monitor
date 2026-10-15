@@ -25,6 +25,4 @@ key_*.log
 *.db-wal
 *.db-shm
 
-# Binarios nativos (OpenSSL) obtenidos con scripts/get-openssl-windows.sh
-native/
 artifacts/

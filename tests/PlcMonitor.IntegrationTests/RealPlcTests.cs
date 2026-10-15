@@ -16,7 +16,12 @@ public class RealPlcTests
     {
         var host = Env("PLCMON_IT_SYMBOLIC_HOST");
         Assert.SkipWhen(host is null, "PLCMON_IT_SYMBOLIC_HOST no definida");
-        var settings = new S7SymbolicSettings { Host = host!, Password = Env("PLCMON_IT_PASSWORD") ?? string.Empty };
+        var settings = new S7SymbolicSettings
+        {
+            Host = host!,
+            Password = Env("PLCMON_IT_PASSWORD") ?? string.Empty,
+            Security = Enum.Parse<S7SymbolicSecurity>(Env("PLCMON_IT_SECURITY") ?? "auto", ignoreCase: true),
+        };
         var device = new DeviceDefinition("it-symbolic", S7SymbolicDriverFactory.Id, JsonSerializer.SerializeToElement(settings, DriverJson.Options));
         var conn = new S7SymbolicDriverFactory().CreateConnection(device, NullLoggerFactory.Instance);
         await conn.ConnectAsync(TestContext.Current.CancellationToken);
@@ -24,10 +29,13 @@ public class RealPlcTests
     }
 
     [Fact]
-    public async Task Symbolic_connects_with_tls()
+    public async Task Symbolic_connects_with_expected_security()
     {
         await using var conn = await ConnectSymbolicAsync();
         conn.State.ShouldBe(ConnectionState.Connected);
+        // PLCMON_IT_EXPECTED_SECURITY: "TLS" o "legacy" (opcional).
+        if (Env("PLCMON_IT_EXPECTED_SECURITY") is { } expected)
+            (await conn.GetDeviceInfoAsync(TestContext.Current.CancellationToken))["Security"].ShouldStartWith(expected, Case.Insensitive);
     }
 
     [Fact]
@@ -77,7 +85,7 @@ public class RealPlcTests
         var settings = new S7SymbolicSettings { Host = host!, Password = "PlcMonitor-contraseña-incorrecta" };
         var device = new DeviceDefinition("it-bad", S7SymbolicDriverFactory.Id, JsonSerializer.SerializeToElement(settings, DriverJson.Options));
         await using var conn = new S7SymbolicDriverFactory().CreateConnection(device, NullLoggerFactory.Instance);
-        await Should.ThrowAsync<S7CommPlusException>(() => conn.ConnectAsync(TestContext.Current.CancellationToken));
+        await Should.ThrowAsync<S7SymbolicException>(() => conn.ConnectAsync(TestContext.Current.CancellationToken));
         conn.State.ShouldBe(ConnectionState.Faulted);
     }
 

@@ -2,6 +2,17 @@
 
 ## [Sin publicar / Unreleased] — fase 2 / phase 2
 
+### Cambiado / Changed
+- **`s7-symbolic` sobre un fork propio de DotNetProjects.S7CommPlusDriver** (submódulo `external/S7CommPlusDriver`, rama `plcmonitor`) en lugar del port de thomas-v2 en `src/S7CommPlus`. / *Now built on an own fork of DotNetProjects.S7CommPlusDriver.*
+- **Acceso simbólico sin TLS**: nuevo ajuste `security` (`auto` por defecto, `tls`, `legacy`; CLI `--security`). `auto` intenta TLS y, si la CPU lo rechaza, usa la autenticación clásica por *challenge* (HarpoS7), como el modo *Preferred* de Ignition. No hace falta PUT/GET. / *Symbolic access without TLS (`security`: `auto`/`tls`/`legacy`).*
+- TLS 1.3 gestionado (BouncyCastle): **ya no hace falta OpenSSL** (ni las DLL en Windows ni `libssl3` en Linux). Se retiran `scripts/get-openssl-windows.sh` y `PLCMONITOR_OPENSSL_DIR`. / *Managed TLS: OpenSSL is no longer required.*
+- `GetDeviceInfo`/`plcmon info` muestran la seguridad negociada (`Security`). La excepción del driver pasa a llamarse `S7SymbolicException` e incluye el detalle de la librería.
+- Se retira la opción `--tls-keylog` (y `tlsKeyLogDirectory`).
+
+### Corregido en el fork / Fixed in the fork
+- Contraseña incorrecta dada por válida (truncado del `ReturnValue` a `Int16`), igual que en la 1.0.
+- S7-1200: un símbolo cuyo primer nivel no era un DB (o no existía) tiraba la sesión con "Could not get type info": la CPU no tiene áreas de temporizadores/contadores S7.
+
 ### Añadido / Added
 - **Motor** `PlcMonitor.Engine`: varios dispositivos a la vez, cada uno con su supervisor; reconexión con espera exponencial; grupos de escaneo; caché del último valor; activar/desactivar en caliente; lectura bajo demanda; escritura con doble llave (`writesEnabled` + `writable`) y log de auditoría; suscripciones con foto inicial y eventos sin huecos. Configuración en `agent.json` validada al arrancar.
 - **Agente** `plcmon-agent`: servicio (Windows Service / systemd) con API gRPC (`agent.proto`, paquete `plcmonitor.agent.v1`) y streaming en vivo. Por defecto solo escucha en `127.0.0.1:5310`.
@@ -16,6 +27,7 @@
 ### Verificado / Verified
 - S7-1200 real (10.225.188.120, PUT/GET deshabilitado): conexión y estado de la CPU con `s7-absolute`; agente completo de punta a punta (estado, `GetDeviceInfo`, `ListTags`, `Subscribe`) también desde el paquete linux-x64 extraído como usuario normal.
 - 310 tests correctos, 6 omitidos (integración sin PLC).
+- S7-1200 real sin TLS ni PUT/GET (10.225.188.120): `s7-symbolic` en modo `auto` → `legacy`; exploración (1463 símbolos), lectura y sondeo, también desde el paquete linux-x64. Integración: 4 correctos, 2 omitidos. 312 tests unitarios correctos.
 
 ## [1.0.0] - 2026-10-14
 

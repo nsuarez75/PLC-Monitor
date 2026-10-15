@@ -1,6 +1,6 @@
 # PLC-Monitor — Manual de uso
 
-> Versión 1.0.0 · Última actualización: 2026-10-14 · [English](../en/user-guide.md)
+> Versión 1.0.0 · Última actualización: 2026-10-15 · [English](../en/user-guide.md)
 
 En esta versión PLC-Monitor se usa desde la línea de comandos con el programa **`plcmon`**. La aplicación de escritorio llegará en la fase 3.
 
@@ -10,16 +10,25 @@ En esta versión PLC-Monitor se usa desde la línea de comandos con el programa 
 |---|---|
 | Sistema | Windows 10/11 x64 o Linux x64/arm64 |
 | .NET | Runtime .NET 10 (o el ejecutable autocontenido cuando se distribuya) |
-| OpenSSL 3 (solo modo simbólico) | **Windows**: `libcrypto-3-x64.dll` y `libssl-3-x64.dll` junto a `plcmon.exe` (se incluyen). **Linux**: el `libssl3` del sistema |
 | Red | Acceso TCP al puerto **102** del PLC |
 
 ### ¿Qué driver uso?
 
 | PLC | Driver | Requisitos en el PLC |
 |---|---|---|
-| S7-1500 FW ≥ 2.9 / S7-1200 FW ≥ 4.3, proyectado con TIA Portal ≥ V17 | **`s7-symbolic`** (por defecto) | Ninguno especial. Si la CPU tiene nivel de protección, la contraseña |
+| S7-1200 (FW ≥ 4.3) / S7-1500, con o sin comunicación segura (TLS) | **`s7-symbolic`** (por defecto) | Ninguno: **no hace falta PUT/GET**. Si la CPU tiene nivel de protección, la contraseña |
 | S7-300 / S7-400 | **`s7-absolute`** | — |
-| S7-1200/1500 sin comunicación segura, o para leer DBs **no optimizados** por dirección | **`s7-absolute`** | En TIA: *Permitir acceso PUT/GET* y DB con *acceso optimizado* desactivado |
+| S7-1200/1500 para leer DBs **no optimizados** por dirección | **`s7-absolute`** | En TIA: *Permitir acceso PUT/GET* y DB con *acceso optimizado* desactivado |
+
+Con `s7-symbolic` la seguridad se elige con `--security`:
+
+| `--security` | Uso | En Ignition |
+|---|---|---|
+| `auto` (por defecto) | Prueba TLS y, si la CPU no lo admite, conecta sin TLS (autenticación clásica). Sirve para cualquier CPU | *Preferred* |
+| `tls` | Exige TLS: falla si la CPU no tiene comunicación segura (TIA ≥ V17, S7-1200 FW ≥ 4.5 / S7-1500 FW ≥ 2.9) | *Required* |
+| `legacy` | Sin TLS directamente (proyectos TIA ≤ V16 o comunicación segura desactivada). Ahorra el intento TLS | *Disabled* |
+
+`plcmon info` muestra en **Security** lo que se negoció (`TLS` o `legacy (sin TLS)`).
 
 ## 2. Opciones comunes
 
@@ -35,7 +44,7 @@ Todas las órdenes que hablan con un PLC aceptan:
 | `--rack`, `--slot` | Rack y slot (absoluto). S7-300: slot 2; S7-1500: slot 1 | 0 / 1 |
 | `-t, --timeout` | Timeout en ms | 10000 |
 | `-v, --verbose` | Log detallado (útil para diagnosticar) | — |
-| `--tls-keylog <DIR>` | Guarda los secretos TLS para descifrar capturas con Wireshark. **Solo diagnóstico** | — |
+| `--security` | `auto`, `tls` o `legacy` (simbólico, ver arriba) | `auto` |
 
 > **Consejo:** pasa la contraseña con la variable de entorno para que no quede en el historial:
 > - PowerShell: `$env:PLCMON_PASSWORD = "..."`
@@ -47,7 +56,7 @@ Todas las órdenes que hablan con un PLC aceptan:
 Lista los drivers disponibles y sus capacidades.
 
 ### `plcmon info`
-Conecta y muestra el estado y la información del dispositivo. Sirve para comprobar la red, el TLS y la contraseña.
+Conecta y muestra el estado y la información del dispositivo. Sirve para comprobar la red, la seguridad negociada (TLS o sin TLS) y la contraseña.
 ```
 plcmon info -H 192.168.2.1
 ```
@@ -136,10 +145,11 @@ Compatible con la sintaxis de Ignition y la clásica de STEP 7. No distingue may
 
 | Síntoma | Causa probable y solución |
 |---|---|
-| `Error de OpenSSL/TLS` | Faltan las DLL de OpenSSL (Windows) o `libssl3` (Linux), o la CPU no admite comunicación segura (firmware antiguo o proyecto anterior a TIA V17). Usa `s7-absolute` |
+| `La CPU no acepta comunicación segura (TLS)` | Se usó `--security tls` con una CPU sin comunicación segura. Usa `auto` o `legacy` |
+| `La CPU rechazó la autenticación clásica (sin TLS)` | Se usó `--security legacy` con una CPU que exige TLS, o su clave pública no está en el catálogo de HarpoS7. Usa `auto` o `tls` |
 | `TCP : Error receiving Data` al conectar | Red o puerto 102 bloqueado, o CPU sin recursos de conexión libres (cada HMI/SCADA consume una). Revisa con `-v` |
 | `Acceso denegado (¿contraseña incorrecta?)` | La contraseña no corresponde a ningún nivel de acceso de la CPU |
 | Conecta, pero las lecturas dan `BadAccessDenied` | No se indicó contraseña y la CPU está protegida |
 | Absoluto: error al leer un DB | El DB no existe, es **optimizado** (en TIA desactiva *Acceso optimizado al bloque*) o PUT/GET no está permitido |
 | Absoluto: conecta y `info` funciona, pero toda lectura da `BadAccessDenied` «error S7 0x8104» | PUT/GET deshabilitado. En TIA: Propiedades de la CPU → Protección y seguridad → Mecanismos de conexión → *Permitir acceso vía comunicación PUT/GET*, y cargar |
-| Hay que analizar el tráfico | `--tls-keylog C:\temp` y captura con Wireshark. Luego: `editcap --inject-secrets tls,key_*.log captura.pcapng salida.pcapng` |
+| Símbolo inexistente | `BadAddressInvalid` «El símbolo '...' no existe en la CPU». Comprueba el nombre con `plcmon browse` |

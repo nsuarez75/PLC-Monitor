@@ -3,7 +3,6 @@ using PlcMonitor.Abstractions;
 using PlcMonitor.Core;
 using PlcMonitor.Drivers.S7Absolute;
 using PlcMonitor.Drivers.S7Symbolic;
-using S7CommPlusDriver;
 using Spectre.Console;
 
 namespace PlcMonitor.Cli;
@@ -24,11 +23,6 @@ internal static class CliRuntime
             });
             b.SetMinimumLevel(settings.Verbose ? LogLevel.Debug : LogLevel.Warning);
         });
-        if (settings.Verbose)
-        {
-            var libLogger = logging.CreateLogger("S7CommPlus");
-            S7pLog.Sink = m => libLogger.LogDebug("{Message}", m);
-        }
 
         var device = settings.ToDeviceDefinition();
         var factory = Registry.Get(device.DriverTypeId);

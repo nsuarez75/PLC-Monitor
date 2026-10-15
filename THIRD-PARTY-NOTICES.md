@@ -4,12 +4,13 @@ PLC-Monitor incluye o usa los siguientes componentes de terceros / includes or u
 
 | Componente | Licencia | Notas |
 |---|---|---|
-| S7CommPlusDriver © Thomas Wiens — https://github.com/thomas-v2/S7CommPlusDriver | GNU LGPL v3 | Modificado. Código fuente en `src/S7CommPlus`, cambios en `src/S7CommPlus/NOTICE.md`. Se distribuye como ensamblado separado y reemplazable (`S7CommPlus.dll`). Texto de la licencia: `licenses/LGPL-3.0.txt` |
-| zlib.net © ComponentAce | BSD | Dentro de S7CommPlus. `licenses/zlib.net.txt` |
+| S7CommPlusDriver — fork propio https://github.com/nsuarez75/S7CommPlusDriver (rama `plcmonitor`) de https://github.com/dotnetprojects/S7CommPlusDriver, derivado de https://github.com/thomas-v2/S7CommPlusDriver (© Thomas Wiens) | GNU LGPL v3 o posterior | Modificado: cambios en `licenses/S7CommPlusDriver-NOTICE.md`. Código fuente en el submódulo `external/S7CommPlusDriver`. Se distribuye como ensamblado separado y reemplazable (`S7CommPlusDriver.dll`). Texto de la licencia: `licenses/LGPL-3.0.txt` |
+| HarpoS7 y HarpoS7.PublicKeys © bonk — https://github.com/bonk-dev/HarpoS7 | MIT | Autenticación S7CommPlus clásica (sin TLS) |
+| BouncyCastle.Cryptography — https://www.bouncycastle.org | MIT | TLS 1.3 gestionado (sin OpenSSL nativo) |
+| zlib.net-mutliplatform — https://github.com/cinderblocks/zlib.net | BSD-3-Clause | |
 | S7.Net Plus — https://github.com/S7NetPlus/s7netplus | MIT | |
 | Spectre.Console — https://github.com/spectreconsole/spectre.console | MIT | |
 | Microsoft .NET / Microsoft.Extensions.* | MIT | |
-| OpenSSL 3.5 — https://www.openssl.org | Apache-2.0 | Solo en el paquete de Windows (`libcrypto-3-x64.dll`, `libssl-3-x64.dll`). En Linux se usa la del sistema |
 
 PLC-Monitor no incluye ni usa la librería AGLink de DELTA LOGIC ni ningún componente de Inductive Automation.
 PLC-Monitor neither includes nor uses DELTA LOGIC's AGLink library or any Inductive Automation component.

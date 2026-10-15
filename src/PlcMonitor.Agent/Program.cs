@@ -3,7 +3,6 @@ using PlcMonitor.Agent;
 using PlcMonitor.Core;
 using PlcMonitor.Drivers.S7Absolute;
 using PlcMonitor.Drivers.S7Symbolic;
-using S7CommPlusDriver;
 
 var builder = WebApplication.CreateBuilder(new WebApplicationOptions
 {
@@ -23,10 +22,6 @@ builder.Services.AddHostedService(sp => sp.GetRequiredService<EngineHost>());
 builder.Services.AddGrpc();
 
 var app = builder.Build();
-
-var libLogger = app.Services.GetRequiredService<ILoggerFactory>().CreateLogger("S7CommPlus");
-if (libLogger.IsEnabled(LogLevel.Debug))
-    S7pLog.Sink = m => libLogger.LogDebug("{Message}", m);
 
 app.MapGrpcService<AgentGrpcService>();
 await app.RunAsync();

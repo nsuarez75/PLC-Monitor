@@ -14,7 +14,7 @@ public class DeviceSettings : CommandSettings
     public const string PasswordEnvironmentVariable = "PLCMON_PASSWORD";
 
     [CommandOption("-d|--driver <DRIVER>")]
-    [Description("Driver: s7-symbolic (S7-1200/1500, TLS) o s7-absolute (PUT/GET).")]
+    [Description("Driver: s7-symbolic (S7-1200/1500, acceso simbólico) o s7-absolute (PUT/GET).")]
     [DefaultValue(S7SymbolicDriverFactory.Id)]
     public string Driver { get; set; } = S7SymbolicDriverFactory.Id;
 
@@ -55,9 +55,10 @@ public class DeviceSettings : CommandSettings
     [DefaultValue(10000)]
     public int TimeoutMs { get; set; } = 10000;
 
-    [CommandOption("--tls-keylog <DIR>")]
-    [Description("Diagnóstico: guarda los secretos TLS en DIR para descifrar capturas con Wireshark (s7-symbolic).")]
-    public string? TlsKeyLogDirectory { get; set; }
+    [CommandOption("--security <MODE>")]
+    [Description("Seguridad (s7-symbolic): auto (TLS y, si la CPU no lo admite, sin TLS), tls o legacy (sin TLS).")]
+    [DefaultValue(S7SymbolicSecurity.Auto)]
+    public S7SymbolicSecurity Security { get; set; } = S7SymbolicSecurity.Auto;
 
     [CommandOption("-v|--verbose")]
     [Description("Muestra el log detallado del driver.")]
@@ -91,7 +92,7 @@ public class DeviceSettings : CommandSettings
                 Password = Password ?? environment(PasswordEnvironmentVariable) ?? string.Empty,
                 Username = Username ?? string.Empty,
                 TimeoutMs = TimeoutMs,
-                TlsKeyLogDirectory = TlsKeyLogDirectory,
+                Security = Security,
             },
             _ => throw new ArgumentException($"Driver desconocido '{Driver}'. Usa s7-symbolic o s7-absolute."),
         };

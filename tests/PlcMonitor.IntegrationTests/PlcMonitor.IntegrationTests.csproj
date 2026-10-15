@@ -1,7 +1,9 @@
 <Project Sdk="Microsoft.NET.Sdk">
   <!--
     Tests contra un PLC real. SOLO LECTURA. Se omiten si no están definidas las variables de entorno:
-      PLCMON_IT_SYMBOLIC_HOST   IP de una S7-1200/1500 con comunicación segura
+      PLCMON_IT_SYMBOLIC_HOST   IP de una S7-1200/1500 (acceso simbólico, con o sin TLS)
+      PLCMON_IT_SECURITY        auto | tls | legacy (opcional, auto por defecto)
+      PLCMON_IT_EXPECTED_SECURITY  TLS | legacy: seguridad que debe negociarse (opcional)
       PLCMON_IT_PASSWORD        contraseña de acceso (opcional)
       PLCMON_IT_SYMBOL          símbolo legible para la prueba de lectura (opcional)
       PLCMON_IT_ABSOLUTE_HOST   IP de un PLC con PUT/GET habilitado (opcional)

@@ -6,7 +6,7 @@ using S7CommPlusDriver.ClientApi;
 namespace PlcMonitor.Drivers.S7Symbolic;
 
 /// <summary>
-/// Conexión simbólica S7CommPlus (TLS + legitimación) con S7-1200/1500.
+/// Conexión simbólica S7CommPlus con S7-1200/1500: TLS o autenticación clásica sin TLS, más legitimación por contraseña.
 /// Las direcciones son nombres simbólicos: <c>"MiDB".Motor.Velocidad</c>, <c>MiDB.Array[3]</c> o el nombre devuelto por la exploración.
 /// </summary>
 internal sealed class S7SymbolicConnection : DeviceConnectionBase, IBrowsableConnection
@@ -14,8 +14,10 @@ internal sealed class S7SymbolicConnection : DeviceConnectionBase, IBrowsableCon
     private readonly S7SymbolicSettings _settings;
     private readonly Func<ISymbolicClient> _clientFactory;
 
-    // Tags ya resueltos (o el motivo por el que no se pudieron resolver). Se vacía al reconectar.
+    // Tags ya resueltos (o el motivo por el que no se pudieron resolver). Se vacían al reconectar.
+    // Las escrituras usan instancias propias para no alterar el valor leído (y conservar la longitud de los String).
     private readonly Dictionary<string, (PlcTag? Tag, string? Error)> _resolved = new(StringComparer.Ordinal);
+    private readonly Dictionary<string, (PlcTag? Tag, string? Error)> _resolvedForWrite = new(StringComparer.Ordinal);
     private ISymbolicClient? _client;
     private IReadOnlyList<SymbolEntry>? _symbols;
 
@@ -24,7 +26,7 @@ internal sealed class S7SymbolicConnection : DeviceConnectionBase, IBrowsableCon
         : base(deviceName, logger, timeProvider)
     {
         _settings = settings;
-        _clientFactory = clientFactory ?? (() => new S7CommPlusClient());
+        _clientFactory = clientFactory ?? (() => new S7CommPlusSymbolicClient(settings, logger));
     }
 
     public override DriverCapabilities Capabilities => DriverCapabilities.Read | DriverCapabilities.Write | DriverCapabilities.Browse;
@@ -46,53 +48,53 @@ internal sealed class S7SymbolicConnection : DeviceConnectionBase, IBrowsableCon
     public Task<BrowseResult> BrowseAsync(BrowseQuery query, CancellationToken cancellationToken = default)
     {
         ArgumentNullException.ThrowIfNull(query);
-        return RunExclusiveAsync(ct => Task.Run(() => Browse(query), ct), cancellationToken);
+        return RunExclusiveAsync(ct => BrowseCoreAsync(query, ct), cancellationToken);
     }
 
     protected override async Task OpenCoreAsync(CancellationToken cancellationToken)
     {
-        S7Client.KeyLogDirectory = _settings.TlsKeyLogDirectory;
         var client = _clientFactory();
-        var result = await Task.Run(() => client.Connect(_settings.Host, _settings.Password, _settings.Username, _settings.TimeoutMs), cancellationToken);
-        if (result != 0)
+        try
         {
-            client.Dispose();
-            throw new S7CommPlusException("Conexión", result);
+            await client.ConnectAsync(cancellationToken);
+        }
+        catch
+        {
+            await client.DisposeAsync();
+            throw;
         }
         _client = client;
         _resolved.Clear();
+        _resolvedForWrite.Clear();
+        Logger.LogInformation("{Device}: sesión S7CommPlus abierta ({Security})", DeviceName, client.NegotiatedSecurity ?? "?");
     }
 
-    protected override Task CloseCoreAsync()
+    protected override async Task CloseCoreAsync()
     {
         var client = _client;
         _client = null;
         _resolved.Clear();
-        client?.Dispose();
-        return Task.CompletedTask;
+        _resolvedForWrite.Clear();
+        if (client is not null)
+            await client.DisposeAsync();
     }
-
-    protected override Task<IReadOnlyList<TagValue>> ReadCoreAsync(IReadOnlyList<string> addresses, CancellationToken cancellationToken) =>
-        Task.Run<IReadOnlyList<TagValue>>(() => Read(addresses), cancellationToken);
-
-    protected override Task<IReadOnlyList<WriteResult>> WriteCoreAsync(IReadOnlyList<WriteRequest> requests, CancellationToken cancellationToken) =>
-        Task.Run<IReadOnlyList<WriteResult>>(() => Write(requests), cancellationToken);
 
     protected override Task<IReadOnlyDictionary<string, string>> GetDeviceInfoCoreAsync(CancellationToken cancellationToken) =>
         Task.FromResult<IReadOnlyDictionary<string, string>>(new Dictionary<string, string>
         {
             ["Host"] = _settings.Host,
-            ["Protocol"] = "S7CommPlus (TLS 1.3)",
+            ["Protocol"] = "S7CommPlus",
+            ["Security"] = _client?.NegotiatedSecurity ?? _settings.Security.ToString().ToLowerInvariant(),
             ["Legitimation"] = string.IsNullOrEmpty(_settings.Password) ? "sin contraseña" : "contraseña",
             ["SymbolsLoaded"] = _symbols is null ? "no" : _symbols.Count.ToString(System.Globalization.CultureInfo.InvariantCulture),
         });
 
     protected override bool IsConnectionLost(Exception exception) =>
-        base.IsConnectionLost(exception) || exception is S7CommPlusException { IsCommunicationError: true };
+        base.IsConnectionLost(exception) || exception is S7SymbolicException { IsCommunicationError: true };
 
     private ISymbolicClient Client => _client ?? throw new IOException("Sesión S7CommPlus cerrada.");
 
-    private TagValue[] Read(IReadOnlyList<string> addresses)
+    protected override async Task<IReadOnlyList<TagValue>> ReadCoreAsync(IReadOnlyList<string> addresses, CancellationToken cancellationToken)
     {
         var client = Client;
         var results = new TagValue[addresses.Count];
@@ -102,7 +104,7 @@ internal sealed class S7SymbolicConnection : DeviceConnectionBase, IBrowsableCon
 
         for (var i = 0; i < addresses.Count; i++)
         {
-            var (tag, error) = Resolve(client, addresses[i]);
+            var (tag, error) = await ResolveAsync(client, _resolved, addresses[i], cancellationToken);
             if (tag is null)
                 results[i] = TagValue.Bad(QualityCode.BadAddressInvalid, TimeProvider.GetUtcNow(), error);
             else
@@ -113,11 +115,7 @@ internal sealed class S7SymbolicConnection : DeviceConnectionBase, IBrowsableCon
         }
 
         if (distinct.Count > 0)
-        {
-            var code = client.ReadTags(distinct.ToList());
-            if (code != 0)
-                throw new S7CommPlusException("Lectura", code);
-        }
+            await client.ReadTagsAsync(distinct.ToList(), cancellationToken);
 
         var timestamp = TimeProvider.GetUtcNow();
         for (var i = 0; i < addresses.Count; i++)
@@ -138,7 +136,7 @@ internal sealed class S7SymbolicConnection : DeviceConnectionBase, IBrowsableCon
         return results;
     }
 
-    private WriteResult[] Write(IReadOnlyList<WriteRequest> requests)
+    protected override async Task<IReadOnlyList<WriteResult>> WriteCoreAsync(IReadOnlyList<WriteRequest> requests, CancellationToken cancellationToken)
     {
         var client = Client;
         var results = new WriteResult?[requests.Count];
@@ -148,14 +146,17 @@ internal sealed class S7SymbolicConnection : DeviceConnectionBase, IBrowsableCon
         for (var i = 0; i < requests.Count; i++)
         {
             var request = requests[i];
-            var (template, error) = Resolve(client, request.Address);
-            if (template is null)
+            var (tag, error) = await ResolveAsync(client, _resolvedForWrite, request.Address, cancellationToken);
+            if (tag is null)
             {
                 results[i] = new WriteResult(request.Address, QualityCode.BadAddressInvalid, error);
                 continue;
             }
-            // Instancia propia para no alterar el tag usado en las lecturas.
-            var tag = PlcTags.TagFactory(template.Name, template.Address, template.Datatype, template.GetType().Name.EndsWith("Array", StringComparison.Ordinal));
+            if (tags.Contains(tag))
+            {
+                results[i] = new WriteResult(request.Address, QualityCode.BadConfiguration, "Dirección repetida en la misma escritura.");
+                continue;
+            }
             if (!PlcTagValueMapper.TrySetValue(tag, request.Value, out var convError))
             {
                 results[i] = new WriteResult(request.Address, QualityCode.BadTypeMismatch, convError);
@@ -167,9 +168,7 @@ internal sealed class S7SymbolicConnection : DeviceConnectionBase, IBrowsableCon
 
         if (tags.Count > 0)
         {
-            var code = client.WriteTags(tags);
-            if (code != 0)
-                throw new S7CommPlusException("Escritura", code);
+            await client.WriteTagsAsync(tags, cancellationToken);
             for (var t = 0; t < tags.Count; t++)
             {
                 var i = tagIndexes[t];
@@ -182,9 +181,10 @@ internal sealed class S7SymbolicConnection : DeviceConnectionBase, IBrowsableCon
         return results.Select(r => r!).ToArray();
     }
 
-    private (PlcTag? Tag, string? Error) Resolve(ISymbolicClient client, string address)
+    private async Task<(PlcTag? Tag, string? Error)> ResolveAsync(
+        ISymbolicClient client, Dictionary<string, (PlcTag? Tag, string? Error)> cache, string address, CancellationToken cancellationToken)
     {
-        if (_resolved.TryGetValue(address, out var cached))
+        if (cache.TryGetValue(address, out var cached))
             return cached;
 
         var validation = ValidateAddress(address);
@@ -197,27 +197,23 @@ internal sealed class S7SymbolicConnection : DeviceConnectionBase, IBrowsableCon
         {
             try
             {
-                var tag = client.ResolveTag(address.Trim());
+                var tag = await client.ResolveTagAsync(address.Trim(), cancellationToken);
                 entry = tag is null ? (null, $"El símbolo '{address}' no existe en la CPU.") : (tag, null);
             }
-#pragma warning disable CA1031 // La librería lanza Exception genérica ante símbolos mal formados o índices fuera de rango.
-            catch (Exception ex) when (ex is not OutOfMemoryException)
-#pragma warning restore CA1031
+            catch (ArgumentException ex)
             {
                 entry = (null, $"Símbolo '{address}' no válido: {ex.Message}");
             }
         }
-        _resolved[address] = entry;
+        cache[address] = entry;
         return entry;
     }
 
-    private BrowseResult Browse(BrowseQuery query)
+    private async Task<BrowseResult> BrowseCoreAsync(BrowseQuery query, CancellationToken cancellationToken)
     {
         if (_symbols is null || query.Refresh)
         {
-            var code = Client.Browse(out var symbols);
-            if (code != 0)
-                throw new S7CommPlusException("Exploración", code);
+            var symbols = await Client.BrowseAsync(cancellationToken);
             _symbols = symbols;
             Logger.LogInformation("{Device}: {Count} símbolos explorados", DeviceName, symbols.Count);
         }

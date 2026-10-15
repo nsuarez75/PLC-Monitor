@@ -1,6 +1,6 @@
 # PLC-Monitor — Manual técnico
 
-> Versión 1.0.0 · Última actualización: 2026-10-14 · [English](../en/technical.md)
+> Versión 1.0.0 · Última actualización: 2026-10-15 · [English](../en/technical.md)
 
 ## 1. Arquitectura
 
@@ -19,9 +19,10 @@ La visión completa (agente, app Avalonia, historiador, OPC UA, SSH) está en [d
               │                   │                                   │
    Drivers.S7Symbolic     Drivers.S7Absolute                 (futuro) Drivers.ModbusTcp ...
         │                         │
-   S7CommPlus (LGPL-3)       S7.Net Plus (MIT)
+   S7CommPlusDriver           S7.Net Plus (MIT)
+   (fork propio, LGPL-3)
         │
-   OpenSSL 3 (nativo)
+   HarpoS7 (MIT) · BouncyCastle (MIT)
 ```
 
 ### Proyectos
@@ -32,7 +33,7 @@ La visión completa (agente, app Avalonia, historiador, OPC UA, SSH) está en [d
 | `src/PlcMonitor.Core` | Lógica independiente del protocolo: `DriverRegistry`, `TagPoller` (sondeo con detección de cambios), `ValueParser` (texto → tipo), `ValueFormatter` |
 | `src/PlcMonitor.Drivers.S7Symbolic` | Driver `s7-symbolic` sobre S7CommPlus |
 | `src/PlcMonitor.Drivers.S7Absolute` | Driver `s7-absolute` sobre S7.Net Plus |
-| `src/S7CommPlus` | Port a .NET 10 de [S7CommPlusDriver](https://github.com/thomas-v2/S7CommPlusDriver), **LGPL-3**. Ensamblado separado. Modificaciones en `NOTICE.md` |
+| `external/S7CommPlusDriver` | Submódulo git: [fork propio](https://github.com/nsuarez75/S7CommPlusDriver) (rama `plcmonitor`) de [DotNetProjects.S7CommPlusDriver](https://github.com/dotnetprojects/S7CommPlusDriver), **LGPL-3**. Ensamblado separado (`S7CommPlusDriver.dll`). Modificaciones en `PLCMONITOR-NOTICE.md` |
 | `src/PlcMonitor.Cli` | CLI `plcmon` (Spectre.Console) |
 | `src/PlcMonitor.Engine` | Motor multi-dispositivo: `TagEngine` (caché, suscripciones, activar/desactivar, escritura con doble llave y auditoría), `DeviceSupervisor` (conexión, reconexión con backoff, grupos de escaneo), configuración `agent.json` |
 | `src/PlcMonitor.Agent.Contracts` | `agent.proto` con cliente y servidor gRPC generados. Lo usarán la app y otros clientes sin depender de ASP.NET |
@@ -69,39 +70,44 @@ La **reconexión automática** no es tarea del driver: la gestionará el agente 
 
 ## 3. Driver S7 simbólico (`s7-symbolic`)
 
-- Protocolo: S7CommPlus sobre ISO-on-TCP (puerto 102).
-  1. `InitSsl` en claro.
-  2. **TLS 1.3**, con suites `TLS_AES_256_GCM_SHA384` / `TLS_AES_128_GCM_SHA256` y grupos `X25519:P-256:P-384`.
-  3. Sesión y legitimación con contraseña.
-- **Resolución de símbolos bajo demanda** (`getPlcTagBySymbol`): no hace falta explorar toda la CPU para leer. Cada símbolo resuelto se guarda en caché por sesión, también si no existe (caché negativa). La caché se vacía al reconectar.
-- `BrowseAsync`: exploración completa (`Browse`), guardada en caché en memoria (nombre + tipo). Admite filtro, límite y `Refresh`.
+- Librería: `S7CommPlusClient` del fork de DotNetProjects.S7CommPlusDriver, envuelta en `ISymbolicClient` (`S7CommPlusSymbolicClient`) para poder sustituirla en los tests.
+- Protocolo: S7CommPlus sobre ISO-on-TCP (puerto 102). Ajuste `security`:
+
+| `security` | Qué hace | Equivale en Ignition a |
+|---|---|---|
+| `auto` (por defecto) | Intenta TLS; si la CPU lo rechaza en `InitSsl`, abre otra conexión con la autenticación clásica | *Preferred* |
+| `tls` | Solo TLS 1.3 (TLS gestionado con BouncyCastle, sin OpenSSL nativo). S7-1200 FW ≥ 4.5 / S7-1500 FW ≥ 2.9 con comunicación PG/HMI segura (TIA ≥ V17) | *Required* |
+| `legacy` | Solo autenticación clásica por *challenge* (sin TLS): proyectos TIA ≤ V16 o CPU con la comunicación segura desactivada | *Disabled* |
+
+- **Autenticación clásica** (HarpoS7, MIT): la CPU envía en `CreateObject` un *challenge* de 20 bytes y la huella de su clave pública (familia `00` = 1500, `01` = 1200, `03` = PLCSIM). Con la clave pública conocida se calcula la clave de sesión y cada PDU va firmada (*digest* de 32 bytes). La clave de sesión se renueva cada 25 minutos.
+- Después: legitimación con contraseña (si se indica). Con usuario, la legitimación nueva (FW 3.1+).
+- `AutoReconnect = false` en la librería: la reconexión es del `DeviceSupervisor`. `WriteEnabled = true`: la doble llave de escritura la aplica el motor.
+- **Resolución de símbolos bajo demanda** (`GetTagBySymbolAsync`): no hace falta explorar toda la CPU para leer. Cada símbolo resuelto se guarda en caché por sesión, también si no existe (caché negativa). Las escrituras usan una caché aparte con instancias propias (no alteran el valor leído y conservan la longitud declarada de los STRING). Las cachés se vacían al reconectar.
+- `BrowseAsync`: exploración completa, guardada en caché en memoria (nombre + tipo). Admite filtro, límite y `Refresh`.
 - **Tipos:** se deducen de la clase de tag que crea la propia librería (`PlcTags.TagFactory`), así cualquier tipo que soporte (BBOOL, BLOCK_FB, HW_*...) queda cubierto. Conversiones:
   - TIME, TOD, LTIME, LTOD y S5TIME → `TimeSpan`.
   - DTL, DT, DATE y LDT → `DateTime`.
   - CHAR y WCHAR → `string`.
   - Arrays → array .NET.
-- Escrituras: se crea una instancia nueva del tag para no alterar el de lectura. Si la CPU rechaza la escritura → `BadAccessDenied`.
-- Errores de la librería: `S7CommPlusException` con el código de `S7Consts`. `IsCommunicationError` decide si hay que reconectar (TCP, ISO, timeout, TLS).
+- Si la CPU rechaza una escritura → `BadAccessDenied`. La misma dirección dos veces en una escritura → `BadConfiguration`.
+- Errores: las excepciones de la librería se convierten en `S7SymbolicException` (código de `S7Consts` + detalle de la librería). `IsCommunicationError` decide si hay que reconectar: errores TCP/ISO, timeout, TLS, firma de integridad incorrecta o los que la librería marca como transitorios.
+- `GetDeviceInfo` incluye `Security`: la seguridad negociada (`TLS` o `legacy (sin TLS)`).
 
-### Hallazgos importantes (corregidos en el port)
+### Cambios en el fork (rama `plcmonitor`)
 
 | Problema | Causa | Solución |
 |---|---|---|
-| Con OpenSSL 3.5 la conexión da timeout | OpenSSL ≥ 3.5 ofrece por defecto el grupo post-cuántico **X25519MLKEM768**, el ClientHello crece y la CPU no responde | `S7Client.TlsGroups = "X25519:P-256:P-384"` (AGLink/Ignition ofrecen solo X25519) |
 | Una contraseña incorrecta se daba por válida | El `ReturnValue` de la legitimación (UInt64) se truncaba a `Int16`. El 1517F devolvió `0x2605990006990016` → `0x0016` > 0 | Cualquier `ReturnValue != 0` → `errCliAccessDenied` |
-| Las DLL de OpenSSL incluidas en el proyecto original son la 3.0.8 (sin soporte) | — | Se usa OpenSSL 3.5 LTS: `scripts/get-openssl-windows.sh`, resolución con `OpenSslLibraryResolver` |
+| En un S7-1200, cualquier símbolo cuyo primer nivel no fuera un DB tiraba la sesión ("Could not get type info") | Tras los DB se busca en M, Q, I, temporizadores y contadores S7; el 1200 no tiene estos dos últimos y la petición de su tipo fallaba | Un área que la CPU no tiene cuenta como «no encontrado» y se recuerda durante la sesión |
+| 24 MB de DLL de OpenSSL en la salida | El paquete las incluye para el backend OpenSSL | `S7CommPlusIncludeOpenSslRuntimes=false` (en `external/Directory.Build.props`) |
+| El driver usa `PlcTags.TagFactory` (interno) | — | `InternalsVisibleTo` para el driver y sus tests |
 
-### Carga de OpenSSL (`OpenSslLibraryResolver`)
-Orden de búsqueda:
-1. Variable de entorno `PLCMONITOR_OPENSSL_DIR`.
-2. Directorio de la aplicación.
-3. `runtimes/<rid>/native`.
-4. Búsqueda del sistema.
+Cuando aparezca un fallo en la librería se corrige en el fork; no se abren incidencias ni PR en el proyecto original.
 
-Nombres de fichero:
-- Windows: `libcrypto-3-x64.dll`, `libssl-3-x64.dll`.
-- Linux: `libcrypto.so.3`, `libssl.so.3`.
-- macOS: `.3.dylib`.
+### Hallazgos de la versión 1.0 (port anterior de thomas-v2)
+
+- Con OpenSSL ≥ 3.5 el handshake TLS no terminaba con el S7-1517F por el grupo post-cuántico X25519MLKEM768. Con el TLS gestionado (BouncyCastle) ya no aplica.
+- La CPU S7-1200 de pruebas responde a `InitSsl` con `ReturnValue=0xA201D60001E6FDF9` (bit de error): no tiene comunicación segura. Con `security: auto` se conecta sin TLS.
 
 ## 4. Driver S7 absoluto (`s7-absolute`)
 
@@ -114,9 +120,7 @@ Nombres de fichero:
 ## 5. Compilar y probar
 
 ```bash
-# Windows: copiar OpenSSL 3.5 (desde Git for Windows o la ruta indicada) a native/win-x64
-scripts/get-openssl-windows.sh
-
+git clone --recurse-submodules git@github.com:nsuarez75/PLC-Monitor.git   # o: git submodule update --init
 dotnet build PlcMonitor.slnx
 dotnet test --solution PlcMonitor.slnx          # usa Microsoft.Testing.Platform (global.json)
 dotnet run --project src/PlcMonitor.Cli -- info -H 192.168.2.1
@@ -133,12 +137,14 @@ scripts/publish-release.sh linux-x64    # paquete con la CLI y el agente (en age
 | `PlcMonitor.Drivers.S7Symbolic.Tests` | Conversión de tipos sobre las clases reales de la librería y conexión contra una CPU simulada |
 | `PlcMonitor.Engine.Tests` | Validación y carga de la configuración, backoff, motor con driver simulado (que hereda de `DeviceConnectionBase`) y reloj controlado: reconexión, activar/desactivar, 4 PLC independientes, doble llave de escritura, suscripciones y suscriptor lento |
 | `PlcMonitor.Agent.Tests` | API gRPC contra el agente en memoria (`WebApplicationFactory`) con driver simulado; conversión a mensajes protobuf |
-| `PlcMonitor.IntegrationTests` | **PLC real, solo lectura.** Se omiten si no hay variables de entorno: `PLCMON_IT_SYMBOLIC_HOST`, `PLCMON_IT_PASSWORD`, `PLCMON_IT_SYMBOL`, `PLCMON_IT_ABSOLUTE_HOST`, `PLCMON_IT_ABSOLUTE_ADDR` |
+| `PlcMonitor.IntegrationTests` | **PLC real, solo lectura.** Se omiten si no hay variables de entorno: `PLCMON_IT_SYMBOLIC_HOST`, `PLCMON_IT_SECURITY`, `PLCMON_IT_EXPECTED_SECURITY`, `PLCMON_IT_PASSWORD`, `PLCMON_IT_SYMBOL`, `PLCMON_IT_ABSOLUTE_HOST`, `PLCMON_IT_ABSOLUTE_ADDR` |
+
+Estado a 2026-10-15 (rama `feature/s7plus-legacy`): 312 tests correctos y 6 omitidos sin PLC. Contra el S7-1200 real (10.225.188.120, sin TLS y sin PUT/GET): conexión `auto` → `legacy`, exploración (1463 símbolos), lectura y sondeo; integración 4 correctos y 2 omitidos (contraseña y absoluto). Pendiente repetir contra el S7-1517F (TLS + contraseña).
 
 Estado a 2026-10-14 (rama `feature/fase2-agente`): 310 tests correctos y 6 omitidos (integración sin PLC). Un S7-1200 real (FW con PUT/GET deshabilitado) confirmó la conexión y la lectura de estado del driver absoluto, y el agente completo de punta a punta. Fase 1: 228 tests unitarios correctos. Integración contra el S7-1517F: 5 correctos y 1 omitido. El driver absoluto no se prueba contra ese PLC porque tiene PUT/GET deshabilitado; falta un PLC con PUT/GET para validarlo en real.
 
 ### Convenciones
-- .NET 10, `Nullable` activo, `TreatWarningsAsErrors`, `AnalysisLevel latest-recommended`. El código heredado de `S7CommPlus` queda excluido del análisis.
+- .NET 10, `Nullable` activo, `TreatWarningsAsErrors`, `AnalysisLevel latest-recommended`. El código de terceros (`external/`) no hereda estos ajustes (`external/Directory.Build.props` y `Directory.Packages.props` propios).
 - Paquetes con versión central en `Directory.Packages.props`.
 - Git: una rama por trabajo (`feature/...`) y commits pequeños. Los manuales ES/EN se actualizan en la misma rama que la funcionalidad.
 
@@ -146,10 +152,11 @@ Estado a 2026-10-14 (rama `feature/fase2-agente`): 310 tests correctos y 6 omiti
 
 | Componente | Licencia | Uso |
 |---|---|---|
-| S7CommPlusDriver (port en `src/S7CommPlus`) | LGPL-3.0 | Ensamblado separado y reemplazable. Las modificaciones se publican (`NOTICE.md`) |
-| zlib.net (ComponentAce) | BSD | Dentro de `S7CommPlus` |
+| S7CommPlusDriver (fork en `external/S7CommPlusDriver`) | LGPL-3.0 o posterior | Ensamblado separado y reemplazable. Modificaciones publicadas (`PLCMONITOR-NOTICE.md`) |
+| HarpoS7 / HarpoS7.PublicKeys | MIT | Autenticación clásica sin TLS |
+| BouncyCastle.Cryptography | MIT | TLS 1.3 gestionado |
+| zlib.net-mutliplatform | BSD-3-Clause | Descompresión de bloques |
 | S7.Net Plus | MIT | Paquete NuGet |
 | Spectre.Console | MIT | CLI |
-| OpenSSL 3.5 | Apache-2.0 | Librería nativa |
 
 **No se usa** la librería AGLink ni su clave de activación incluidas en el módulo de Ignition: son de Inductive Automation y DELTA LOGIC.
