@@ -45,7 +45,7 @@ Todo en .NET 10 (LTS), Windows y Linux x64/arm64.
 | `S7Monitor.App` | UI Avalonia 11 (MVVM, CommunityToolkit.Mvvm) | Avalonia: MIT |
 | `S7Monitor.Deploy` | Despliegue por SSH (subir binario, crear servicio systemd o Windows Service, enviar config) | SSH.NET: MIT |
 
-Requisito nativo: OpenSSL 3 (`libssl-3`/`libcrypto-3`). En Linux viene con el sistema; en Windows se distribuye con la app.
+Sin dependencias nativas: desde 2026-10-15 el driver simbólico usa un fork propio de DotNetProjects.S7CommPlusDriver con TLS gestionado (BouncyCastle) y autenticación clásica sin TLS (HarpoS7). Ya no hace falta OpenSSL.
 
 ## 3. Modelo funcional
 
@@ -88,6 +88,6 @@ Requisito nativo: OpenSSL 3 (`libssl-3`/`libcrypto-3`). En Linux viene con el si
 
 ## 5. Riesgos
 
-- *S7CommPlusDriver* lo marca su autor como "en desarrollo". Riesgo de incompatibilidades con firmwares concretos. Se mitiga con pruebas contra cada PLC real y con las capturas descifrables (`key_*.log`) para depurar.
-- El modo simbólico requiere firmware con TLS: S7-1500 ≥ V2.9 y S7-1200 ≥ V4.3, proyectado en TIA ≥ V17. Para CPUs antiguas queda el modo absoluto.
+- *S7CommPlusDriver* es un protocolo obtenido por ingeniería inversa. Riesgo de incompatibilidades con firmwares concretos. Se mitiga con pruebas contra cada PLC real y corrigiendo en nuestro fork (`external/S7CommPlusDriver`).
+- El modo simbólico funciona con TLS (TIA ≥ V17, S7-1500 ≥ V2.9 / S7-1200 ≥ V4.5) y sin TLS (autenticación clásica, `security: auto`/`legacy`); necesita la clave pública de la familia de la CPU en el catálogo de HarpoS7. Para S7-300/400 queda el modo absoluto.
 - Hay límite de conexiones HMI en la CPU: cada agente consume una.
