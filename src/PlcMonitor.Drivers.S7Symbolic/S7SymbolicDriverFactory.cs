@@ -3,14 +3,17 @@ using PlcMonitor.Abstractions;
 
 namespace PlcMonitor.Drivers.S7Symbolic;
 
-/// <summary>Driver S7 simbólico: S7CommPlus con TLS para S7-1200 (FW ≥ 4.3) y S7-1500 (FW ≥ 2.9).</summary>
+/// <summary>
+/// Driver S7 simbólico: S7CommPlus para S7-1200 (FW ≥ 4.3) y S7-1500, con TLS o con la autenticación clásica
+/// por challenge (sin TLS), según <see cref="S7SymbolicSettings.Security"/>.
+/// </summary>
 public sealed class S7SymbolicDriverFactory : DriverFactoryBase<S7SymbolicSettings>
 {
     public const string Id = "s7-symbolic";
 
     public override string TypeId => Id;
 
-    public override string DisplayName => "Siemens S7 simbólico (S7CommPlus/TLS)";
+    public override string DisplayName => "Siemens S7 simbólico (S7CommPlus, TLS o sin TLS)";
 
     public override DriverCapabilities Capabilities => DriverCapabilities.Read | DriverCapabilities.Write | DriverCapabilities.Browse;
 
@@ -23,8 +26,8 @@ public sealed class S7SymbolicDriverFactory : DriverFactoryBase<S7SymbolicSettin
             errors.Add("Timeout mínimo: 500 ms.");
         if (!string.IsNullOrEmpty(settings.Username) && string.IsNullOrEmpty(settings.Password))
             errors.Add("Si se indica usuario, la contraseña es obligatoria.");
-        if (settings.TlsKeyLogDirectory is { Length: > 0 } dir && !Directory.Exists(dir))
-            errors.Add($"El directorio de claves TLS '{dir}' no existe.");
+        if (!Enum.IsDefined(settings.Security))
+            errors.Add("security debe ser auto, tls o legacy.");
         return errors;
     }
 

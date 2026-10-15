@@ -53,7 +53,7 @@ There is an example next to the executable, `agent.sample.json`. The JSON accept
 
 | Field | Meaning |
 |---|---|
-| `settings` | The driver's own settings (`host`, `cpu`, `rack`, `slot`, `password`...). See the [user guide](user-guide.md) |
+| `settings` | The driver's own settings (`host`, `cpu`, `rack`, `slot`, `password`, `security`...). See the [user guide](user-guide.md) |
 | `reconnect` | Delay between connection attempts: `initialDelayMs`, then ×`multiplier` after each failure, up to `maxDelayMs`. Resets after a successful connection |
 | `scanGroups` | Scan groups (*scan classes*): the tags of a group are read together every `intervalMs` |
 | `tags[].name` | Tag name, unique within the device. Defaults to the address |

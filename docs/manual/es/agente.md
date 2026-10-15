@@ -53,7 +53,7 @@ Junto al ejecutable hay un ejemplo, `agent.sample.json`. El JSON admite comentar
 
 | Campo | Significado |
 |---|---|
-| `settings` | Los mismos ajustes que el driver (`host`, `cpu`, `rack`, `slot`, `password`...). Ver el [manual de uso](usuario.md) |
+| `settings` | Los mismos ajustes que el driver (`host`, `cpu`, `rack`, `slot`, `password`, `security`...). Ver el [manual de uso](usuario.md) |
 | `reconnect` | Espera entre intentos de conexión: `initialDelayMs`, luego ×`multiplier` en cada fallo, hasta `maxDelayMs`. Al conectar vuelve al valor inicial |
 | `scanGroups` | Grupos de escaneo (*scan classes*): los tags de un grupo se leen juntos cada `intervalMs` |
 | `tags[].name` | Nombre del tag, único en el dispositivo. Si se omite se usa la dirección |

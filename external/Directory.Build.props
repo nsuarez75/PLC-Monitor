@@ -1,0 +1,7 @@
+<Project>
+  <!-- Código de terceros (submódulos): no hereda los ajustes de PLC-Monitor (Directory.Build.props raíz). -->
+  <PropertyGroup>
+    <!-- Se usa el TLS gestionado (BouncyCastle): sin las DLL nativas de OpenSSL del fork. -->
+    <S7CommPlusIncludeOpenSslRuntimes>false</S7CommPlusIncludeOpenSslRuntimes>
+  </PropertyGroup>
+</Project>

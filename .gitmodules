@@ -1,0 +1,4 @@
+[submodule "external/S7CommPlusDriver"]
+	path = external/S7CommPlusDriver
+	url = git@github.com:nsuarez75/S7CommPlusDriver.git
+	branch = plcmonitor

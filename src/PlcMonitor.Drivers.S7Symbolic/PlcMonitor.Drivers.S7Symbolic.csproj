@@ -1,10 +1,11 @@
 <Project Sdk="Microsoft.NET.Sdk">
   <PropertyGroup>
-    <Description>Driver S7 simbólico (S7CommPlus + TLS) para S7-1200/1500.</Description>
+    <Description>Driver S7 simbólico (S7CommPlus, con o sin TLS) para S7-1200/1500.</Description>
   </PropertyGroup>
   <ItemGroup>
     <ProjectReference Include="..\PlcMonitor.Abstractions\PlcMonitor.Abstractions.csproj" />
-    <ProjectReference Include="..\S7CommPlus\S7CommPlus.csproj" />
+    <!-- Fork propio de DotNetProjects.S7CommPlusDriver (LGPL-3): external/S7CommPlusDriver, rama plcmonitor -->
+    <ProjectReference Include="..\..\external\S7CommPlusDriver\src\S7CommPlusDriver\S7CommPlusDriver.csproj" SetTargetFramework="TargetFramework=net9.0" />
   </ItemGroup>
   <ItemGroup>
     <InternalsVisibleTo Include="PlcMonitor.Drivers.S7Symbolic.Tests" />
