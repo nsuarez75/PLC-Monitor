@@ -1,6 +1,6 @@
 # PLC-Monitor — Technical manual
 
-> Version 1.0.0 · Last updated: 2026-10-15 · [Castellano](../es/tecnico.md)
+> Version 1.1.0 · Last updated: 2026-10-15 · [Castellano](../es/tecnico.md)
 
 ## 1. Architecture
 

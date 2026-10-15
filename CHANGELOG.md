@@ -1,6 +1,9 @@
 # Changelog
 
-## [Sin publicar / Unreleased] — fase 2 / phase 2
+## [1.1.0] - 2026-10-15
+
+Agente multi-PLC con API gRPC, app de escritorio, acceso simbólico sin TLS y agentes remotos instalables por SSH.
+Multi-PLC agent with gRPC API, desktop app, symbolic access without TLS and remote agents installed over SSH.
 
 ### Cambiado / Changed
 - **`s7-symbolic` sobre un fork propio de DotNetProjects.S7CommPlusDriver** (submódulo `external/S7CommPlusDriver`, rama `plcmonitor`) en lugar del port de thomas-v2 en `src/S7CommPlus`. / *Now built on an own fork of DotNetProjects.S7CommPlusDriver.*
@@ -39,6 +42,9 @@
 - 310 tests correctos, 6 omitidos (integración sin PLC).
 - S7-1200 real sin TLS ni PUT/GET (10.225.188.120): `s7-symbolic` en modo `auto` → `legacy`; exploración (1463 símbolos), lectura y sondeo, también desde el paquete linux-x64. Integración: 4 correctos, 2 omitidos. 312 tests unitarios correctos.
 - Escritura en el S7-1200 sin TLS (laboratorio): Real, Int, Time, STRING (con `ñ`) y Word con `plcmon write`, y a través del agente con doble llave, validación de tipo y log de auditoría. Valores restaurados.
+- Despliegue del agente por SSH probado de verdad en un contenedor Ubuntu 24.04 con systemd (instalar, TLS + token, estado, log, actualizar, desinstalar). **Windows sin probar en un equipo real.**
+- **Pendiente:** validar `s7-symbolic` con la librería nueva contra el S7-1517F (TLS + contraseña).
+- 390 tests correctos, 9 omitidos (integración sin PLC ni equipo SSH).
 
 ## [1.0.0] - 2026-10-14
 
