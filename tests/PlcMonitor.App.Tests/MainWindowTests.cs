@@ -125,6 +125,27 @@ public class MainWindowTests
         Avalonia.Application.Current.RequestedThemeVariant = Avalonia.Styling.ThemeVariant.Light;
     });
 
+    [Fact]
+    public Task Tag_details_window_renders() => HeadlessApp.RunAsync(() =>
+    {
+        Avalonia.Application.Current!.RequestedThemeVariant = Avalonia.Styling.ThemeVariant.Light;
+        var vm = ViewModelWithData();
+        var tag = vm.Devices[0].Tags.Single(t => t.Name == "peso");
+        var config = new DeviceConfig { Name = "casa1200", WritesEnabled = true };
+        var group = new ScanGroupConfig { Name = "rapido", IntervalMs = 250 };
+        group.Tags.Add(new TagConfig { Name = "peso", Address = "Viruta_Datos.Viruta.Peso", Writable = true });
+        config.ScanGroups.Add(group);
+        config.ScanGroups.Add(new ScanGroupConfig { Name = "lento", IntervalMs = 2000 });
+        var window = new TagDetailsWindow { DataContext = new TagDetailsViewModel(vm, tag, config) };
+        window.Show();
+
+        window.GetVisualDescendants().OfType<TextBlock>().Select(t => t.Text).ShouldContain("HISTÓRICO");
+        Capture(window, "tag-details.png");
+        Avalonia.Application.Current.RequestedThemeVariant = Avalonia.Styling.ThemeVariant.Dark;
+        Capture(window, "tag-details-dark.png");
+        Avalonia.Application.Current.RequestedThemeVariant = Avalonia.Styling.ThemeVariant.Light;
+    });
+
     /// <summary>
     /// Integración: la ventana real conectada a un agente real (PLCMON_IT_AGENT_URL). Se omite si no está definida.
     /// Con PLCMON_UI_CAPTURE_DIR guarda la captura.

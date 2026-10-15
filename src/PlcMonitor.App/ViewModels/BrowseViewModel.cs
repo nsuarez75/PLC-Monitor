@@ -6,8 +6,18 @@ using PlcMonitor.Agent.Contracts;
 
 namespace PlcMonitor.App.ViewModels;
 
-/// <summary>Un símbolo encontrado al explorar.</summary>
-public sealed record BrowseItemViewModel(string Address, string NativeType, string DataType);
+/// <summary>Un símbolo encontrado al explorar. <see cref="IsAdded"/> indica que ya es un tag del dispositivo.</summary>
+public sealed partial class BrowseItemViewModel(string address, string nativeType, string dataType) : ObservableObject
+{
+    public string Address { get; } = address;
+
+    public string NativeType { get; } = nativeType;
+
+    public string DataType { get; } = dataType;
+
+    [ObservableProperty]
+    public partial bool IsAdded { get; set; }
+}
 
 /// <summary>Buscador de símbolos del dispositivo seleccionado y alta de tags a partir de ellos.</summary>
 public sealed partial class BrowseViewModel(IAgentContext context, Func<DeviceViewModel?> device) : ObservableObject
@@ -66,8 +76,14 @@ public sealed partial class BrowseViewModel(IAgentContext context, Func<DeviceVi
         {
             var reply = await client.BrowseAsync(new BrowseRequest { Device = target.Name, Filter = Filter, MaxResults = MaxResults, Refresh = refresh });
             Results.Clear();
+            var existing = target.Tags.Select(t => t.Address).ToHashSet(StringComparer.Ordinal);
             foreach (var item in reply.Items)
-                Results.Add(new BrowseItemViewModel(item.Address, item.NativeType, item.DataType.ToString()));
+            {
+                Results.Add(new BrowseItemViewModel(item.Address, item.NativeType, item.DataType.ToString())
+                {
+                    IsAdded = existing.Contains(item.Address),
+                });
+            }
             Summary = $"{reply.Items.Count} mostrados de {reply.TotalMatches} coincidencias · {reply.TotalSymbols} símbolos en {target.Name}";
         }
         catch (RpcException ex)
@@ -86,13 +102,14 @@ public sealed partial class BrowseViewModel(IAgentContext context, Func<DeviceVi
     private async Task AddAsync(BrowseItemViewModel? item)
     {
         item ??= SelectedItem;
-        if (item is null || context.Client is not { } client || device() is not { } target)
+        if (item is null || item.IsAdded || context.Client is not { } client || device() is not { } target)
             return;
         try
         {
             var config = await client.GetDeviceConfigAsync(new DeviceRequest { Device = target.Name });
-            if (config.ScanGroups.SelectMany(g => g.Tags).Any(t => (string.IsNullOrEmpty(t.Name) ? t.Address : t.Name) == item.Address))
+            if (config.ScanGroups.SelectMany(g => g.Tags).Any(t => t.Address == item.Address || (string.IsNullOrEmpty(t.Name) ? t.Address : t.Name) == item.Address))
             {
+                item.IsAdded = true;
                 context.Report($"{item.Address} ya es un tag de {target.Name}");
                 return;
             }
@@ -102,6 +119,7 @@ public sealed partial class BrowseViewModel(IAgentContext context, Func<DeviceVi
                 config.ScanGroups.Add(group = new ScanGroupConfig { Name = groupName, IntervalMs = IntervalMs });
             group.Tags.Add(new TagConfig { Address = item.Address, Writable = AddWritable });
             await client.PutDeviceAsync(new PutDeviceRequest { Device = config, Persist = true });
+            item.IsAdded = true;
             context.Report($"Añadido {item.Address} a {target.Name} (grupo {group.Name}, {group.IntervalMs} ms)");
         }
         catch (RpcException ex)

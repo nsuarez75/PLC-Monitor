@@ -163,8 +163,74 @@ public sealed class MainViewModelTests : IDisposable
         var saved = await ConfigurationFileLoad(agent);
         saved.Devices[0].ScanGroups.Single(g => g.Name == "rapido").Tags.ShouldHaveSingleItem().Address.ShouldBe("DB1.Motor");
 
+        // Ya añadido: el símbolo queda marcado y no se vuelve a añadir.
+        vm.Browse.Results[0].IsAdded.ShouldBeTrue();
         await vm.Browse.AddCommand.ExecuteAsync(vm.Browse.Results[0]);
-        vm.Message.ShouldContain("ya es un tag");
+        (await ConfigurationFileLoad(agent)).Devices[0].ScanGroups.SelectMany(g => g.Tags).Count(t => t.Address == "DB1.Motor").ShouldBe(1);
+    }
+
+    [Fact]
+    public async Task Browse_marks_symbols_that_are_already_tags()
+    {
+        await using var agent = new AgentFactory(Device("plc1", tags: [T("DB1.Motor", "motor")]));
+        var plc = agent.Driver.Plc("plc1");
+        plc.Values["DB1.Motor"] = 1;
+        plc.Values["DB1.Bomba"] = 2;
+        await using var vm = await ConnectAsync(agent);
+        await Wait.UntilAsync(() => _ui.Read(() => vm.Devices[0].IsConnected));
+
+        await vm.Browse.SearchCommand.ExecuteAsync(null);
+
+        var results = vm.Browse.Results.ToDictionary(r => r.Address);
+        results["DB1.Motor"].IsAdded.ShouldBeTrue();
+        results["DB1.Bomba"].IsAdded.ShouldBeFalse();
+
+        await vm.Browse.AddCommand.ExecuteAsync(results["DB1.Bomba"]);
+        results["DB1.Bomba"].IsAdded.ShouldBeTrue();
+        await vm.Browse.AddCommand.ExecuteAsync(results["DB1.Motor"]);
+        (await ConfigurationFileLoad(agent)).Devices[0].ScanGroups.SelectMany(g => g.Tags).Count().ShouldBe(2);
+    }
+
+    [Fact]
+    public async Task Tag_details_show_and_save_the_tag_configuration()
+    {
+        await using var agent = new AgentFactory(Device("plc1", writesEnabled: true, tags: [T("DB1.DBW0", "velocidad"), T("DB1.DBW2", "otro")]));
+        agent.Driver.Plc("plc1").Values["DB1.DBW0"] = 5;
+        agent.Driver.Plc("plc1").Values["DB1.DBW2"] = 6;
+        await using var vm = await ConnectAsync(agent);
+        var tag = TagOf(vm, "plc1", "velocidad");
+
+        await vm.OpenTagDetailsCommand.ExecuteAsync(tag);
+
+        var details = _dialogs.TagDetails.ShouldHaveSingleItem();
+        details.Tag.ShouldBeSameAs(tag);
+        (details.Name, details.Address, details.GroupName, details.IntervalMs, details.Writable, details.SelectedDataType)
+            .ShouldBe(("velocidad", "DB1.DBW0", "g", 50, false, TagDetailsViewModel.AutomaticType));
+        details.WritesEnabled.ShouldBeTrue();
+        details.Groups.ShouldBe(["g"]);
+        details.GroupNote.ShouldBe("El grupo «g» se lee cada 50 ms.");
+
+        details.Name = "otro";
+        await details.SaveCommand.ExecuteAsync(null);
+        details.Saved.ShouldBeFalse();
+        details.Errors.ShouldContain("repetido");
+
+        details.Name = "consigna";
+        details.GroupName = "lento";
+        details.IntervalMs = 2000;
+        details.GroupNote.ShouldBe("Grupo nuevo: se creará con un periodo de 2000 ms.");
+        details.Writable = true;
+        details.SelectedDataType = "Int16";
+        await details.SaveCommand.ExecuteAsync(null);
+
+        details.Saved.ShouldBeTrue(details.Errors);
+        var saved = (await ConfigurationFileLoad(agent)).Devices[0];
+        var moved = saved.ScanGroups.Single(g => g.Name == "lento");
+        moved.IntervalMs.ShouldBe(2000);
+        var config = moved.Tags.ShouldHaveSingleItem();
+        (config.Name, config.Address, config.Writable, config.DataType).ShouldBe(("consigna", "DB1.DBW0", true, (PlcMonitor.Abstractions.TagDataType?)PlcMonitor.Abstractions.TagDataType.Int16));
+        saved.ScanGroups.Single(g => g.Name == "g").Tags.Select(t => t.Name).ShouldBe(["otro"]);
+        await Wait.UntilAsync(() => _ui.Read(() => vm.Devices[0].Tags.Any(t => t.Name == "consigna" && t.Writable)), "tag renombrado en la lista");
     }
 
     [Fact]

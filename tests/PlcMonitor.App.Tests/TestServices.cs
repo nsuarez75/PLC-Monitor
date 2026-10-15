@@ -35,6 +35,14 @@ internal sealed class FakeDialogs : IDialogs
         Questions.Add(message);
         return Task.FromResult(Answer);
     }
+
+    public List<PlcMonitor.App.ViewModels.TagDetailsViewModel> TagDetails { get; } = [];
+
+    public Task ShowTagDetailsAsync(PlcMonitor.App.ViewModels.TagDetailsViewModel details)
+    {
+        TagDetails.Add(details);
+        return Task.CompletedTask;
+    }
 }
 
 /// <summary>Conecta con el agente en memoria sea cual sea la URL.</summary>

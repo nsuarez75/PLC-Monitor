@@ -269,6 +269,23 @@ public sealed partial class MainViewModel : ObservableObject, IAgentContext, IAs
     [RelayCommand]
     private void CloseEditor() => Editor = null;
 
+    /// <summary>Abre la ventana de detalle y configuración de un tag (doble clic en la lista).</summary>
+    [RelayCommand]
+    private async Task OpenTagDetailsAsync(TagViewModel? tag)
+    {
+        if (tag is null || Client is not { } client)
+            return;
+        try
+        {
+            var config = await client.GetDeviceConfigAsync(new DeviceRequest { Device = tag.Device });
+            await Dialogs.ShowTagDetailsAsync(new TagDetailsViewModel(this, tag, config));
+        }
+        catch (RpcException ex)
+        {
+            Report(Describe(ex), isError: true);
+        }
+    }
+
     [RelayCommand(CanExecute = nameof(CanEditDevice))]
     private async Task DeleteDeviceAsync()
     {
