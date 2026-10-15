@@ -131,12 +131,20 @@ internal static class PlcTagValueMapper
             else
                 converted = Convert.ChangeType(value, target, CultureInfo.InvariantCulture);
 
-            property.SetValue(tag, converted);
+            try
+            {
+                property.SetValue(tag, converted);
+            }
+            catch (TargetInvocationException ex) when (ex.InnerException is not null)
+            {
+                // El setter de la librería valida (p. ej. STRING más largo que su longitud declarada).
+                System.Runtime.ExceptionServices.ExceptionDispatchInfo.Capture(ex.InnerException).Throw();
+            }
             return true;
         }
         catch (Exception ex) when (ex is FormatException or InvalidCastException or OverflowException or ArgumentException)
         {
-            error = $"No se puede convertir '{value}' a {tag.GetType().Name.Replace("PlcTag", string.Empty, StringComparison.Ordinal)}: {ex.Message}";
+            error = $"No se puede convertir '{Shorten(value)}' a {tag.GetType().Name.Replace("PlcTag", string.Empty, StringComparison.Ordinal)}: {ex.Message}";
             return false;
         }
     }
@@ -153,6 +161,13 @@ internal static class PlcTagValueMapper
             PlcTagQC.TAG_QUALITY_UNCERTAIN => QualityCode.Uncertain,
             _ => QualityCode.Bad,
         };
+    }
+
+    // Los valores muy largos (p. ej. un texto de 300 caracteres) se recortan en el mensaje de error.
+    private static string Shorten(object value)
+    {
+        var text = Convert.ToString(value, CultureInfo.InvariantCulture) ?? string.Empty;
+        return text.Length <= 40 ? text : string.Concat(text.AsSpan(0, 40), "…");
     }
 
     private static PropertyInfo? ValueProperty(Type type) =>

@@ -83,6 +83,18 @@ public class PlcTagValueMapperTests
     }
 
     [Fact]
+    public void Set_rejects_strings_longer_than_the_declared_length()
+    {
+        var tag = PlcTags.TagFactory("T", new ItemAddress(), Softdatatype.S7COMMP_SOFTDATATYPE_STRING, false, 10);
+
+        PlcTagValueMapper.TrySetValue(tag, new string('X', 300), out var error).ShouldBeFalse();
+
+        error!.ShouldContain("10");
+        error!.ShouldContain("…");
+        PlcTagValueMapper.TrySetValue(tag, "0123456789", out _).ShouldBeTrue();
+    }
+
+    [Fact]
     public void Set_rejects_null() =>
         PlcTagValueMapper.TrySetValue(Tag(Softdatatype.S7COMMP_SOFTDATATYPE_INT), null, out _).ShouldBeFalse();
 
