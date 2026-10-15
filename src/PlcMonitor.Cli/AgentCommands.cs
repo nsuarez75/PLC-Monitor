@@ -126,6 +126,12 @@ public sealed class AgentInfoCommand : AsyncCommand<AgentSettings>
             table.AddRow("Arrancado", AgentRuntime.DateTimeText(info.Started));
             table.AddRow("Configuración", Markup.Escape(info.ConfigPath));
             table.AddRow("Drivers", Markup.Escape(string.Join(", ", info.Drivers.Select(d => d.Id))));
+            if (info.Historian is { } h)
+            {
+                table.AddRow("Historiador", h.Enabled
+                    ? Markup.Escape($"{h.HistorizedTags} tags · {h.SizeBytes / 1024.0 / 1024.0:0.0} MB en {h.Files} ficheros · retención {(h.RetentionDays > 0 ? $"{h.RetentionDays} días" : "sin límite")} · {h.Path}")
+                    : "[grey]desactivado[/]");
+            }
             AgentRuntime.Console.Write(table);
             return 0;
         });
@@ -568,6 +574,49 @@ public sealed class AgentTagAddSettings : AgentPersistSettings
     [CommandOption("--type <TIPO>")]
     [Description("Tipo para interpretar las escrituras si el driver no lo deduce (Boolean, Int16, Float...).")]
     public string? Type { get; set; }
+
+    [CommandOption("--history")]
+    [Description("Guardar el tag en el histórico.")]
+    public bool History { get; set; }
+
+    [CommandOption("--history-min <DURACION>")]
+    [Description("Histórico: intervalo mínimo entre muestras (p.ej. 1s). Por defecto, cada cambio.")]
+    public string? HistoryMin { get; set; }
+
+    [CommandOption("--history-max <DURACION>")]
+    [Description("Histórico: guardar al menos cada este tiempo aunque no cambie (p.ej. 1m).")]
+    public string? HistoryMax { get; set; }
+
+    [CommandOption("--history-deadband <VALOR>")]
+    [Description("Histórico: banda muerta absoluta, o en % si termina en % (p.ej. 0.5 o 2%).")]
+    public string? HistoryDeadband { get; set; }
+
+    public override ValidationResult Validate()
+    {
+        if (HistoryMin is not null && Durations.Parse(HistoryMin) is null)
+            return ValidationResult.Error($"Duración no válida: '{HistoryMin}'.");
+        if (HistoryMax is not null && Durations.Parse(HistoryMax) is null)
+            return ValidationResult.Error($"Duración no válida: '{HistoryMax}'.");
+        if (HistoryDeadband is not null && !double.TryParse(HistoryDeadband.TrimEnd('%'), NumberStyles.Float, CultureInfo.InvariantCulture, out _))
+            return ValidationResult.Error($"Banda muerta no válida: '{HistoryDeadband}'.");
+        return base.Validate();
+    }
+
+    /// <summary>Configuración del histórico pedida en la línea de órdenes; null si no se pidió.</summary>
+    public HistoryConfig? HistoryConfig()
+    {
+        if (!History && HistoryMin is null && HistoryMax is null && HistoryDeadband is null)
+            return null;
+        var deadband = HistoryDeadband?.Trim() ?? "0";
+        return new HistoryConfig
+        {
+            Enabled = true,
+            MinIntervalMs = HistoryMin is { } min ? (int)Durations.Parse(min)!.Value.TotalMilliseconds : 0,
+            MaxIntervalMs = HistoryMax is { } max ? (int)Durations.Parse(max)!.Value.TotalMilliseconds : 0,
+            Deadband = double.Parse(deadband.TrimEnd('%'), CultureInfo.InvariantCulture),
+            DeadbandPercent = deadband.EndsWith('%'),
+        };
+    }
 }
 
 /// <summary>plcmon agent tag add — añade (o sustituye) un tag en un grupo de escaneo del dispositivo.</summary>
@@ -601,6 +650,7 @@ public sealed class AgentTagAddCommand : AsyncCommand<AgentTagAddSettings>
                 Address = settings.Address,
                 Writable = settings.Writable,
                 DataType = dataType,
+                History = settings.HistoryConfig(),
             });
 
             await client.PutDeviceAsync(new PutDeviceRequest { Device = device, Persist = !settings.NoPersist }, cancellationToken: cancellationToken);
@@ -646,4 +696,153 @@ public sealed class AgentTagRemoveCommand : AsyncCommand<AgentTagRemoveSettings>
             AgentRuntime.Console.MarkupLine($"[green]Tag eliminado[/] {Markup.Escape(device.Name)}/{Markup.Escape(settings.Tag)}");
             return 0;
         });
+}
+
+public sealed class AgentHistorySettings : AgentSettings
+{
+    [CommandArgument(0, "<DISPOSITIVO>")]
+    public string Device { get; set; } = "";
+
+    [CommandArgument(1, "<TAG>")]
+    [Description("Uno o varios tags.")]
+    public string[] Tags { get; set; } = [];
+
+    [CommandOption("--last <DURACION>")]
+    [Description("Periodo hasta ahora: 30s, 15m, 2h, 7d... Por defecto 1h (si no se indica --from).")]
+    public string? Last { get; set; }
+
+    [CommandOption("--from <FECHA>")]
+    [Description("Inicio (hora local), p.ej. \"2026-10-15 08:00\".")]
+    public string? From { get; set; }
+
+    [CommandOption("--to <FECHA>")]
+    [Description("Fin (hora local). Por defecto, ahora.")]
+    public string? To { get; set; }
+
+    [CommandOption("-i|--interval <DURACION>")]
+    [Description("Agrega por intervalos (1m, 15m, 1h...). Sin él, puntos en bruto.")]
+    public string? Interval { get; set; }
+
+    [CommandOption("--agg <AGREGADO>")]
+    [Description("Agregado con --interval: avg, min, max, first, last.")]
+    [DefaultValue("avg")]
+    public string Aggregate { get; set; } = "avg";
+
+    [CommandOption("-n|--max <N>")]
+    [Description("Máximo de puntos por tag.")]
+    [DefaultValue(10000)]
+    public int MaxPoints { get; set; } = 10000;
+
+    [CommandOption("--csv <FICHERO>")]
+    [Description("Guarda el resultado en CSV (dispositivo, tag, hora UTC ISO 8601, valor, calidad) en vez de mostrarlo.")]
+    public string? Csv { get; set; }
+
+    public override ValidationResult Validate()
+    {
+        if (Last is not null && Durations.Parse(Last) is null)
+            return ValidationResult.Error($"Duración no válida: '{Last}'. Ejemplos: 30s, 15m, 2h, 7d.");
+        if (Interval is not null && Durations.Parse(Interval) is null)
+            return ValidationResult.Error($"Intervalo no válido: '{Interval}'.");
+        if (Durations.ParseAggregate(Aggregate) is null)
+            return ValidationResult.Error("--agg debe ser avg, min, max, first o last.");
+        if (From is not null && !DateTimeOffset.TryParse(From, CultureInfo.CurrentCulture, DateTimeStyles.AssumeLocal, out _))
+            return ValidationResult.Error($"Fecha no válida: '{From}'.");
+        if (To is not null && !DateTimeOffset.TryParse(To, CultureInfo.CurrentCulture, DateTimeStyles.AssumeLocal, out _))
+            return ValidationResult.Error($"Fecha no válida: '{To}'.");
+        return base.Validate();
+    }
+}
+
+/// <summary>Duraciones cortas (500ms, 30s, 15m, 2h, 7d) y nombres de agregados.</summary>
+public static class Durations
+{
+    public static TimeSpan? Parse(string text)
+    {
+        var match = System.Text.RegularExpressions.Regex.Match(text.Trim(), @"^(\d+(?:[.,]\d+)?)\s*(ms|s|m|h|d)$", System.Text.RegularExpressions.RegexOptions.IgnoreCase);
+        if (!match.Success)
+            return null;
+        var value = double.Parse(match.Groups[1].Value.Replace(',', '.'), CultureInfo.InvariantCulture);
+        return match.Groups[2].Value.ToLowerInvariant() switch
+        {
+            "ms" => TimeSpan.FromMilliseconds(value),
+            "s" => TimeSpan.FromSeconds(value),
+            "m" => TimeSpan.FromMinutes(value),
+            "h" => TimeSpan.FromHours(value),
+            _ => TimeSpan.FromDays(value),
+        };
+    }
+
+    public static HistoryAggregate? ParseAggregate(string text) => text.Trim().ToLowerInvariant() switch
+    {
+        "avg" or "media" => HistoryAggregate.Average,
+        "min" => HistoryAggregate.Min,
+        "max" => HistoryAggregate.Max,
+        "first" => HistoryAggregate.First,
+        "last" => HistoryAggregate.Last,
+        _ => null,
+    };
+}
+
+/// <summary>plcmon agent history — histórico de tags guardado por el agente.</summary>
+public sealed class AgentHistoryCommand : AsyncCommand<AgentHistorySettings>
+{
+    public override Task<int> ExecuteAsync(CommandContext context, AgentHistorySettings settings, CancellationToken cancellationToken) =>
+        AgentRuntime.RunAsync(settings, async client =>
+        {
+            var to = settings.To is { } t ? DateTimeOffset.Parse(t, CultureInfo.CurrentCulture, DateTimeStyles.AssumeLocal) : DateTimeOffset.Now;
+            var from = settings.From is { } f ? DateTimeOffset.Parse(f, CultureInfo.CurrentCulture, DateTimeStyles.AssumeLocal)
+                : to - (Durations.Parse(settings.Last ?? "1h") ?? TimeSpan.FromHours(1));
+            var request = new HistoryRequest
+            {
+                Device = settings.Device,
+                From = Timestamp.FromDateTimeOffset(from),
+                To = Timestamp.FromDateTimeOffset(to),
+                IntervalMs = settings.Interval is { } i ? (int)Durations.Parse(i)!.Value.TotalMilliseconds : 0,
+                Aggregate = Durations.ParseAggregate(settings.Aggregate)!.Value,
+                MaxPoints = settings.MaxPoints,
+            };
+            request.Tags.AddRange(settings.Tags);
+            var reply = await client.QueryHistoryAsync(request, cancellationToken: cancellationToken);
+            var console = AgentRuntime.Console;
+
+            if (settings.Csv is { } path)
+            {
+                await using var writer = new StreamWriter(path, append: false, new System.Text.UTF8Encoding(false));
+                await writer.WriteLineAsync("device,tag,timestamp,value,quality");
+                var rows = 0;
+                foreach (var s in reply.Series)
+                {
+                    foreach (var p in s.Points)
+                    {
+                        await writer.WriteLineAsync(string.Join(',', Csv(s.Device), Csv(s.Tag),
+                            p.Timestamp.ToDateTimeOffset().ToString("yyyy-MM-ddTHH:mm:ss.fffZ", CultureInfo.InvariantCulture),
+                            Csv(PointText(p)), p.Quality.ToString()));
+                        rows++;
+                    }
+                }
+                console.MarkupLine($"[green]Guardado[/] {Markup.Escape(path)} ({rows} filas)");
+                return 0;
+            }
+
+            foreach (var s in reply.Series)
+            {
+                var table = new Table().Title($"[bold]{Markup.Escape(s.Device)}/{Markup.Escape(s.Tag)}[/]").AddColumns("Hora", "Valor", "Calidad");
+                foreach (var p in s.Points)
+                {
+                    table.AddRow(
+                        p.Timestamp.ToDateTimeOffset().ToLocalTime().ToString("yyyy-MM-dd HH:mm:ss.fff", CultureInfo.InvariantCulture),
+                        Markup.Escape(PointText(p)),
+                        AgentRuntime.QualityMarkup(p.Quality));
+                }
+                console.Write(table);
+                console.MarkupLine($"[grey]{s.Points.Count} puntos{(s.Truncated ? " (hay más: aumenta --max o usa --interval)" : "")}[/]");
+            }
+            return 0;
+        });
+
+    private static string PointText(HistoryPoint p) =>
+        p.HasNumber ? p.Number.ToString("G15", CultureInfo.InvariantCulture) : p.Text;
+
+    private static string Csv(string value) =>
+        value.IndexOfAny([',', '"', '\n', '\r']) >= 0 ? "\"" + value.Replace("\"", "\"\"", StringComparison.Ordinal) + "\"" : value;
 }
