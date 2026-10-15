@@ -210,7 +210,11 @@
                         <DataTemplate x:DataType="vm:TagViewModel">
                           <Grid ColumnDefinitions="2*,2.2*,1.6*,90,130,100,250" ColumnSpacing="12">
                             <StackPanel VerticalAlignment="Center">
-                              <TextBlock Text="{Binding Name}" FontWeight="SemiBold" TextTrimming="CharacterEllipsis" />
+                              <StackPanel Orientation="Horizontal" Spacing="6">
+                                <TextBlock Text="{Binding Name}" FontWeight="SemiBold" TextTrimming="CharacterEllipsis" />
+                                <c:Icon Kind="history" Width="13" Height="13" Foreground="{DynamicResource App.Accent}" IsVisible="{Binding Historized}"
+                                        ToolTip.Tip="Se guarda en el histórico" />
+                              </StackPanel>
                               <TextBlock Text="{Binding Group}" Classes="muted" FontSize="11" />
                             </StackPanel>
                             <TextBlock Grid.Column="1" Text="{Binding Address}" Classes="muted mono" FontSize="12" TextTrimming="CharacterEllipsis"
@@ -231,6 +235,73 @@
                                 <c:Icon Kind="x" Width="14" Height="14" />
                               </Button>
                             </StackPanel>
+                          </Grid>
+                        </DataTemplate>
+                      </ListBox.ItemTemplate>
+                    </ListBox>
+                  </DockPanel>
+                </Border>
+              </DockPanel>
+            </TabItem>
+
+            <!-- Histórico -->
+            <TabItem Header="Histórico">
+              <DockPanel Margin="0,12,0,0" DataContext="{Binding History}" x:DataType="vm:HistoryViewModel">
+                <Border DockPanel.Dock="Top" Classes="card" Padding="14" Margin="0,0,0,12">
+                  <StackPanel Spacing="12">
+                    <TextBlock Classes="muted" TextWrapping="Wrap" IsVisible="{Binding !HasHistorizedTags}"
+                               Text="Este dispositivo no tiene tags historizados. Actívalo en un tag con doble clic → Histórico." />
+                    <ItemsControl ItemsSource="{Binding Tags}" IsVisible="{Binding HasHistorizedTags}">
+                      <ItemsControl.ItemsPanel>
+                        <ItemsPanelTemplate><WrapPanel /></ItemsPanelTemplate>
+                      </ItemsControl.ItemsPanel>
+                      <ItemsControl.ItemTemplate>
+                        <DataTemplate x:DataType="vm:HistoryTagOption">
+                          <CheckBox Content="{Binding Name}" IsChecked="{Binding IsSelected}" Margin="0,0,16,0" />
+                        </DataTemplate>
+                      </ItemsControl.ItemTemplate>
+                    </ItemsControl>
+                    <StackPanel Orientation="Horizontal" Spacing="10">
+                      <ComboBox ItemsSource="{x:Static vm:HistoryViewModel.Ranges}" SelectedItem="{Binding Range}" MinWidth="160" />
+                      <ComboBox ItemsSource="{x:Static vm:HistoryViewModel.Aggregates}" SelectedItem="{Binding Aggregate}" MinWidth="130" />
+                      <TextBlock Text="cada" Classes="muted" VerticalAlignment="Center" IsVisible="{Binding IsAggregated}" />
+                      <ComboBox ItemsSource="{x:Static vm:HistoryViewModel.Intervals}" SelectedItem="{Binding Interval}" MinWidth="100" IsVisible="{Binding IsAggregated}" />
+                      <Button Classes="accent" Command="{Binding QueryCommand}">
+                        <StackPanel Orientation="Horizontal" Spacing="6">
+                          <c:Icon Kind="search" />
+                          <TextBlock Text="Consultar" />
+                        </StackPanel>
+                      </Button>
+                      <Button Classes="secondary" Command="{Binding ExportCommand}" ToolTip.Tip="Exportar a CSV">
+                        <StackPanel Orientation="Horizontal" Spacing="6">
+                          <c:Icon Kind="download" />
+                          <TextBlock Text="CSV" />
+                        </StackPanel>
+                      </Button>
+                    </StackPanel>
+                  </StackPanel>
+                </Border>
+
+                <TextBlock DockPanel.Dock="Top" Text="{Binding Summary}" Classes="muted" FontSize="12" Margin="2,0,0,8" />
+
+                <Border Classes="card" ClipToBounds="True">
+                  <DockPanel>
+                    <Grid DockPanel.Dock="Top" Classes="tablehead" ColumnDefinitions="200,2*,2*,150" ColumnSpacing="12" Margin="16,12,16,10">
+                      <TextBlock Text="HORA" />
+                      <TextBlock Grid.Column="1" Text="TAG" />
+                      <TextBlock Grid.Column="2" Text="VALOR" />
+                      <TextBlock Grid.Column="3" Text="CALIDAD" />
+                    </Grid>
+                    <ListBox Classes="table" ItemsSource="{Binding Rows}">
+                      <ListBox.ItemTemplate>
+                        <DataTemplate x:DataType="vm:HistoryRowViewModel">
+                          <Grid ColumnDefinitions="200,2*,2*,150" ColumnSpacing="12">
+                            <TextBlock Text="{Binding Time}" Classes="muted mono" FontSize="12" VerticalAlignment="Center" />
+                            <TextBlock Grid.Column="1" Text="{Binding Tag}" FontWeight="SemiBold" VerticalAlignment="Center" TextTrimming="CharacterEllipsis" />
+                            <TextBlock Grid.Column="2" Text="{Binding Value}" Classes="mono" VerticalAlignment="Center" TextTrimming="CharacterEllipsis" />
+                            <Border Grid.Column="3" Classes="pill" Classes.good="{Binding IsGood}" Classes.bad="{Binding IsBad}">
+                              <TextBlock Text="{Binding Quality}" TextTrimming="CharacterEllipsis" MaxWidth="130" />
+                            </Border>
                           </Grid>
                         </DataTemplate>
                       </ListBox.ItemTemplate>

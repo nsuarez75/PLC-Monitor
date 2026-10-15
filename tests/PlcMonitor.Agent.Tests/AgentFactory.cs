@@ -23,7 +23,10 @@ internal sealed class AgentFactory : WebApplicationFactory<Program>
 
     public FakeDriverFactory Driver { get; } = new();
 
-    public string ConfigPath { get; } = Path.Combine(Path.GetTempPath(), $"plcmon-agent-{Guid.NewGuid():N}.json");
+    /// <summary>Carpeta propia del agente de prueba (configuración e histórico).</summary>
+    public string Directory { get; } = System.IO.Directory.CreateTempSubdirectory("plcmon-agent-").FullName;
+
+    public string ConfigPath => Path.Combine(Directory, "agent.json");
 
     /// <summary>Ajustes adicionales del agente (p.ej. Agent:Security:TokenSha256). Se aplican al arrancar.</summary>
     public Dictionary<string, string> Settings { get; } = [];
@@ -65,7 +68,14 @@ internal sealed class AgentFactory : WebApplicationFactory<Program>
         foreach (var channel in _channels)
             channel.Dispose();
         base.Dispose(disposing);
-        File.Delete(ConfigPath);
+        try
+        {
+            System.IO.Directory.Delete(Directory, recursive: true);
+        }
+        catch (IOException)
+        {
+            // El historiador puede tardar un instante en soltar sus ficheros: es una carpeta temporal.
+        }
     }
 
     /// <summary>Repite la llamada hasta que el resultado cumple la condición (máximo 10 s).</summary>

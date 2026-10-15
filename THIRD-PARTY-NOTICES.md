@@ -15,6 +15,8 @@ PLC-Monitor incluye o usa los siguientes componentes de terceros / includes or u
 | Inter (fuente) — https://rsms.me/inter | SIL Open Font License 1.1 | App de escritorio (Avalonia.Fonts.Inter) |
 | Lucide (trazados de iconos) — https://lucide.dev | ISC | App de escritorio (`Controls/Icon.cs`) |
 | SSH.NET — https://github.com/sshnet/SSH.NET | MIT | Instalación remota del agente desde la app |
+| Microsoft.Data.Sqlite y SQLitePCLRaw — Microsoft / Eric Sink | MIT | Historiador del agente |
+| SQLite — https://sqlite.org | Dominio público | Historiador del agente (biblioteca nativa e_sqlite3) |
 | System.Security.Cryptography.ProtectedData — Microsoft | MIT | Protección del token de los agentes (Windows) |
 | Microsoft .NET / Microsoft.Extensions.* | MIT | |
 

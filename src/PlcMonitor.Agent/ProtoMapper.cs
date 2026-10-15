@@ -46,6 +46,7 @@ internal static class ProtoMapper
         IntervalMs = (int)snapshot.Definition.Interval.TotalMilliseconds,
         Writable = snapshot.Definition.Writable,
         Value = ToProto(snapshot.Value),
+        Historized = snapshot.Definition.IsHistorized,
     };
 
     public static Api.TagUpdate ToProto(TagUpdate update) => new()
@@ -115,6 +116,16 @@ internal static class ProtoMapper
                 Address = t.Address,
                 Writable = t.Writable,
                 DataType = t.DataType is { } type ? ToProto(type) : Api.DataType.Unknown,
+                History = t.History is { } h
+                    ? new Api.HistoryConfig
+                    {
+                        Enabled = h.Enabled,
+                        MinIntervalMs = h.MinIntervalMs,
+                        Deadband = h.Deadband,
+                        DeadbandPercent = h.DeadbandMode == DeadbandMode.Percent,
+                        MaxIntervalMs = h.MaxIntervalMs,
+                    }
+                    : null,
             }));
             pb.ScanGroups.Add(g);
         }
@@ -155,10 +166,33 @@ internal static class ProtoMapper
                 Address = t.Address.Trim(),
                 Writable = t.Writable,
                 DataType = t.DataType == Api.DataType.Unknown ? null : FromProto(t.DataType),
+                History = t.History is { } h
+                    ? new TagHistorySettings
+                    {
+                        Enabled = h.Enabled,
+                        MinIntervalMs = h.MinIntervalMs,
+                        Deadband = h.Deadband,
+                        DeadbandMode = h.DeadbandPercent ? DeadbandMode.Percent : DeadbandMode.Absolute,
+                        MaxIntervalMs = h.MaxIntervalMs,
+                    }
+                    : null,
             }));
             device.ScanGroups.Add(group);
         }
         return device;
+    }
+
+    public static Api.HistorySeries ToProto(PlcMonitor.Historian.HistorySeries series)
+    {
+        var pb = new Api.HistorySeries { Device = series.Key.Device, Tag = series.Key.Tag, Truncated = series.Truncated };
+        foreach (var p in series.Points)
+        {
+            var point = new Api.HistoryPoint { Timestamp = Timestamp.FromDateTimeOffset(p.Timestamp), Text = p.Text ?? "", Quality = ToProto(p.Quality) };
+            if (p.Number is { } n)
+                point.Number = n;
+            pb.Points.Add(point);
+        }
+        return pb;
     }
 
     private static void SetTyped(Api.TagValue pb, object? value)

@@ -6,6 +6,9 @@ public interface IDialogs
     /// <summary>Pregunta sí/no. Devuelve true si el usuario acepta.</summary>
     Task<bool> ConfirmAsync(string title, string message);
 
+    /// <summary>Pide dónde guardar un fichero. Devuelve la ruta o null si se cancela.</summary>
+    Task<string?> SaveFileAsync(string title, string suggestedName, string extension);
+
     /// <summary>Muestra la ventana de detalle de un tag hasta que se cierra.</summary>
     Task ShowTagDetailsAsync(ViewModels.TagDetailsViewModel details);
 }

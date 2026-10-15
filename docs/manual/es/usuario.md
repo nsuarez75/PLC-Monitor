@@ -117,6 +117,7 @@ La URL se indica con `-a, --agent` o con la variable `PLCMON_AGENT`; por defecto
 | `plcmon agent device remove DISPOSITIVO [-y]` | Da de baja un dispositivo y sus tags (pide confirmación) |
 | `plcmon agent tag add DISPOSITIVO DIRECCION [--name N] [-g GRUPO] [-i MS] [--writable] [--type T]` | Añade un tag (o lo sustituye si ya existe ese nombre). El grupo se crea si no existe, con el periodo `-i` |
 | `plcmon agent tag remove DISPOSITIVO TAG` | Quita un tag; los grupos vacíos se eliminan |
+| `plcmon agent history DISPOSITIVO TAG... [--last 2h \| --from F --to F] [-i 1m --agg max] [--csv F]` | Histórico guardado por el agente: en bruto o agregado (`avg`, `min`, `max`, `first`, `last`), en tabla o a CSV. Las fechas van en hora local, p.ej. `"2026-10-15 08:00"` |
 | `plcmon agent watch [DISPOSITIVO...]` | Foto inicial y después los cambios de valores y de estado en directo (Ctrl+C para salir). Si el agente corta la suscripción por lentitud, se vuelve a suscribir sola |
 
 Los cambios de configuración (`device`, `tag`) se guardan en el `agent.json` del agente salvo con `--no-persist`.
@@ -128,6 +129,9 @@ plcmon agent write prensa1 marcha true
 plcmon agent device add prensa1 -d s7-symbolic -s '{"host":"192.168.0.10","security":"auto"}' --writes
 plcmon agent browse prensa1 Motor
 plcmon agent tag add prensa1 "MiDB".Velocidad --name velocidad -g rapido -i 250
+plcmon agent tag add prensa1 "MiDB".Presion --history --history-min 1s --history-deadband 2% --history-max 1m
+plcmon agent history prensa1 velocidad presion --last 8h -i 5m --agg max
+plcmon agent history prensa1 velocidad --from "2026-10-15 06:00" --to "2026-10-15 14:00" --csv turno.csv
 ```
 
 ## 4. Sintaxis de direcciones

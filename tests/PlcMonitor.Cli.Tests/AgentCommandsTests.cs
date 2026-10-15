@@ -260,6 +260,51 @@ public sealed class AgentCommandsTests : IDisposable
     }
 
     [Fact]
+    public async Task History_of_a_tag_added_with_history_is_shown_and_exported()
+    {
+        await using var agent = new AgentFactory(Device("plc1"));
+        var plc = agent.Driver.Plc("plc1");
+        plc.Values["DB1.DBW0"] = 7;
+        UseAgent(agent);
+        (await RunAsync("agent", "tag", "add", "plc1", "DB1.DBW0", "--name", "velocidad", "-i", "50", "--history", "--history-max", "1m", "--history-deadband", "2%")).ShouldBe(0);
+        var config = await agent.CreateGrpcClient().GetDeviceConfigAsync(new DeviceRequest { Device = "plc1" });
+        var history = config.ScanGroups.SelectMany(g => g.Tags).Single().History;
+        (history.Enabled, history.MaxIntervalMs, history.Deadband, history.DeadbandPercent).ShouldBe((true, 60000, 2.0, true));
+        await EventuallyAsync(async () => await agent.CreateGrpcClient().ListTagsAsync(new ListTagsRequest()), t => t.Tags.Single().Value.Quality == Quality.Good);
+
+        (await RunAsync("agent", "history", "plc1", "velocidad", "--last", "1h")).ShouldBe(0);
+        Output.ShouldContain("plc1/velocidad");
+        Output.ShouldContain("Good");
+
+        var csv = Path.Combine(agent.Directory, "historico.csv");
+        (await RunAsync("agent", "history", "plc1", "velocidad", "--csv", csv)).ShouldBe(0);
+        var lines = await File.ReadAllLinesAsync(csv);
+        lines[0].ShouldBe("device,tag,timestamp,value,quality");
+        lines.ShouldContain(l => l.StartsWith("plc1,velocidad,", StringComparison.Ordinal) && l.EndsWith(",7,Good", StringComparison.Ordinal));
+
+        (await RunAsync("agent", "info")).ShouldBe(0);
+        Output.ShouldContain("1 tags");
+        (await RunAsync("agent", "history", "plc1", "velocidad", "--last", "ayer")).ShouldNotBe(0);
+    }
+
+    [Theory]
+    [InlineData("500ms", 0.5)]
+    [InlineData("30s", 30)]
+    [InlineData("15m", 900)]
+    [InlineData("2h", 7200)]
+    [InlineData("1.5d", 129600)]
+    public void Durations_are_parsed(string text, double seconds) => Durations.Parse(text).ShouldBe(TimeSpan.FromSeconds(seconds));
+
+    [Fact]
+    public void Invalid_durations_and_aggregates_are_rejected()
+    {
+        Durations.Parse("10").ShouldBeNull();
+        Durations.Parse("h").ShouldBeNull();
+        Durations.ParseAggregate("max").ShouldBe(HistoryAggregate.Max);
+        Durations.ParseAggregate("mediana").ShouldBeNull();
+    }
+
+    [Fact]
     public async Task Unreachable_agent_gives_a_readable_error()
     {
         AgentRuntime.ChannelFactory = e => GrpcChannel.ForAddress(e.Url);

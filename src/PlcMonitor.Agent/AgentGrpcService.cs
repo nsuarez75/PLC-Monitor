@@ -24,6 +24,16 @@ public sealed class AgentGrpcService(EngineHost host, DriverRegistry registry, I
             Started = Timestamp.FromDateTimeOffset(host.Started),
             ConfigPath = host.ConfigPath,
         };
+        var stats = host.Historian.GetStats();
+        info.Historian = new Api.HistorianInfo
+        {
+            Enabled = stats.Enabled,
+            Path = stats.Path,
+            RetentionDays = stats.RetentionDays,
+            SizeBytes = stats.SizeBytes,
+            Files = stats.Files,
+            HistorizedTags = stats.HistorizedTags,
+        };
         info.Drivers.AddRange(registry.Factories.Select(f => new Api.Driver
         {
             Id = f.TypeId,
@@ -179,6 +189,25 @@ public sealed class AgentGrpcService(EngineHost host, DriverRegistry registry, I
             await host.SaveConfigurationAsync(context.CancellationToken);
         logger.LogInformation("Dispositivo {Device} dado de baja desde {Peer}", request.Device, context.Peer);
         return new Empty();
+    }
+
+    public override async Task<Api.HistoryReply> QueryHistory(Api.HistoryRequest request, ServerCallContext context)
+    {
+        if (string.IsNullOrWhiteSpace(request.Device) || request.Tags.Count == 0)
+            throw new RpcException(new Status(StatusCode.InvalidArgument, "Indica el dispositivo y al menos un tag."));
+        var to = request.To?.ToDateTimeOffset() ?? DateTimeOffset.UtcNow;
+        var from = request.From?.ToDateTimeOffset() ?? to.AddHours(-1);
+        var query = new PlcMonitor.Historian.HistoryQuery(
+            request.Tags.Select(t => new TagKey(request.Device, t)).ToArray(),
+            from,
+            to,
+            request.IntervalMs > 0 ? TimeSpan.FromMilliseconds(request.IntervalMs) : null,
+            (PlcMonitor.Historian.HistoryAggregate)(int)request.Aggregate,
+            request.MaxPoints > 0 ? request.MaxPoints : 10_000);
+        var series = await Guard(() => host.Historian.QueryAsync(query, context.CancellationToken));
+        var reply = new Api.HistoryReply();
+        reply.Series.AddRange(series.Select(ProtoMapper.ToProto));
+        return reply;
     }
 
     private Api.Device ToProto(DeviceStatus status) => ProtoMapper.ToProto(status, Engine.GetTags(status.Device).Count);

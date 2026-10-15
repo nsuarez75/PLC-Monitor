@@ -3,6 +3,9 @@
 ## [Sin publicar / Unreleased]
 
 ### Añadido / Added
+- **Historiador (fase 4)** en el agente: SQLite, un fichero por mes, retención (90 días por defecto). Por tag: activar, frecuencia mínima (sin perder el último valor), banda muerta absoluta o %, tiempo máximo; los cambios de calidad se guardan siempre. API `QueryHistory` (bruto o agregado: media/mín/máx/primero/último) y estado en `GetInfo`. / *Historian.*
+- CLI: `plcmon agent history` (tabla o CSV) y `tag add --history …`; `agent info` muestra el historiador.
+- App: sección «Histórico» en la ventana del tag, icono en los tags historizados y pestaña «Histórico» con consulta y exportación a CSV.
 - App: doble clic en un tag abre su ventana de detalle (valor en vivo y configuración editable: nombre, dirección, grupo y periodo, escribible, tipo). Sección «Histórico» preparada para la fase 4.
 - App, Explorar: los símbolos que ya son tags salen marcados como «Añadido».
 

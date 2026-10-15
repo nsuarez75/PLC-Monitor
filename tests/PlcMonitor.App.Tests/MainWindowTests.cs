@@ -84,8 +84,7 @@ public class MainWindowTests
         var vm = ViewModelWithData();
         var window = new MainWindow { DataContext = vm };
         window.Show();
-        window.GetVisualDescendants().OfType<TabControl>().Single().SelectedIndex = 1;
-        window.UpdateLayout();
+        SelectTab(window, "Explorar");
         var box = window.GetVisualDescendants().OfType<TextBox>().First(t => t.PlaceholderText?.StartsWith("Buscar", StringComparison.Ordinal) == true);
         box.Focus();
 
@@ -146,6 +145,26 @@ public class MainWindowTests
         Avalonia.Application.Current.RequestedThemeVariant = Avalonia.Styling.ThemeVariant.Light;
     });
 
+    [Fact]
+    public Task History_tab_renders() => HeadlessApp.RunAsync(() =>
+    {
+        Avalonia.Application.Current!.RequestedThemeVariant = Avalonia.Styling.ThemeVariant.Light;
+        var vm = ViewModelWithData();
+        var window = new MainWindow { DataContext = vm };
+        window.Show();
+        vm.History.Tags.Add(new HistoryTagOption("peso") { IsSelected = true });
+        vm.History.Tags.Add(new HistoryTagOption("clock"));
+        var now = DateTimeOffset.Now;
+        for (var i = 0; i < 6; i++)
+            vm.History.Rows.Add(new HistoryRowViewModel(now.AddSeconds(-10 * i), "peso", (12.5 - i * 0.5).ToString(System.Globalization.CultureInfo.InvariantCulture), Quality.Good));
+        vm.History.Rows.Add(new HistoryRowViewModel(now.AddMinutes(-2), "peso", "", Quality.BadNotConnected));
+        vm.History.Summary = "7 puntos de 1 tags · última hora";
+        SelectTab(window, "Histórico");
+
+        window.GetVisualDescendants().OfType<TextBlock>().Select(t => t.Text).ShouldContain("7 puntos de 1 tags · última hora");
+        Capture(window, "history.png");
+    });
+
     /// <summary>
     /// Integración: la ventana real conectada a un agente real (PLCMON_IT_AGENT_URL). Se omite si no está definida.
     /// Con PLCMON_UI_CAPTURE_DIR guarda la captura.
@@ -171,6 +190,13 @@ public class MainWindowTests
             Capture(window, "real-agent.png");
             await vm.DisposeAsync();
         });
+    }
+
+    private static void SelectTab(Window window, string header)
+    {
+        var tabs = window.GetVisualDescendants().OfType<TabControl>().Single();
+        tabs.SelectedItem = tabs.Items.OfType<TabItem>().Single(t => t.Header as string == header);
+        window.UpdateLayout();
     }
 
     /// <summary>Si PLCMON_UI_CAPTURE_DIR está definida, guarda una captura para revisarla.</summary>

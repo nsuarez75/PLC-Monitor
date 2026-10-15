@@ -14,6 +14,13 @@ public static class ConfigurationValidator
         ArgumentNullException.ThrowIfNull(registry);
 
         var errors = new List<string>();
+        var historian = configuration.Historian ?? new HistorianSettings();
+        if (historian.RetentionDays < 0)
+            errors.Add("historian.retentionDays no puede ser negativo.");
+        if (historian.FlushIntervalMs < 100)
+            errors.Add("historian.flushIntervalMs debe ser al menos 100.");
+        if (string.IsNullOrWhiteSpace(historian.Path))
+            errors.Add("historian.path está vacío.");
         var deviceNames = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
         for (var i = 0; i < configuration.Devices.Count; i++)
         {
@@ -76,6 +83,16 @@ public static class ConfigurationValidator
                 }
                 if (!tagNames.Add(tag.EffectiveName))
                     errors.Add($"{groupWhere}: tag '{tag.EffectiveName}' repetido en el dispositivo.");
+                if (tag.History is { } h)
+                {
+                    var tagWhere = $"{groupWhere}, tag '{tag.EffectiveName}'";
+                    if (h.MinIntervalMs < 0 || h.MaxIntervalMs < 0)
+                        errors.Add($"{tagWhere}: los intervalos del histórico no pueden ser negativos.");
+                    if (h.MaxIntervalMs > 0 && h.MaxIntervalMs < h.MinIntervalMs)
+                        errors.Add($"{tagWhere}: history.maxIntervalMs no puede ser menor que minIntervalMs.");
+                    if (h.Deadband < 0)
+                        errors.Add($"{tagWhere}: la banda muerta no puede ser negativa.");
+                }
             }
         }
     }

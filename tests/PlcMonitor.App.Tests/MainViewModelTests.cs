@@ -234,6 +234,59 @@ public sealed class MainViewModelTests : IDisposable
     }
 
     [Fact]
+    public async Task History_is_configured_in_the_tag_window_and_queried_in_the_history_tab()
+    {
+        await using var agent = new AgentFactory(Device("plc1", tags: [T("DB1.DBW0", "velocidad"), T("DB1.DBW2", "otro")]));
+        var plc = agent.Driver.Plc("plc1");
+        plc.Values["DB1.DBW0"] = 5;
+        plc.Values["DB1.DBW2"] = 1;
+        await using var vm = await ConnectAsync(agent);
+        vm.HistorianEnabled.ShouldBeTrue();
+        _ui.Read(() => vm.History.HasHistorizedTags).ShouldBeFalse();
+
+        // Activar el histórico desde la ventana del tag.
+        await vm.OpenTagDetailsCommand.ExecuteAsync(TagOf(vm, "plc1", "velocidad"));
+        var details = _dialogs.TagDetails.Single();
+        details.HistorianEnabled.ShouldBeTrue();
+        details.HistoryEnabled.ShouldBeFalse();
+        details.HistoryEnabled = true;
+        details.HistoryMaxIntervalMs = 60_000;
+        details.HistoryDeadband = 2;
+        details.HistoryDeadbandPercent = true;
+        await details.SaveCommand.ExecuteAsync(null);
+        details.Saved.ShouldBeTrue(details.Errors);
+        var history = (await ConfigurationFileLoad(agent)).Devices[0].ScanGroups.SelectMany(g => g.Tags).Single(t => t.Name == "velocidad").History!;
+        (history.Enabled, history.MaxIntervalMs, history.Deadband, history.DeadbandMode).ShouldBe((true, 60_000, 2.0, PlcMonitor.Engine.Configuration.DeadbandMode.Percent));
+
+        await Wait.UntilAsync(() => _ui.Read(() => vm.History.Tags.Select(t => t.Name).SequenceEqual(["velocidad"])), "tag historizado en la pestaña");
+        _ui.Read(() => TagOf(vm, "plc1", "velocidad").Historized).ShouldBeTrue();
+        await Wait.UntilAsync(() => _ui.Read(() => TagOf(vm, "plc1", "velocidad").IsGood), "valor tras reconfigurar");
+        plc.Values["DB1.DBW0"] = 50;
+        await Wait.UntilAsync(() => _ui.Read(() => TagOf(vm, "plc1", "velocidad").ValueText) == "50", "cambio");
+
+        // Consulta en bruto, agregada y exportación.
+        await vm.History.QueryCommand.ExecuteAsync(null);
+        vm.History.Rows.Where(r => r.IsGood).Select(r => r.Value).ShouldBe(["50", "5"]);
+        vm.History.Summary.ShouldContain("puntos de 1 tags");
+
+        vm.History.Aggregate = HistoryViewModel.Aggregates.Single(a => a.Text == "Máximo");
+        vm.History.Interval = HistoryViewModel.Intervals.Single(i => i.Text == "1 día");
+        vm.History.IsAggregated.ShouldBeTrue();
+        await vm.History.QueryCommand.ExecuteAsync(null);
+        vm.History.Rows.ShouldAllBe(r => r.Value == "50");
+
+        var csv = Path.Combine(agent.Directory, "export.csv");
+        _dialogs.SavePath = csv;
+        await vm.History.ExportCommand.ExecuteAsync(null);
+        File.ReadAllLines(csv)[0].ShouldBe("device,tag,timestamp,value,quality");
+        File.ReadAllLines(csv).Skip(1).ShouldAllBe(l => l.StartsWith("plc1,velocidad,", StringComparison.Ordinal));
+
+        vm.History.Tags.Single().IsSelected = false;
+        await vm.History.QueryCommand.ExecuteAsync(null);
+        vm.History.Summary.ShouldBe("Marca al menos un tag.");
+    }
+
+    [Fact]
     public async Task New_device_is_created_from_the_editor_and_selected()
     {
         await using var agent = new AgentFactory(Device("plc1", enabled: false));

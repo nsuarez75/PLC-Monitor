@@ -18,8 +18,9 @@ public sealed partial class TagDetailsViewModel : ObservableObject
     private readonly string _originalName;
     private readonly Dictionary<string, int> _groupIntervals;
 
-    public TagDetailsViewModel(IAgentContext context, TagViewModel tag, DeviceConfig device)
+    public TagDetailsViewModel(IAgentContext context, TagViewModel tag, DeviceConfig device, bool historianEnabled = true)
     {
+        HistorianEnabled = historianEnabled;
         ArgumentNullException.ThrowIfNull(tag);
         ArgumentNullException.ThrowIfNull(device);
         _context = context;
@@ -38,7 +39,35 @@ public sealed partial class TagDetailsViewModel : ObservableObject
         SelectedDataType = config is null || config.DataType == Agent.Contracts.DataType.Unknown ? AutomaticType : config.DataType.ToString();
         GroupName = group?.Name ?? "default";
         IntervalMs = group?.IntervalMs ?? 1000;
+        if (config?.History is { } history)
+        {
+            HistoryEnabled = history.Enabled;
+            HistoryMinIntervalMs = history.MinIntervalMs;
+            HistoryMaxIntervalMs = history.MaxIntervalMs;
+            HistoryDeadband = history.Deadband;
+            HistoryDeadbandPercent = history.DeadbandPercent;
+        }
     }
+
+    /// <summary>El agente tiene el historiador activado.</summary>
+    public bool HistorianEnabled { get; }
+
+    [ObservableProperty]
+    public partial bool HistoryEnabled { get; set; }
+
+    /// <summary>Intervalo mínimo entre muestras (0 = cada cambio).</summary>
+    [ObservableProperty]
+    public partial int HistoryMinIntervalMs { get; set; }
+
+    /// <summary>Tiempo máximo sin guardar (0 = nunca).</summary>
+    [ObservableProperty]
+    public partial int HistoryMaxIntervalMs { get; set; }
+
+    [ObservableProperty]
+    public partial double HistoryDeadband { get; set; }
+
+    [ObservableProperty]
+    public partial bool HistoryDeadbandPercent { get; set; }
 
     /// <summary>Tag en vivo (valor, calidad, hora).</summary>
     public TagViewModel Tag { get; }
@@ -141,6 +170,16 @@ public sealed partial class TagDetailsViewModel : ObservableObject
                 Address = address,
                 Writable = Writable,
                 DataType = SelectedDataType == AutomaticType ? Agent.Contracts.DataType.Unknown : Enum.Parse<DataType>(SelectedDataType),
+                History = HistoryEnabled || HistoryMinIntervalMs > 0 || HistoryMaxIntervalMs > 0 || HistoryDeadband > 0
+                    ? new HistoryConfig
+                    {
+                        Enabled = HistoryEnabled,
+                        MinIntervalMs = HistoryMinIntervalMs,
+                        MaxIntervalMs = HistoryMaxIntervalMs,
+                        Deadband = HistoryDeadband,
+                        DeadbandPercent = HistoryDeadbandPercent,
+                    }
+                    : null,
             });
             foreach (var empty in device.ScanGroups.Where(g => g.Tags.Count == 0).ToArray())
                 device.ScanGroups.Remove(empty);

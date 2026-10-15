@@ -69,6 +69,10 @@ public static class CliApp
                     .WithExample("agent", "tag", "add", "prensa1", "\"MiDB\".Velocidad", "--name", "velocidad", "-g", "rapido", "-i", "250");
                 tag.AddCommand<AgentTagRemoveCommand>("remove").WithDescription("Quita un tag.");
             });
+            agent.AddCommand<AgentHistoryCommand>("history")
+                .WithDescription("Histórico de tags guardado por el agente (tabla o CSV).")
+                .WithExample("agent", "history", "prensa1", "velocidad", "--last", "2h", "-i", "1m", "--agg", "max")
+                .WithExample("agent", "history", "prensa1", "velocidad", "presion", "--from", "2026-10-15 08:00", "--csv", "turno.csv");
             agent.AddCommand<AgentWatchCommand>("watch")
                 .WithDescription("Cambios de valores y de estado en directo (Ctrl+C para salir).")
                 .WithExample("agent", "watch", "prensa1");

@@ -7,6 +7,47 @@ namespace PlcMonitor.Engine.Configuration;
 public sealed class AgentConfiguration
 {
     public List<DeviceConfiguration> Devices { get; init; } = [];
+
+    /// <summary>Historiador: dónde y cuánto tiempo se guardan los tags con historización activada.</summary>
+    public HistorianSettings Historian { get; set; } = new();
+}
+
+/// <summary>Ajustes globales del historiador.</summary>
+public sealed class HistorianSettings
+{
+    public bool Enabled { get; set; } = true;
+
+    /// <summary>Carpeta de los ficheros (uno por mes). Relativa a la carpeta del agente.</summary>
+    public string Path { get; set; } = "history";
+
+    /// <summary>Días que se conservan las muestras (0 = sin límite).</summary>
+    public int RetentionDays { get; set; } = 90;
+
+    /// <summary>Cada cuánto se vuelcan a disco las muestras acumuladas.</summary>
+    public int FlushIntervalMs { get; set; } = 1000;
+}
+
+public enum DeadbandMode
+{
+    Absolute,
+    Percent,
+}
+
+/// <summary>Historización de un tag (estilo Ignition).</summary>
+public sealed class TagHistorySettings
+{
+    public bool Enabled { get; set; }
+
+    /// <summary>Intervalo mínimo entre muestras guardadas (0 = cada cambio). Si llegan cambios más rápido, se guarda el último al cumplirse el intervalo.</summary>
+    public int MinIntervalMs { get; set; }
+
+    /// <summary>Banda muerta: solo se guarda si el valor numérico cambia más que esto (0 = cualquier cambio).</summary>
+    public double Deadband { get; set; }
+
+    public DeadbandMode DeadbandMode { get; set; } = DeadbandMode.Absolute;
+
+    /// <summary>Tiempo máximo sin guardar: se repite el valor actual aunque no cambie (0 = nunca).</summary>
+    public int MaxIntervalMs { get; set; }
 }
 
 /// <summary>Un dispositivo: driver, ajustes del driver, reconexión y grupos de escaneo con sus tags.</summary>
@@ -66,6 +107,9 @@ public sealed class TagConfiguration
 
     /// <summary>Tipo para interpretar los valores escritos cuando el driver no lo deduce de la dirección.</summary>
     public TagDataType? DataType { get; set; }
+
+    /// <summary>Historización del tag; null = no se historiza.</summary>
+    public TagHistorySettings? History { get; set; }
 
     internal string EffectiveName => string.IsNullOrWhiteSpace(Name) ? Address : Name;
 }

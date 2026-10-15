@@ -48,7 +48,10 @@ internal sealed class DeviceSupervisor : IAsyncDisposable
         _sink = sink;
         Tags = config.ScanGroups
             .SelectMany(g => g.Tags.Select(t => new TagDefinition(
-                new TagKey(config.Name, t.EffectiveName), t.Address, g.Name, TimeSpan.FromMilliseconds(g.IntervalMs), t.Writable, t.DataType)))
+                new TagKey(config.Name, t.EffectiveName), t.Address, g.Name, TimeSpan.FromMilliseconds(g.IntervalMs), t.Writable, t.DataType)
+            {
+                History = t.History,
+            }))
             .ToArray();
         _status = new DeviceStatus(config.Name, config.Driver, Enabled: false, config.WritesEnabled,
             ConnectionState.Disconnected, DisabledDetail, time.GetUtcNow());

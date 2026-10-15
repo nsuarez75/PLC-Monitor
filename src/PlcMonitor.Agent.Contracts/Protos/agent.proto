@@ -51,6 +51,10 @@ service AgentService {
 
   // Baja de un dispositivo.
   rpc DeleteDevice(DeleteDeviceRequest) returns (google.protobuf.Empty);
+
+  // Histórico de uno o varios tags entre dos instantes, en bruto o agregado por intervalo.
+  // Si el historiador está desactivado: FAILED_PRECONDITION.
+  rpc QueryHistory(HistoryRequest) returns (HistoryReply);
 }
 
 enum ConnectionState {
@@ -100,6 +104,17 @@ message AgentInfo {
   google.protobuf.Timestamp started = 4;
   string config_path = 5;
   repeated Driver drivers = 6;
+  HistorianInfo historian = 7;
+}
+
+message HistorianInfo {
+  bool enabled = 1;
+  // Carpeta de los ficheros del histórico (uno por mes).
+  string path = 2;
+  int32 retention_days = 3;
+  int64 size_bytes = 4;
+  int32 files = 5;
+  int32 historized_tags = 6;
 }
 
 message Driver {
@@ -171,6 +186,8 @@ message Tag {
   int32 interval_ms = 5;
   bool writable = 6;
   TagValue value = 7;
+  // Se guarda en el histórico.
+  bool historized = 8;
 }
 
 message ListTagsRequest {
@@ -282,6 +299,60 @@ message TagConfig {
   bool writable = 3;
   // DATA_TYPE_UNKNOWN = lo deduce el driver.
   DataType data_type = 4;
+  // Historización; ausente = no se historiza.
+  HistoryConfig history = 5;
+}
+
+message HistoryConfig {
+  bool enabled = 1;
+  // Intervalo mínimo entre muestras guardadas (0 = cada cambio).
+  int32 min_interval_ms = 2;
+  // Banda muerta (0 = cualquier cambio); en % del último valor si deadband_percent.
+  double deadband = 3;
+  bool deadband_percent = 4;
+  // Tiempo máximo sin guardar: se repite el valor actual (0 = nunca).
+  int32 max_interval_ms = 5;
+}
+
+enum HistoryAggregate {
+  HISTORY_AGGREGATE_AVERAGE = 0;
+  HISTORY_AGGREGATE_MIN = 1;
+  HISTORY_AGGREGATE_MAX = 2;
+  HISTORY_AGGREGATE_FIRST = 3;
+  HISTORY_AGGREGATE_LAST = 4;
+}
+
+message HistoryRequest {
+  string device = 1;
+  repeated string tags = 2;
+  // Por defecto: la última hora.
+  google.protobuf.Timestamp from = 3;
+  google.protobuf.Timestamp to = 4;
+  // 0 = puntos en bruto; >0 = agregados por intervalos de este tamaño.
+  int32 interval_ms = 5;
+  HistoryAggregate aggregate = 6;
+  // Máximo de puntos por tag (por defecto 10000).
+  int32 max_points = 7;
+}
+
+message HistoryPoint {
+  google.protobuf.Timestamp timestamp = 1;
+  // Valor numérico (booleanos como 0/1); ausente si el valor es texto o la calidad es mala sin valor.
+  optional double number = 2;
+  string text = 3;
+  Quality quality = 4;
+}
+
+message HistorySeries {
+  string device = 1;
+  string tag = 2;
+  repeated HistoryPoint points = 3;
+  // Había más puntos que max_points.
+  bool truncated = 4;
+}
+
+message HistoryReply {
+  repeated HistorySeries series = 1;
 }
 
 message ScanGroupConfig {

@@ -37,6 +37,7 @@ La visión completa (agente, app Avalonia, historiador, OPC UA, SSH) está en [d
 | `src/PlcMonitor.Cli` | CLI `plcmon` (Spectre.Console). Órdenes directas al PLC y `plcmon agent ...` como cliente gRPC del agente (`AgentCommands.cs`) |
 | `src/PlcMonitor.Engine` | Motor multi-dispositivo: `TagEngine` (caché, suscripciones, activar/desactivar, escritura con doble llave y auditoría), `DeviceSupervisor` (conexión, reconexión con backoff, grupos de escaneo), configuración `agent.json` |
 | `src/PlcMonitor.Agent.Contracts` | `agent.proto` con cliente y servidor gRPC generados. Lo usarán la app y otros clientes sin depender de ASP.NET |
+| `src/PlcMonitor.Historian` | Historiador (Microsoft.Data.Sqlite): `HistorySampler` (muestreo por tag), `SqliteHistorianStore` (un fichero por mes, retención), `HistoryAggregator`, `HistorianService` (suscrito al motor, reloj de 100 ms, volcado por lotes). Lo arranca el agente |
 | `src/PlcMonitor.Deploy` | Instalación remota del agente por SSH (SSH.NET): `SshNetSession` (clave o contraseña, huella SSH fijada), `AgentDeployer` (detecta sistema y RID, sube el paquete, instala/actualiza/desinstala, estado y log), `AgentScripts` (bash y PowerShell generados y probados) |
 | `src/PlcMonitor.App` | App de escritorio `plcmon-app` (Avalonia 12, MVVM con CommunityToolkit.Mvvm). Cliente gRPC del agente: `MainViewModel` (conexión, suscripción con resuscripción, índice de tags), `DeviceViewModel`, `TagViewModel`, `BrowseViewModel`, `DeviceEditorViewModel`. Servicios sustituibles en tests: `IAgentConnector`, `IUiDispatcher`, `IDialogs`. Ver el [manual de la app](app.md) |
 | `src/PlcMonitor.Agent` | Servicio `plcmon-agent` (ASP.NET Core, HTTP/2, Windows Service/systemd). Ver el [manual del agente](agente.md) |
@@ -140,6 +141,7 @@ scripts/publish-release.sh linux-x64    # paquete con la CLI y el agente (en age
 | `PlcMonitor.Engine.Tests` | Validación y carga de la configuración, backoff, motor con driver simulado (que hereda de `DeviceConnectionBase`) y reloj controlado: reconexión, activar/desactivar, 4 PLC independientes, doble llave de escritura, suscripciones y suscriptor lento |
 | `PlcMonitor.Agent.Tests` | API gRPC contra el agente en memoria (`WebApplicationFactory`) con driver simulado; conversión a mensajes protobuf |
 | `PlcMonitor.App.Tests` | ViewModels contra el agente en memoria (conexión, valores en vivo, escritura con confirmación, activar, explorar y añadir, editor con validación y renombrado, bajas) y la ventana real con Avalonia Headless + Skia (capturas PNG con `PLCMON_UI_CAPTURE_DIR`; contra un agente real con `PLCMON_IT_AGENT_URL`) |
+| `PlcMonitor.Historian.Tests` | Muestreador (frecuencia mínima, bandas muertas, tiempo máximo, calidad), almacén (meses, tipos, retención), agregados y el servicio sobre el motor con reloj simulado |
 | `PlcMonitor.Deploy.Tests` | Despliegue con SSH simulado (detección, sudo/root, credenciales nuevas o conservadas, Windows, errores, `bash -n` de los scripts) y uno **real** contra un equipo Linux con systemd (`PLCMON_IT_SSH_HOST`, `_PORT`, `_USER`, `_PASSWORD`, `PLCMON_IT_AGENT_PACKAGES`) |
 | `PlcMonitor.Cli.Tests` | Órdenes `plcmon agent ...` con la configuración real de la CLI (`CliApp`), contra el agente en memoria y una consola de prueba (Spectre.Console.Testing) |
 | `PlcMonitor.IntegrationTests` | **PLC real, solo lectura.** Se omiten si no hay variables de entorno: `PLCMON_IT_SYMBOLIC_HOST`, `PLCMON_IT_SECURITY`, `PLCMON_IT_EXPECTED_SECURITY`, `PLCMON_IT_PASSWORD`, `PLCMON_IT_SYMBOL`, `PLCMON_IT_ABSOLUTE_HOST`, `PLCMON_IT_ABSOLUTE_ADDR` |
@@ -191,6 +193,7 @@ La imagen mínima no trae D-Bus: un usuario normal no puede usar `systemctl` y e
 | Fuente Inter | SIL OFL 1.1 | App de escritorio (Avalonia.Fonts.Inter) |
 | Iconos Lucide (trazados) | ISC | App de escritorio (`Controls/Icon.cs`) |
 | SSH.NET | MIT | Despliegue remoto del agente |
+| Microsoft.Data.Sqlite (SQLitePCLRaw, SQLite) | MIT / dominio público | Historiador |
 | System.Security.Cryptography.ProtectedData | MIT | Token de los agentes protegido con DPAPI en Windows |
 
 **No se usa** la librería AGLink ni su clave de activación incluidas en el módulo de Ignition: son de Inductive Automation y DELTA LOGIC.
