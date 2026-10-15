@@ -5,6 +5,8 @@ using Google.Protobuf.WellKnownTypes;
 using Grpc.Core;
 using PlcMonitor.Agent.Contracts;
 using PlcMonitor.App.Services;
+using PlcMonitor.Deploy;
+using PlcMonitor.Agent.Contracts.Client;
 
 namespace PlcMonitor.App.ViewModels;
 
@@ -21,19 +23,33 @@ public sealed partial class MainViewModel : ObservableObject, IAgentContext, IAs
     private readonly IUiDispatcher _ui;
     private readonly AppSettings _settings;
     private readonly string _settingsPath;
+    private readonly string _profilesPath;
+    private readonly Func<SshTarget, CancellationToken, Task<ISshSession>> _sshFactory;
     private readonly Dictionary<(string Device, string Tag), TagViewModel> _tagIndex = [];
     private IDisposable? _channel;
     private CancellationTokenSource? _subscriptionCts;
     private Task _subscription = Task.CompletedTask;
 
-    public MainViewModel(IAgentConnector connector, IUiDispatcher ui, IDialogs dialogs, AppSettings settings, string settingsPath)
+    public MainViewModel(
+        IAgentConnector connector,
+        IUiDispatcher ui,
+        IDialogs dialogs,
+        AppSettings settings,
+        string settingsPath,
+        string? profilesPath = null,
+        Func<SshTarget, CancellationToken, Task<ISshSession>>? sshFactory = null)
     {
         _connector = connector;
         _ui = ui;
         Dialogs = dialogs;
         _settings = settings;
         _settingsPath = settingsPath;
+        _profilesPath = profilesPath ?? Path.Combine(Path.GetDirectoryName(Path.GetFullPath(settingsPath))!, "agents.json");
+        _sshFactory = sshFactory ?? (async (target, ct) => await SshNetSession.ConnectAsync(target, ct));
+        Profiles = [.. AgentProfileStore.LoadOrCreate(_profilesPath, settings)];
         AgentUrl = settings.AgentUrl;
+        SelectedProfile = Profiles.FirstOrDefault(p => string.Equals(p.Url, settings.AgentUrl, StringComparison.OrdinalIgnoreCase)) ?? Profiles.FirstOrDefault();
+        Theme = settings.Theme is "light" or "dark" ? settings.Theme : "system";
         RecentAgents = [.. settings.RecentAgents];
         Browse = new BrowseViewModel(this, () => SelectedDevice);
     }
@@ -46,6 +62,33 @@ public sealed partial class MainViewModel : ObservableObject, IAgentContext, IAs
 
     public ObservableCollection<string> RecentAgents { get; }
 
+    /// <summary>Agentes conocidos (perfiles).</summary>
+    public ObservableCollection<AgentProfile> Profiles { get; }
+
+    /// <summary>Perfil con el que se conecta.</summary>
+    [ObservableProperty]
+    [NotifyCanExecuteChangedFor(nameof(ConnectCommand))]
+    public partial AgentProfile? SelectedProfile { get; set; }
+
+    /// <summary>Panel de gestión de agentes abierto; null si no.</summary>
+    [ObservableProperty]
+    public partial AgentsViewModel? Agents { get; set; }
+
+    partial void OnSelectedProfileChanged(AgentProfile? value)
+    {
+        if (value is not null)
+            AgentUrl = value.Url;
+    }
+
+    /// <summary>Guarda los perfiles en disco.</summary>
+    public void SaveProfiles() => AgentProfileStore.Save(_profilesPath, Profiles);
+
+    [RelayCommand]
+    private void OpenAgents() => Agents = new AgentsViewModel(this, _sshFactory);
+
+    [RelayCommand]
+    private void CloseAgents() => Agents = null;
+
     public BrowseViewModel Browse { get; }
 
     public IReadOnlyList<Driver> Drivers { get; private set; } = [];
@@ -55,7 +98,7 @@ public sealed partial class MainViewModel : ObservableObject, IAgentContext, IAs
     public partial string AgentUrl { get; set; }
 
     [ObservableProperty]
-    [NotifyPropertyChangedFor(nameof(ConnectionText))]
+    [NotifyPropertyChangedFor(nameof(ConnectionText), nameof(IsReconnecting), nameof(IsOnline))]
     [NotifyCanExecuteChangedFor(nameof(ConnectCommand), nameof(DisconnectCommand), nameof(NewDeviceCommand), nameof(EditDeviceCommand), nameof(DeleteDeviceCommand))]
     public partial bool IsConnected { get; set; }
 
@@ -65,8 +108,22 @@ public sealed partial class MainViewModel : ObservableObject, IAgentContext, IAs
 
     /// <summary>La suscripción está viva (si es false con IsConnected, se está reintentando).</summary>
     [ObservableProperty]
-    [NotifyPropertyChangedFor(nameof(ConnectionText))]
+    [NotifyPropertyChangedFor(nameof(ConnectionText), nameof(IsReconnecting), nameof(IsOnline))]
     public partial bool IsLive { get; set; }
+
+    /// <summary>Tema elegido: "system", "light" o "dark". La vista lo aplica.</summary>
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(ThemeText), nameof(ThemeIcon))]
+    public partial string Theme { get; set; }
+
+    public string ThemeText => Theme switch { "light" => "Claro", "dark" => "Oscuro", _ => "Sistema" };
+
+    public string ThemeIcon => Theme == "dark" ? "moon" : "sun";
+
+    public bool IsReconnecting => IsConnected && !IsLive;
+
+    /// <summary>Conectado y recibiendo en vivo.</summary>
+    public bool IsOnline => IsConnected && IsLive;
 
     [ObservableProperty]
     public partial string AgentDescription { get; set; } = "";
@@ -97,17 +154,29 @@ public sealed partial class MainViewModel : ObservableObject, IAgentContext, IAs
 
     public string Describe(Exception exception) => AgentErrors.Describe(exception, AgentUrl);
 
+    /// <summary>Alterna sistema → claro → oscuro y lo recuerda.</summary>
+    [RelayCommand]
+    private void ToggleTheme()
+    {
+        Theme = Theme switch { "system" => "light", "light" => "dark", _ => "system" };
+        _settings.Theme = Theme;
+        _settings.Save(_settingsPath);
+    }
+
     private bool CanConnect() => !IsConnected && !IsConnecting && !string.IsNullOrWhiteSpace(AgentUrl);
 
     [RelayCommand(CanExecute = nameof(CanConnect))]
     private async Task ConnectAsync()
     {
         var url = AgentUrl.Trim();
+        var endpoint = SelectedProfile is { } profile && string.Equals(profile.Url, url, StringComparison.OrdinalIgnoreCase)
+            ? profile.Endpoint
+            : new AgentEndpoint(url);
         IsConnecting = true;
         Report($"Conectando con {url}…");
         try
         {
-            var (client, channel) = _connector.Connect(url);
+            var (client, channel) = _connector.Connect(endpoint);
             AgentInfo info;
             try
             {
@@ -127,6 +196,13 @@ public sealed partial class MainViewModel : ObservableObject, IAgentContext, IAs
             _settings.Save(_settingsPath);
             if (!RecentAgents.Contains(url))
                 RecentAgents.Insert(0, url);
+            if (!Profiles.Any(p => string.Equals(p.Url, url, StringComparison.OrdinalIgnoreCase)))
+            {
+                var added = new AgentProfile { Name = url, Url = url };
+                Profiles.Add(added);
+                SelectedProfile = added;
+                SaveProfiles();
+            }
             _subscriptionCts = new CancellationTokenSource();
             _subscription = RunSubscriptionAsync(client, _subscriptionCts.Token);
             Report($"Conectado a {url}");

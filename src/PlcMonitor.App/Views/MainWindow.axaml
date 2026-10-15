@@ -1,185 +1,376 @@
 <Window xmlns="https://github.com/avaloniaui"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
         xmlns:vm="using:PlcMonitor.App.ViewModels"
+        xmlns:c="using:PlcMonitor.App.Controls"
+        xmlns:svc="using:PlcMonitor.App.Services"
+        xmlns:v="using:PlcMonitor.App.Views"
         x:Class="PlcMonitor.App.Views.MainWindow"
         x:DataType="vm:MainViewModel"
-        Title="PLC-Monitor" Width="1280" Height="800" MinWidth="900" MinHeight="560">
+        Title="PLC-Monitor" Width="1320" Height="820" MinWidth="980" MinHeight="600">
 
   <DockPanel>
-    <!-- Conexión con el agente -->
-    <Border DockPanel.Dock="Top" Padding="12,10" BorderThickness="0,0,0,1" BorderBrush="{DynamicResource SystemControlForegroundBaseLowBrush}">
-      <Grid ColumnDefinitions="Auto,320,Auto,Auto,*,Auto" ColumnSpacing="8">
-        <TextBlock Grid.Column="0" Text="Agente" VerticalAlignment="Center" FontWeight="SemiBold" />
-        <AutoCompleteBox Grid.Column="1" Text="{Binding AgentUrl}" ItemsSource="{Binding RecentAgents}"
-                         IsEnabled="{Binding !IsConnected}" PlaceholderText="http://127.0.0.1:5310" MinimumPrefixLength="0" />
-        <Button Grid.Column="2" Content="Conectar" Command="{Binding ConnectCommand}" Classes="accent" IsVisible="{Binding !IsConnected}" />
-        <Button Grid.Column="3" Content="Desconectar" Command="{Binding DisconnectCommand}" IsVisible="{Binding IsConnected}" />
-        <TextBlock Grid.Column="4" Text="{Binding AgentDescription}" VerticalAlignment="Center" Classes="muted" TextTrimming="CharacterEllipsis" />
-        <TextBlock Grid.Column="5" Text="{Binding ConnectionText}" VerticalAlignment="Center" FontWeight="SemiBold" />
+    <!-- ░░ Barra superior: marca, agente y estado de la conexión ░░ -->
+    <Border DockPanel.Dock="Top" Classes="bar" BorderThickness="0,0,0,1" Padding="16,10">
+      <Grid ColumnDefinitions="Auto,*,Auto,Auto" ColumnSpacing="16">
+        <StackPanel Orientation="Horizontal" Spacing="10" VerticalAlignment="Center">
+          <Border Classes="brand">
+            <c:Icon Kind="pulse" Width="18" Height="18" Foreground="White" StrokeWidth="2.4" />
+          </Border>
+          <StackPanel VerticalAlignment="Center">
+            <TextBlock Text="PLC-Monitor" FontWeight="Bold" FontSize="14" />
+            <TextBlock Text="{Binding AgentDescription}" Classes="muted" FontSize="11" IsVisible="{Binding IsConnected}" />
+            <TextBlock Text="Diagnóstico de PLCs Siemens S7" Classes="muted" FontSize="11" IsVisible="{Binding !IsConnected}" />
+          </StackPanel>
+        </StackPanel>
+
+        <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="8" HorizontalAlignment="Center" VerticalAlignment="Center">
+          <ComboBox ItemsSource="{Binding Profiles}" SelectedItem="{Binding SelectedProfile}" Width="320"
+                    IsEnabled="{Binding !IsConnected}" PlaceholderText="Elige un agente">
+            <ComboBox.ItemTemplate>
+              <DataTemplate x:DataType="svc:AgentProfile">
+                <StackPanel Orientation="Horizontal" Spacing="8">
+                  <c:Icon Kind="server" Width="14" Height="14" Foreground="{DynamicResource App.TextMuted}" />
+                  <TextBlock Text="{Binding Name}" FontWeight="SemiBold" />
+                  <TextBlock Text="{Binding Url}" Classes="muted" FontSize="12" />
+                </StackPanel>
+              </DataTemplate>
+            </ComboBox.ItemTemplate>
+          </ComboBox>
+          <Button Classes="accent" Command="{Binding ConnectCommand}" IsVisible="{Binding !IsConnected}">
+            <StackPanel Orientation="Horizontal" Spacing="6">
+              <c:Icon Kind="link" />
+              <TextBlock Text="Conectar" />
+            </StackPanel>
+          </Button>
+          <Button Classes="secondary" Command="{Binding DisconnectCommand}" IsVisible="{Binding IsConnected}">
+            <StackPanel Orientation="Horizontal" Spacing="6">
+              <c:Icon Kind="unlink" />
+              <TextBlock Text="Desconectar" />
+            </StackPanel>
+          </Button>
+        </StackPanel>
+
+        <Border Grid.Column="2" Classes="pill" Padding="10,4"
+                Classes.good="{Binding IsOnline}" Classes.warn="{Binding IsReconnecting}">
+          <StackPanel Orientation="Horizontal" Spacing="7">
+            <Ellipse Classes="dot" Classes.good="{Binding IsOnline}" Classes.warn="{Binding IsReconnecting}" />
+            <TextBlock Text="{Binding ConnectionText}" />
+          </StackPanel>
+        </Border>
+
+        <StackPanel Grid.Column="3" Orientation="Horizontal" Spacing="2">
+        <Button Classes="ghost" Command="{Binding OpenAgentsCommand}" ToolTip.Tip="Gestionar agentes (instalar en equipos por SSH)">
+          <StackPanel Orientation="Horizontal" Spacing="6">
+            <c:Icon Kind="server" Width="16" Height="16" />
+            <TextBlock Text="Agentes" />
+          </StackPanel>
+        </Button>
+        <Button Classes="ghost" Command="{Binding ToggleThemeCommand}" ToolTip.Tip="{Binding ThemeText, StringFormat='Tema: {0}'}">
+          <c:Icon Kind="{Binding ThemeIcon}" Width="18" Height="18" />
+        </Button>
+        </StackPanel>
       </Grid>
     </Border>
 
-    <!-- Barra de mensajes -->
-    <Border DockPanel.Dock="Bottom" Padding="12,6" BorderThickness="0,1,0,0" BorderBrush="{DynamicResource SystemControlForegroundBaseLowBrush}">
-      <TextBlock Text="{Binding Message}" Classes.error="{Binding IsMessageError}" TextTrimming="CharacterEllipsis" />
+    <!-- ░░ Barra de estado ░░ -->
+    <Border DockPanel.Dock="Bottom" Classes="bar" BorderThickness="0,1,0,0" Padding="16,7">
+      <StackPanel Orientation="Horizontal" Spacing="8">
+        <c:Icon Kind="alert" Width="14" Height="14" Foreground="{DynamicResource App.Bad}" IsVisible="{Binding IsMessageError}" />
+        <c:Icon Kind="info" Width="14" Height="14" Foreground="{DynamicResource App.TextMuted}" IsVisible="{Binding !IsMessageError}" />
+        <TextBlock Text="{Binding Message}" Classes="muted" Classes.error="{Binding IsMessageError}" TextTrimming="CharacterEllipsis" FontSize="12" />
+      </StackPanel>
     </Border>
 
-    <Grid ColumnDefinitions="300,4,*">
-      <!-- Dispositivos -->
-      <DockPanel Grid.Column="0" Margin="12">
-        <TextBlock DockPanel.Dock="Top" Text="Dispositivos" Classes="header" Margin="0,0,0,6" />
-        <StackPanel DockPanel.Dock="Bottom" Orientation="Horizontal" Spacing="6" Margin="0,8,0,0">
-          <Button Content="Nuevo" Command="{Binding NewDeviceCommand}" />
-          <Button Content="Editar" Command="{Binding EditDeviceCommand}" />
-          <Button Content="Eliminar" Command="{Binding DeleteDeviceCommand}" />
-        </StackPanel>
-        <ListBox ItemsSource="{Binding Devices}" SelectedItem="{Binding SelectedDevice}">
-          <ListBox.ItemTemplate>
-            <DataTemplate x:DataType="vm:DeviceViewModel">
-              <Grid ColumnDefinitions="Auto,*,Auto" RowDefinitions="Auto,Auto" ColumnSpacing="8">
-                <Ellipse Grid.RowSpan="2" Classes="state" Classes.connected="{Binding IsConnected}"
-                         Classes.connecting="{Binding IsConnecting}" Classes.faulted="{Binding IsFaulted}" VerticalAlignment="Center" />
-                <TextBlock Grid.Column="1" Text="{Binding Name}" FontWeight="SemiBold" TextTrimming="CharacterEllipsis" />
-                <Button Grid.Column="2" Grid.RowSpan="2" Content="{Binding ToggleText}" Command="{Binding ToggleEnabledCommand}"
-                        Padding="8,2" FontSize="12" VerticalAlignment="Center" />
-                <TextBlock Grid.Column="1" Grid.Row="1" Classes="muted" FontSize="12" TextTrimming="CharacterEllipsis">
-                  <Run Text="{Binding StateText}" /><Run Text=" · " /><Run Text="{Binding Driver}" />
-                </TextBlock>
-              </Grid>
-            </DataTemplate>
-          </ListBox.ItemTemplate>
-        </ListBox>
-      </DockPanel>
-
-      <GridSplitter Grid.Column="1" ResizeDirection="Columns" Background="{DynamicResource SystemControlForegroundBaseLowBrush}" />
-
-      <!-- Editor de dispositivo (alta o edición) -->
-      <ScrollViewer Grid.Column="2" IsVisible="{Binding Editor, Converter={x:Static ObjectConverters.IsNotNull}}">
-        <StackPanel Margin="16" Spacing="10" MaxWidth="720" HorizontalAlignment="Left" DataContext="{Binding Editor}" x:DataType="vm:DeviceEditorViewModel">
-          <TextBlock Text="{Binding Title}" FontSize="20" FontWeight="SemiBold" />
-          <Grid ColumnDefinitions="180,*" RowDefinitions="Auto,Auto,Auto,Auto,Auto,Auto" RowSpacing="10" ColumnSpacing="12">
-            <TextBlock Text="Nombre" VerticalAlignment="Center" />
-            <TextBox Grid.Column="1" Text="{Binding Name}" PlaceholderText="prensa1" />
-            <TextBlock Grid.Row="1" Text="Driver" VerticalAlignment="Center" />
-            <ComboBox Grid.Row="1" Grid.Column="1" ItemsSource="{Binding DriverIds}" SelectedItem="{Binding DriverId}" MinWidth="220" />
-            <TextBlock Grid.Row="2" Text="Ajustes del driver (JSON)" VerticalAlignment="Top" Margin="0,6,0,0" />
-            <TextBox Grid.Row="2" Grid.Column="1" Text="{Binding SettingsJson}" AcceptsReturn="True" FontFamily="monospace" MinHeight="140" />
-            <TextBlock Grid.Row="3" Text="Estado" VerticalAlignment="Center" />
-            <StackPanel Grid.Row="3" Grid.Column="1" Orientation="Horizontal" Spacing="16">
-              <CheckBox Content="Activo" IsChecked="{Binding Enabled}" />
-              <CheckBox Content="Escrituras habilitadas (1.ª llave)" IsChecked="{Binding WritesEnabled}" />
-            </StackPanel>
-            <TextBlock Grid.Row="4" Text="Reconexión" VerticalAlignment="Center" />
-            <StackPanel Grid.Row="4" Grid.Column="1" Orientation="Horizontal" Spacing="8">
-              <NumericUpDown Value="{Binding InitialDelayMs}" Minimum="100" Increment="500" FormatString="0" Width="130" />
-              <TextBlock Text="ms inicial · máx." VerticalAlignment="Center" />
-              <NumericUpDown Value="{Binding MaxDelayMs}" Minimum="100" Increment="1000" FormatString="0" Width="140" />
-              <TextBlock Text="ms · ×" VerticalAlignment="Center" />
-              <NumericUpDown Value="{Binding Multiplier}" Minimum="1" Increment="0.5" FormatString="0.0" Width="110" />
-            </StackPanel>
-            <TextBlock Grid.Row="5" Grid.Column="1" Text="{Binding TagSummary}" Classes="muted" />
+    <Grid ColumnDefinitions="280,*">
+      <!-- ░░ Lateral: dispositivos ░░ -->
+      <Border Classes="bar" BorderThickness="0,0,1,0">
+        <DockPanel Margin="12,14,12,12">
+          <Grid DockPanel.Dock="Top" ColumnDefinitions="*,Auto" Margin="4,0,0,10">
+            <TextBlock Text="DISPOSITIVOS" Classes="caption" VerticalAlignment="Center" />
+            <Button Grid.Column="1" Classes="ghost" Command="{Binding NewDeviceCommand}" ToolTip.Tip="Nuevo dispositivo">
+              <c:Icon Kind="plus" />
+            </Button>
           </Grid>
-          <TextBlock Text="{Binding Errors}" Classes="error" TextWrapping="Wrap" />
-          <StackPanel Orientation="Horizontal" Spacing="8">
-            <Button Content="Guardar" Command="{Binding SaveCommand}" Classes="accent" />
-            <Button Content="Cancelar" Command="{Binding $parent[Window].((vm:MainViewModel)DataContext).CloseEditorCommand}" />
-          </StackPanel>
+          <TextBlock DockPanel.Dock="Top" Classes="muted" TextWrapping="Wrap" Margin="4,8" FontSize="12"
+                     IsVisible="{Binding !IsConnected}" Text="Conecta con un agente para ver sus PLC." />
+          <ListBox Classes="devices" ItemsSource="{Binding Devices}" SelectedItem="{Binding SelectedDevice}">
+            <ListBox.ItemTemplate>
+              <DataTemplate x:DataType="vm:DeviceViewModel">
+                <Grid ColumnDefinitions="Auto,*,Auto" RowDefinitions="Auto,Auto" ColumnSpacing="10" RowSpacing="2">
+                  <Border Grid.RowSpan="2" Width="34" Height="34" CornerRadius="8" Background="{DynamicResource App.SurfaceAlt}">
+                    <c:Icon Kind="cpu" Width="18" Height="18" Foreground="{DynamicResource App.TextMuted}" />
+                  </Border>
+                  <TextBlock Grid.Column="1" Text="{Binding Name}" FontWeight="SemiBold" TextTrimming="CharacterEllipsis" VerticalAlignment="Bottom" />
+                  <StackPanel Grid.Column="1" Grid.Row="1" Orientation="Horizontal" Spacing="6">
+                    <Ellipse Classes="dot" Width="7" Height="7" Classes.good="{Binding IsConnected}"
+                             Classes.warn="{Binding IsConnecting}" Classes.bad="{Binding IsFaulted}" />
+                    <TextBlock Text="{Binding StateText}" Classes="muted" FontSize="11.5" />
+                  </StackPanel>
+                  <TextBlock Grid.Column="2" Grid.RowSpan="2" Text="{Binding Tags.Count}" Classes="muted" FontSize="11.5" VerticalAlignment="Center"
+                             ToolTip.Tip="{Binding TagCountText}" />
+                </Grid>
+              </DataTemplate>
+            </ListBox.ItemTemplate>
+          </ListBox>
+        </DockPanel>
+      </Border>
+
+      <!-- ░░ Contenido ░░ -->
+      <Panel Grid.Column="1">
+        <!-- Vacío: sin dispositivo seleccionado -->
+        <StackPanel HorizontalAlignment="Center" VerticalAlignment="Center" Spacing="10"
+                    IsVisible="{Binding SelectedDevice, Converter={x:Static ObjectConverters.IsNull}}">
+          <Border Width="56" Height="56" CornerRadius="16" Background="{DynamicResource App.AccentSoft}" HorizontalAlignment="Center">
+            <c:Icon Kind="server" Width="26" Height="26" Foreground="{DynamicResource App.Accent}" />
+          </Border>
+          <TextBlock Text="Ningún dispositivo seleccionado" FontSize="15" FontWeight="SemiBold" HorizontalAlignment="Center" />
+          <TextBlock Classes="muted" HorizontalAlignment="Center" TextAlignment="Center" TextWrapping="Wrap" MaxWidth="360"
+                     Text="Conecta con un agente y elige un PLC, o da de alta uno nuevo con el botón +." />
         </StackPanel>
-      </ScrollViewer>
 
-      <!-- Tags y explorador del dispositivo seleccionado -->
-      <TabControl Grid.Column="2" Margin="8,4" IsVisible="{Binding Editor, Converter={x:Static ObjectConverters.IsNull}}">
-        <TabItem Header="Tags">
-          <DockPanel>
-            <StackPanel DockPanel.Dock="Top" Margin="4,0,4,8" Spacing="2" DataContext="{Binding SelectedDevice}" x:DataType="vm:DeviceViewModel">
-              <TextBlock FontSize="18" FontWeight="SemiBold">
-                <Run Text="{Binding Name}" /><Run Text="  " /><Run Text="{Binding StateText}" FontSize="14" FontWeight="Normal" />
-              </TextBlock>
-              <TextBlock Classes="muted" TextWrapping="Wrap">
-                <Run Text="Desde " /><Run Text="{Binding Since}" /><Run Text="  " /><Run Text="{Binding Detail}" />
-              </TextBlock>
-            </StackPanel>
-            <Grid DockPanel.Dock="Top" ColumnDefinitions="2*,2*,1.6*,80,150,90,260" Margin="12,0,12,4" ColumnSpacing="8">
-              <TextBlock Text="Tag" Classes="header" />
-              <TextBlock Grid.Column="1" Text="Dirección" Classes="header" />
-              <TextBlock Grid.Column="2" Text="Valor" Classes="header" />
-              <TextBlock Grid.Column="3" Text="Tipo" Classes="header" />
-              <TextBlock Grid.Column="4" Text="Calidad" Classes="header" />
-              <TextBlock Grid.Column="5" Text="Hora" Classes="header" />
-              <TextBlock Grid.Column="6" Text="Escribir" Classes="header" />
-            </Grid>
-            <TextBlock DockPanel.Dock="Top" Margin="12,8" Classes="muted" TextWrapping="Wrap"
-                       IsVisible="{Binding SelectedDevice, Converter={x:Static ObjectConverters.IsNull}}"
-                       Text="Conecta con un agente y selecciona un dispositivo. Con «Nuevo» se da de alta un PLC." />
-            <TextBlock DockPanel.Dock="Top" Margin="12,8" Classes="muted" TextWrapping="Wrap"
-                       IsVisible="{Binding SelectedDevice.Tags.Count, FallbackValue=False, Converter={x:Static vm:Converters.IsZero}}"
-                       Text="Este dispositivo no tiene tags. Añádelos desde la pestaña «Explorar» (con el PLC conectado)." />
-            <ListBox ItemsSource="{Binding SelectedDevice.Tags}">
-              <ListBox.ItemTemplate>
-                <DataTemplate x:DataType="vm:TagViewModel">
-                  <Grid ColumnDefinitions="2*,2*,1.6*,80,150,90,260" ColumnSpacing="8">
-                    <StackPanel>
-                      <TextBlock Text="{Binding Name}" FontWeight="SemiBold" TextTrimming="CharacterEllipsis" />
-                      <TextBlock Text="{Binding Group}" Classes="muted" FontSize="11" />
-                    </StackPanel>
-                    <TextBlock Grid.Column="1" Text="{Binding Address}" TextTrimming="CharacterEllipsis" VerticalAlignment="Center" ToolTip.Tip="{Binding Address}" />
-                    <TextBlock Grid.Column="2" Text="{Binding ValueText}" TextTrimming="CharacterEllipsis" VerticalAlignment="Center"
-                               FontFamily="monospace" ToolTip.Tip="{Binding ValueText}" />
-                    <TextBlock Grid.Column="3" Text="{Binding DataType}" Classes="muted" VerticalAlignment="Center" />
-                    <TextBlock Grid.Column="4" Text="{Binding Quality}" Classes="quality" Classes.good="{Binding IsGood}"
-                               Classes.uncertain="{Binding IsUncertain}" Classes.bad="{Binding IsBad}" VerticalAlignment="Center" TextTrimming="CharacterEllipsis" />
-                    <TextBlock Grid.Column="5" Text="{Binding Time}" Classes="muted" VerticalAlignment="Center" FontSize="12" />
-                    <StackPanel Grid.Column="6" Orientation="Horizontal" Spacing="4">
-                      <TextBox Text="{Binding NewValue}" Width="110" IsVisible="{Binding Writable}" PlaceholderText="valor" />
-                      <Button Content="Escribir" Command="{Binding WriteCommand}" IsVisible="{Binding Writable}" Padding="8,2" />
-                      <Button Content="Quitar" Command="{Binding RemoveCommand}" Padding="8,2" />
-                    </StackPanel>
-                  </Grid>
-                </DataTemplate>
-              </ListBox.ItemTemplate>
-            </ListBox>
-          </DockPanel>
-        </TabItem>
-
-        <TabItem Header="Explorar">
-          <DockPanel DataContext="{Binding Browse}" x:DataType="vm:BrowseViewModel" Margin="4">
-            <StackPanel DockPanel.Dock="Top" Spacing="8" Margin="0,0,0,8">
-              <Grid ColumnDefinitions="*,Auto,Auto,Auto" ColumnSpacing="8">
-                <TextBox Text="{Binding Filter}" PlaceholderText="Texto del nombre (vacío = todo)">
-                  <TextBox.KeyBindings>
-                    <KeyBinding Gesture="Enter" Command="{Binding SearchCommand}" CommandParameter="False" />
-                  </TextBox.KeyBindings>
-                </TextBox>
-                <NumericUpDown Grid.Column="1" Value="{Binding MaxResults}" Minimum="10" Maximum="100000" Increment="100" FormatString="0" Width="130" />
-                <Button Grid.Column="2" Content="Buscar" Command="{Binding SearchCommand}" CommandParameter="False" Classes="accent" />
-                <Button Grid.Column="3" Content="Volver a explorar la CPU" Command="{Binding SearchCommand}" CommandParameter="True" />
-              </Grid>
-              <StackPanel Orientation="Horizontal" Spacing="8">
-                <TextBlock Text="Añadir al grupo" VerticalAlignment="Center" />
-                <TextBox Text="{Binding GroupName}" Width="140" />
-                <TextBlock Text="periodo (si es nuevo)" VerticalAlignment="Center" />
-                <NumericUpDown Value="{Binding IntervalMs}" Minimum="50" Increment="250" FormatString="0" Width="130" />
-                <TextBlock Text="ms" VerticalAlignment="Center" />
-                <CheckBox Content="Escribible (2.ª llave)" IsChecked="{Binding AddWritable}" />
+        <!-- Dispositivo seleccionado -->
+        <DockPanel Margin="20,16,20,16" IsVisible="{Binding SelectedDevice, Converter={x:Static ObjectConverters.IsNotNull}}">
+          <Grid DockPanel.Dock="Top" ColumnDefinitions="*,Auto" Margin="0,0,0,14" DataContext="{Binding SelectedDevice}" x:DataType="vm:DeviceViewModel">
+            <StackPanel Spacing="6">
+              <StackPanel Orientation="Horizontal" Spacing="10">
+                <TextBlock Text="{Binding Name}" Classes="title" />
+                <Border Classes="pill" Classes.good="{Binding IsConnected}" Classes.warn="{Binding IsConnecting}" Classes.bad="{Binding IsFaulted}">
+                  <StackPanel Orientation="Horizontal" Spacing="6">
+                    <Ellipse Classes="dot" Width="7" Height="7" Classes.good="{Binding IsConnected}" Classes.warn="{Binding IsConnecting}" Classes.bad="{Binding IsFaulted}" />
+                    <TextBlock Text="{Binding StateText}" />
+                  </StackPanel>
+                </Border>
+                <Border Classes="pill accent" IsVisible="{Binding WritesEnabled}">
+                  <TextBlock Text="Escritura habilitada" />
+                </Border>
               </StackPanel>
-              <TextBlock Text="{Binding Summary}" Classes="muted" />
+              <TextBlock Classes="muted" TextWrapping="Wrap" FontSize="12">
+                <Run Text="{Binding Driver}" /><Run Text="  ·  desde " /><Run Text="{Binding Since}" /><Run Text="  " /><Run Text="{Binding Detail}" />
+              </TextBlock>
             </StackPanel>
-            <ListBox ItemsSource="{Binding Results}" SelectedItem="{Binding SelectedItem}">
-              <ListBox.ItemTemplate>
-                <DataTemplate x:DataType="vm:BrowseItemViewModel">
-                  <Grid ColumnDefinitions="*,120,100,Auto" ColumnSpacing="8">
-                    <TextBlock Text="{Binding Address}" VerticalAlignment="Center" TextTrimming="CharacterEllipsis" />
-                    <TextBlock Grid.Column="1" Text="{Binding NativeType}" Classes="muted" VerticalAlignment="Center" />
-                    <TextBlock Grid.Column="2" Text="{Binding DataType}" Classes="muted" VerticalAlignment="Center" />
-                    <Button Grid.Column="3" Content="Añadir" Padding="8,2"
-                            Command="{Binding $parent[ListBox].((vm:BrowseViewModel)DataContext).AddCommand}" CommandParameter="{Binding}" />
-                  </Grid>
-                </DataTemplate>
-              </ListBox.ItemTemplate>
-            </ListBox>
-          </DockPanel>
-        </TabItem>
-      </TabControl>
+            <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="6" VerticalAlignment="Top">
+              <Button Classes="secondary" Command="{Binding ToggleEnabledCommand}">
+                <StackPanel Orientation="Horizontal" Spacing="6">
+                  <c:Icon Kind="power" />
+                  <TextBlock Text="{Binding ToggleText}" />
+                </StackPanel>
+              </Button>
+              <Button Classes="secondary" Command="{Binding $parent[Window].((vm:MainViewModel)DataContext).EditDeviceCommand}">
+                <StackPanel Orientation="Horizontal" Spacing="6">
+                  <c:Icon Kind="pencil" />
+                  <TextBlock Text="Editar" />
+                </StackPanel>
+              </Button>
+              <Button Classes="ghost danger" Command="{Binding $parent[Window].((vm:MainViewModel)DataContext).DeleteDeviceCommand}" ToolTip.Tip="Eliminar dispositivo">
+                <c:Icon Kind="trash" />
+              </Button>
+            </StackPanel>
+          </Grid>
+
+          <TabControl Classes="compact">
+            <!-- Tags en vivo -->
+            <TabItem>
+              <TabItem.Header>
+                <StackPanel Orientation="Horizontal" Spacing="8">
+                  <TextBlock Text="Tags" />
+                  <Border Classes="pill" Padding="7,0">
+                    <TextBlock Text="{Binding SelectedDevice.Tags.Count, FallbackValue=0}" />
+                  </Border>
+                </StackPanel>
+              </TabItem.Header>
+              <DockPanel Margin="0,12,0,0">
+                <StackPanel DockPanel.Dock="Top" Orientation="Horizontal" Spacing="8" Margin="0,0,0,10"
+                            DataContext="{Binding SelectedDevice}" x:DataType="vm:DeviceViewModel" IsVisible="{Binding HasTags, FallbackValue=False}">
+                  <Border Classes="pill good">
+                    <TextBlock><Run Text="{Binding GoodCount}" /><Run Text=" en buen estado" /></TextBlock>
+                  </Border>
+                  <Border Classes="pill bad" IsVisible="{Binding HasBadTags}">
+                    <TextBlock><Run Text="{Binding BadCount}" /><Run Text=" con error" /></TextBlock>
+                  </Border>
+                </StackPanel>
+
+                <Border Classes="card" ClipToBounds="True">
+                  <DockPanel>
+                    <Grid DockPanel.Dock="Top" Classes="tablehead" ColumnDefinitions="2*,2.2*,1.6*,90,130,100,250" ColumnSpacing="12" Margin="16,12,16,10">
+                      <TextBlock Text="TAG" />
+                      <TextBlock Grid.Column="1" Text="DIRECCIÓN" />
+                      <TextBlock Grid.Column="2" Text="VALOR" />
+                      <TextBlock Grid.Column="3" Text="TIPO" />
+                      <TextBlock Grid.Column="4" Text="CALIDAD" />
+                      <TextBlock Grid.Column="5" Text="ACTUALIZADO" />
+                      <TextBlock Grid.Column="6" Text="ESCRIBIR" />
+                    </Grid>
+                    <StackPanel DockPanel.Dock="Top" Margin="16,24" Spacing="6" HorizontalAlignment="Center"
+                                IsVisible="{Binding !SelectedDevice.HasTags, FallbackValue=False}">
+                      <TextBlock Text="Sin tags" FontWeight="SemiBold" HorizontalAlignment="Center" />
+                      <TextBlock Classes="muted" Text="Añádelos desde la pestaña «Explorar» con el PLC conectado." HorizontalAlignment="Center" />
+                    </StackPanel>
+                    <ListBox Classes="table" ItemsSource="{Binding SelectedDevice.Tags}">
+                      <ListBox.ItemTemplate>
+                        <DataTemplate x:DataType="vm:TagViewModel">
+                          <Grid ColumnDefinitions="2*,2.2*,1.6*,90,130,100,250" ColumnSpacing="12">
+                            <StackPanel VerticalAlignment="Center">
+                              <TextBlock Text="{Binding Name}" FontWeight="SemiBold" TextTrimming="CharacterEllipsis" />
+                              <TextBlock Text="{Binding Group}" Classes="muted" FontSize="11" />
+                            </StackPanel>
+                            <TextBlock Grid.Column="1" Text="{Binding Address}" Classes="muted mono" FontSize="12" TextTrimming="CharacterEllipsis"
+                                       VerticalAlignment="Center" ToolTip.Tip="{Binding Address}" />
+                            <TextBlock Grid.Column="2" Text="{Binding ValueText}" Classes="mono" FontSize="13.5" FontWeight="SemiBold"
+                                       Classes.error="{Binding IsBad}" TextTrimming="CharacterEllipsis" VerticalAlignment="Center" ToolTip.Tip="{Binding ValueText}" />
+                            <TextBlock Grid.Column="3" Text="{Binding DataType}" Classes="muted" VerticalAlignment="Center" />
+                            <Border Grid.Column="4" Classes="pill" Classes.good="{Binding IsGood}" Classes.warn="{Binding IsUncertain}" Classes.bad="{Binding IsBad}">
+                              <TextBlock Text="{Binding Quality}" TextTrimming="CharacterEllipsis" MaxWidth="110" />
+                            </Border>
+                            <TextBlock Grid.Column="5" Text="{Binding Time}" Classes="muted mono" FontSize="11.5" VerticalAlignment="Center" />
+                            <StackPanel Grid.Column="6" Orientation="Horizontal" Spacing="4" VerticalAlignment="Center">
+                              <TextBox Text="{Binding NewValue}" Width="120" IsVisible="{Binding Writable}" PlaceholderText="nuevo valor" Classes="mono" />
+                              <Button Classes="accent" Padding="9,6" Command="{Binding WriteCommand}" IsVisible="{Binding Writable}" ToolTip.Tip="Escribir">
+                                <c:Icon Kind="send" Width="14" Height="14" />
+                              </Button>
+                              <Button Classes="ghost danger" Command="{Binding RemoveCommand}" ToolTip.Tip="Quitar tag">
+                                <c:Icon Kind="x" Width="14" Height="14" />
+                              </Button>
+                            </StackPanel>
+                          </Grid>
+                        </DataTemplate>
+                      </ListBox.ItemTemplate>
+                    </ListBox>
+                  </DockPanel>
+                </Border>
+              </DockPanel>
+            </TabItem>
+
+            <!-- Explorador de símbolos -->
+            <TabItem Header="Explorar">
+              <DockPanel Margin="0,12,0,0" DataContext="{Binding Browse}" x:DataType="vm:BrowseViewModel">
+                <Border DockPanel.Dock="Top" Classes="card" Padding="14" Margin="0,0,0,12">
+                  <StackPanel Spacing="12">
+                    <Grid ColumnDefinitions="*,Auto,Auto,Auto" ColumnSpacing="8">
+                      <TextBox Text="{Binding Filter}" PlaceholderText="Buscar símbolos por nombre (vacío = todos)">
+                        <TextBox.InnerLeftContent>
+                          <c:Icon Kind="search" Margin="10,0,2,0" Foreground="{DynamicResource App.TextMuted}" />
+                        </TextBox.InnerLeftContent>
+                        <TextBox.KeyBindings>
+                          <KeyBinding Gesture="Enter" Command="{Binding SearchCommand}" />
+                        </TextBox.KeyBindings>
+                      </TextBox>
+                      <NumericUpDown Grid.Column="1" Value="{Binding MaxResults}" Minimum="10" Maximum="100000" Increment="100" FormatString="0" Width="130"
+                                     ToolTip.Tip="Máximo de resultados" />
+                      <Button Grid.Column="2" Classes="accent" Command="{Binding SearchCommand}">
+                        <StackPanel Orientation="Horizontal" Spacing="6">
+                          <c:Icon Kind="search" />
+                          <TextBlock Text="Buscar" />
+                        </StackPanel>
+                      </Button>
+                      <Button Grid.Column="3" Classes="secondary" Command="{Binding RefreshCommand}" ToolTip.Tip="Volver a explorar la CPU (tras cargar un programa nuevo)">
+                        <c:Icon Kind="refresh" />
+                      </Button>
+                    </Grid>
+                    <StackPanel Orientation="Horizontal" Spacing="10">
+                      <TextBlock Text="Añadir al grupo" Classes="muted" VerticalAlignment="Center" />
+                      <TextBox Text="{Binding GroupName}" Width="140" />
+                      <TextBlock Text="cada" Classes="muted" VerticalAlignment="Center" />
+                      <NumericUpDown Value="{Binding IntervalMs}" Minimum="50" Increment="250" FormatString="0" Width="130" />
+                      <TextBlock Text="ms (si el grupo es nuevo)" Classes="muted" VerticalAlignment="Center" />
+                      <CheckBox Content="Escribible" IsChecked="{Binding AddWritable}" Margin="8,0,0,0" />
+                    </StackPanel>
+                  </StackPanel>
+                </Border>
+
+                <TextBlock DockPanel.Dock="Top" Text="{Binding Summary}" Classes="muted" FontSize="12" Margin="2,0,0,8" />
+
+                <Border Classes="card" ClipToBounds="True">
+                  <DockPanel>
+                    <Grid DockPanel.Dock="Top" Classes="tablehead" ColumnDefinitions="*,140,110,Auto" ColumnSpacing="12" Margin="16,12,16,10">
+                      <TextBlock Text="SÍMBOLO" />
+                      <TextBlock Grid.Column="1" Text="TIPO PLC" />
+                      <TextBlock Grid.Column="2" Text="TIPO" />
+                      <TextBlock Grid.Column="3" Text="" Width="86" />
+                    </Grid>
+                    <ListBox Classes="table" ItemsSource="{Binding Results}" SelectedItem="{Binding SelectedItem}">
+                      <ListBox.ItemTemplate>
+                        <DataTemplate x:DataType="vm:BrowseItemViewModel">
+                          <Grid ColumnDefinitions="*,140,110,Auto" ColumnSpacing="12">
+                            <TextBlock Text="{Binding Address}" Classes="mono" FontSize="12.5" VerticalAlignment="Center" TextTrimming="CharacterEllipsis" />
+                            <TextBlock Grid.Column="1" Text="{Binding NativeType}" Classes="muted" VerticalAlignment="Center" />
+                            <TextBlock Grid.Column="2" Text="{Binding DataType}" Classes="muted" VerticalAlignment="Center" />
+                            <Button Grid.Column="3" Classes="secondary" Padding="10,4" Width="86"
+                                    Command="{Binding $parent[ListBox].((vm:BrowseViewModel)DataContext).AddCommand}" CommandParameter="{Binding}">
+                              <StackPanel Orientation="Horizontal" Spacing="5">
+                                <c:Icon Kind="plus" Width="14" Height="14" />
+                                <TextBlock Text="Añadir" />
+                              </StackPanel>
+                            </Button>
+                          </Grid>
+                        </DataTemplate>
+                      </ListBox.ItemTemplate>
+                    </ListBox>
+                  </DockPanel>
+                </Border>
+              </DockPanel>
+            </TabItem>
+          </TabControl>
+        </DockPanel>
+
+        <!-- Gestión de agentes (por encima del contenido) -->
+        <v:AgentsView DataContext="{Binding Agents}" IsVisible="{Binding $parent[Window].((vm:MainViewModel)DataContext).Agents, Converter={x:Static ObjectConverters.IsNotNull}}" />
+
+        <!-- Editor de dispositivo (por encima del contenido) -->
+        <Border Background="{DynamicResource App.Background}" IsVisible="{Binding Editor, Converter={x:Static ObjectConverters.IsNotNull}}">
+          <ScrollViewer>
+            <Border Classes="card" Margin="24" Padding="24" MaxWidth="760" HorizontalAlignment="Left" VerticalAlignment="Top">
+              <StackPanel Spacing="16" DataContext="{Binding Editor}" x:DataType="vm:DeviceEditorViewModel">
+                <StackPanel Spacing="2">
+                  <TextBlock Text="{Binding Title}" Classes="title" />
+                  <TextBlock Text="Los cambios se guardan en la configuración del agente." Classes="muted" />
+                </StackPanel>
+                <Grid ColumnDefinitions="170,*" RowDefinitions="Auto,Auto,Auto,Auto,Auto" RowSpacing="14" ColumnSpacing="16">
+                  <TextBlock Text="Nombre" VerticalAlignment="Center" FontWeight="Medium" />
+                  <TextBox Grid.Column="1" Text="{Binding Name}" PlaceholderText="prensa1" />
+                  <TextBlock Grid.Row="1" Text="Driver" VerticalAlignment="Center" FontWeight="Medium" />
+                  <ComboBox Grid.Row="1" Grid.Column="1" ItemsSource="{Binding DriverIds}" SelectedItem="{Binding DriverId}" MinWidth="240" />
+                  <StackPanel Grid.Row="2" Spacing="2" Margin="0,6,0,0">
+                    <TextBlock Text="Ajustes" FontWeight="Medium" />
+                    <TextBlock Text="JSON del driver" Classes="muted" FontSize="11.5" />
+                  </StackPanel>
+                  <TextBox Grid.Row="2" Grid.Column="1" Text="{Binding SettingsJson}" AcceptsReturn="True" Classes="mono" MinHeight="150" FontSize="12.5" />
+                  <TextBlock Grid.Row="3" Text="Opciones" VerticalAlignment="Center" FontWeight="Medium" />
+                  <StackPanel Grid.Row="3" Grid.Column="1" Orientation="Horizontal" Spacing="20">
+                    <CheckBox Content="Activo" IsChecked="{Binding Enabled}" />
+                    <CheckBox Content="Escrituras habilitadas (1.ª llave)" IsChecked="{Binding WritesEnabled}" />
+                  </StackPanel>
+                  <StackPanel Grid.Row="4" Spacing="2">
+                    <TextBlock Text="Reconexión" FontWeight="Medium" />
+                    <TextBlock Text="espera inicial, máxima y factor" Classes="muted" FontSize="11.5" />
+                  </StackPanel>
+                  <StackPanel Grid.Row="4" Grid.Column="1" Orientation="Horizontal" Spacing="8">
+                    <NumericUpDown Value="{Binding InitialDelayMs}" Minimum="100" Increment="500" FormatString="0" Width="130" />
+                    <TextBlock Text="ms" Classes="muted" VerticalAlignment="Center" />
+                    <NumericUpDown Value="{Binding MaxDelayMs}" Minimum="100" Increment="1000" FormatString="0" Width="140" Margin="8,0,0,0" />
+                    <TextBlock Text="ms" Classes="muted" VerticalAlignment="Center" />
+                    <NumericUpDown Value="{Binding Multiplier}" Minimum="1" Increment="0.5" FormatString="0.0" Width="110" Margin="8,0,0,0" />
+                    <TextBlock Text="×" Classes="muted" VerticalAlignment="Center" />
+                  </StackPanel>
+                </Grid>
+                <TextBlock Text="{Binding TagSummary}" Classes="muted" IsVisible="{Binding !IsNew}" />
+                <Border Classes="pill bad" CornerRadius="8" Padding="12,8" IsVisible="{Binding Errors, Converter={x:Static StringConverters.IsNotNullOrEmpty}}"
+                        HorizontalAlignment="Stretch">
+                  <TextBlock Text="{Binding Errors}" TextWrapping="Wrap" />
+                </Border>
+                <StackPanel Orientation="Horizontal" Spacing="8">
+                  <Button Classes="accent" Command="{Binding SaveCommand}">
+                    <StackPanel Orientation="Horizontal" Spacing="6">
+                      <c:Icon Kind="save" />
+                      <TextBlock Text="Guardar" />
+                    </StackPanel>
+                  </Button>
+                  <Button Classes="secondary" Content="Cancelar" Command="{Binding $parent[Window].((vm:MainViewModel)DataContext).CloseEditorCommand}" />
+                </StackPanel>
+              </StackPanel>
+            </Border>
+          </ScrollViewer>
+        </Border>
+      </Panel>
     </Grid>
   </DockPanel>
 </Window>

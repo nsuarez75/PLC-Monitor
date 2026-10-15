@@ -37,6 +37,7 @@ The full picture (agent, Avalonia app, historian, OPC UA, SSH) is in [docs/arqui
 | `src/PlcMonitor.Cli` | `plcmon` CLI (Spectre.Console). Direct PLC commands and `plcmon agent ...` as a gRPC client of the agent (`AgentCommands.cs`) |
 | `src/PlcMonitor.Engine` | Multi-device engine: `TagEngine` (cache, subscriptions, enable/disable, two-key writes with audit), `DeviceSupervisor` (connection, backoff reconnection, scan groups), `agent.json` configuration |
 | `src/PlcMonitor.Agent.Contracts` | `agent.proto` with generated gRPC client and server. Used by the app and other clients without depending on ASP.NET |
+| `src/PlcMonitor.Deploy` | Remote agent installation over SSH (SSH.NET): `SshNetSession` (key or password, pinned SSH host key), `AgentDeployer` (detects system and RID, uploads the package, installs/updates/uninstalls, status and log), `AgentScripts` (generated and tested bash and PowerShell) |
 | `src/PlcMonitor.App` | `plcmon-app` desktop app (Avalonia 12, MVVM with CommunityToolkit.Mvvm). gRPC client of the agent: `MainViewModel` (connection, subscription with resubscribe, tag index), `DeviceViewModel`, `TagViewModel`, `BrowseViewModel`, `DeviceEditorViewModel`. Services replaceable in tests: `IAgentConnector`, `IUiDispatcher`, `IDialogs`. See the [app manual](app.md) |
 | `src/PlcMonitor.Agent` | `plcmon-agent` service (ASP.NET Core, HTTP/2, Windows Service/systemd). See the [agent manual](agent.md) |
 | `tests/*` | xUnit v3 on Microsoft.Testing.Platform |
@@ -139,12 +140,36 @@ scripts/publish-release.sh linux-x64    # package with the CLI and the agent (in
 | `PlcMonitor.Engine.Tests` | Configuration validation and loading, backoff, engine with a simulated driver (derived from `DeviceConnectionBase`) and a fake clock: reconnection, enable/disable, 4 independent PLCs, two-key writes, subscriptions and slow subscribers |
 | `PlcMonitor.Agent.Tests` | gRPC API against the in-memory agent (`WebApplicationFactory`) with a simulated driver; protobuf mapping |
 | `PlcMonitor.App.Tests` | View models against the in-memory agent (connection, live values, confirmed writes, enable, browse and add, editor with validation and rename, removals) and the real window with Avalonia Headless + Skia (PNG captures with `PLCMON_UI_CAPTURE_DIR`; against a real agent with `PLCMON_IT_AGENT_URL`) |
+| `PlcMonitor.Deploy.Tests` | Deployment with simulated SSH (detection, sudo/root, new or kept credentials, Windows, errors, `bash -n` of the scripts) and a **real** one against a Linux machine with systemd (`PLCMON_IT_SSH_HOST`, `_PORT`, `_USER`, `_PASSWORD`, `PLCMON_IT_AGENT_PACKAGES`) |
 | `PlcMonitor.Cli.Tests` | `plcmon agent ...` commands with the real CLI wiring (`CliApp`), against the in-memory agent and a test console (Spectre.Console.Testing) |
 | `PlcMonitor.IntegrationTests` | **Real PLC, read-only.** Skipped unless these environment variables are set: `PLCMON_IT_SYMBOLIC_HOST`, `PLCMON_IT_SECURITY`, `PLCMON_IT_EXPECTED_SECURITY`, `PLCMON_IT_PASSWORD`, `PLCMON_IT_SYMBOL`, `PLCMON_IT_ABSOLUTE_HOST`, `PLCMON_IT_ABSOLUTE_ADDR` |
 
 Status on 2026-10-15 (branch `feature/s7plus-legacy`): 312 tests passing, 6 skipped without a PLC. Against the real S7-1200 (10.225.188.120, no TLS, no PUT/GET): `auto` connection → `legacy`, browse (1463 symbols), reads and polling; integration 4 passed, 2 skipped (password and absolute). Still to repeat against the S7-1517F (TLS + password).
 
 Status on 2026-10-14 (branch `feature/fase2-agente`): 310 tests passing, 6 skipped (integration without a PLC). A real S7-1200 (PUT/GET disabled) confirmed the absolute driver's connection and status read, and the full agent end to end. Phase 1: 228 unit tests passing. Integration against the S7-1517F: 5 passed, 1 skipped. The absolute driver is not tested against that PLC because PUT/GET is disabled on it; a PUT/GET-enabled PLC is still needed for a real validation.
+
+### Testing SSH deployment
+
+An Ubuntu container with systemd and SSH acts as the remote machine:
+
+```bash
+cat > Dockerfile <<'EOF2'
+FROM ubuntu:24.04
+ENV DEBIAN_FRONTEND=noninteractive
+RUN apt-get update && apt-get install -y --no-install-recommends systemd systemd-sysv openssh-server sudo ca-certificates \
+ && useradd -m -s /bin/bash tecnico && echo 'tecnico:clave-de-prueba' | chpasswd && usermod -aG sudo tecnico && systemctl enable ssh
+STOPSIGNAL SIGRTMIN+3
+CMD ["/sbin/init"]
+EOF2
+docker build -t plcmon-sshbox . && docker run -d --name plcmon-sshbox --privileged --cgroupns=host \
+  -v /sys/fs/cgroup:/sys/fs/cgroup:rw -p 2222:22 -p 5311:5311 plcmon-sshbox
+scripts/publish-release.sh linux-x64        # builds artifacts/release/<version>/agents/
+PLCMON_IT_SSH_HOST=127.0.0.1 PLCMON_IT_SSH_PORT=2222 PLCMON_IT_SSH_USER=tecnico PLCMON_IT_SSH_PASSWORD=clave-de-prueba \
+PLCMON_IT_AGENT_PACKAGES=$PWD/artifacts/release/1.0.0/agents dotnet test --solution PlcMonitor.slnx
+```
+
+The minimal image has no D-Bus: a regular user cannot use `systemctl`, so the status falls back to `pidof`.
+**Windows has not been tested on a real machine**: its scripts are covered by tests with simulated SSH.
 
 ### Conventions
 - .NET 10, `Nullable` on, `TreatWarningsAsErrors`, `AnalysisLevel latest-recommended`. Third-party code (`external/`) does not inherit these settings (its own `external/Directory.Build.props` and `Directory.Packages.props`).
@@ -164,5 +189,8 @@ Status on 2026-10-14 (branch `feature/fase2-agente`): 310 tests passing, 6 skipp
 | Avalonia, SkiaSharp, HarfBuzzSharp | MIT | Desktop app |
 | CommunityToolkit.Mvvm | MIT | Desktop app |
 | Inter font | SIL OFL 1.1 | Desktop app (Avalonia.Fonts.Inter) |
+| Lucide icons (paths) | ISC | Desktop app (`Controls/Icon.cs`) |
+| SSH.NET | MIT | Remote agent deployment |
+| System.Security.Cryptography.ProtectedData | MIT | Agent tokens protected with DPAPI on Windows |
 
 The AGLink library and the activation key bundled in Ignition's module are **not** used: they belong to Inductive Automation and DELTA LOGIC.

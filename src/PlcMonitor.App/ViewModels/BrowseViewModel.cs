@@ -24,7 +24,7 @@ public sealed partial class BrowseViewModel(IAgentContext context, Func<DeviceVi
     public partial string Summary { get; set; } = "";
 
     [ObservableProperty]
-    [NotifyCanExecuteChangedFor(nameof(SearchCommand))]
+    [NotifyCanExecuteChangedFor(nameof(SearchCommand), nameof(RefreshCommand))]
     public partial bool IsBusy { get; set; }
 
     /// <summary>Grupo de escaneo donde se añaden los tags (se crea si no existe).</summary>
@@ -48,8 +48,15 @@ public sealed partial class BrowseViewModel(IAgentContext context, Func<DeviceVi
 
     private bool CanSearch() => !IsBusy;
 
+    /// <summary>Busca en la caché de símbolos del agente.</summary>
     [RelayCommand(CanExecute = nameof(CanSearch))]
-    private async Task SearchAsync(bool refresh)
+    private Task SearchAsync() => BrowseAsync(refresh: false);
+
+    /// <summary>Vuelve a explorar la CPU (tras cargar un programa nuevo).</summary>
+    [RelayCommand(CanExecute = nameof(CanSearch))]
+    private Task RefreshAsync() => BrowseAsync(refresh: true);
+
+    private async Task BrowseAsync(bool refresh)
     {
         if (context.Client is not { } client || device() is not { } target)
             return;

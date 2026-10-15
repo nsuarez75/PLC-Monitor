@@ -22,7 +22,7 @@ PLC-Monitor is an in-house, free tool for on-site testing and diagnostics of Sie
 | Desktop app (Avalonia) | ✅ First version (phase 3) |
 | Historian (SQLite / TimescaleDB) | ⏳ Phase 4 |
 | OPC UA server | ⏳ Phase 5 |
-| Remote agents over SSH | ⏳ Phase 6 |
+| Remote agents over SSH (install/update/uninstall from the app; token + TLS) | ✅ First version (Linux tested; Windows not yet on real hardware) |
 | Charts | ⏳ Phase 7 |
 | More protocols (Modbus TCP...) | ⏳ Planned (the architecture already supports it) |
 
@@ -35,4 +35,5 @@ PLC-Monitor is an in-house, free tool for on-site testing and diagnostics of Sie
 | 2026-10-15 | `plcmon agent ...` commands (agent client from the terminal) |
 | 2026-10-15 | Live configuration and browse API; `plcmon agent browse/config/device/tag` |
 | 2026-10-15 | Desktop application manual |
+| 2026-10-15 | Remote agents: security (token + TLS) and SSH installation from the app |
 | 2026-10-15 | `s7-symbolic` with or without TLS (`--security auto/tls/legacy`) on the DotNetProjects.S7CommPlusDriver fork; no native OpenSSL |

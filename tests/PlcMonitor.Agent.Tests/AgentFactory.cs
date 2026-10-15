@@ -25,6 +25,9 @@ internal sealed class AgentFactory : WebApplicationFactory<Program>
 
     public string ConfigPath { get; } = Path.Combine(Path.GetTempPath(), $"plcmon-agent-{Guid.NewGuid():N}.json");
 
+    /// <summary>Ajustes adicionales del agente (p.ej. Agent:Security:TokenSha256). Se aplican al arrancar.</summary>
+    public Dictionary<string, string> Settings { get; } = [];
+
     public static DeviceConfiguration Device(string name, bool enabled = true, bool writesEnabled = false, params TagConfiguration[] tags) => new()
     {
         Name = name,
@@ -48,6 +51,8 @@ internal sealed class AgentFactory : WebApplicationFactory<Program>
     protected override void ConfigureWebHost(IWebHostBuilder builder)
     {
         builder.UseSetting("Agent:ConfigPath", ConfigPath);
+        foreach (var (key, value) in Settings)
+            builder.UseSetting(key, value);
         builder.ConfigureServices(services =>
         {
             services.RemoveAll<DriverRegistry>();

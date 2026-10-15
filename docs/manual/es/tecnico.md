@@ -37,6 +37,7 @@ La visión completa (agente, app Avalonia, historiador, OPC UA, SSH) está en [d
 | `src/PlcMonitor.Cli` | CLI `plcmon` (Spectre.Console). Órdenes directas al PLC y `plcmon agent ...` como cliente gRPC del agente (`AgentCommands.cs`) |
 | `src/PlcMonitor.Engine` | Motor multi-dispositivo: `TagEngine` (caché, suscripciones, activar/desactivar, escritura con doble llave y auditoría), `DeviceSupervisor` (conexión, reconexión con backoff, grupos de escaneo), configuración `agent.json` |
 | `src/PlcMonitor.Agent.Contracts` | `agent.proto` con cliente y servidor gRPC generados. Lo usarán la app y otros clientes sin depender de ASP.NET |
+| `src/PlcMonitor.Deploy` | Instalación remota del agente por SSH (SSH.NET): `SshNetSession` (clave o contraseña, huella SSH fijada), `AgentDeployer` (detecta sistema y RID, sube el paquete, instala/actualiza/desinstala, estado y log), `AgentScripts` (bash y PowerShell generados y probados) |
 | `src/PlcMonitor.App` | App de escritorio `plcmon-app` (Avalonia 12, MVVM con CommunityToolkit.Mvvm). Cliente gRPC del agente: `MainViewModel` (conexión, suscripción con resuscripción, índice de tags), `DeviceViewModel`, `TagViewModel`, `BrowseViewModel`, `DeviceEditorViewModel`. Servicios sustituibles en tests: `IAgentConnector`, `IUiDispatcher`, `IDialogs`. Ver el [manual de la app](app.md) |
 | `src/PlcMonitor.Agent` | Servicio `plcmon-agent` (ASP.NET Core, HTTP/2, Windows Service/systemd). Ver el [manual del agente](agente.md) |
 | `tests/*` | xUnit v3 sobre Microsoft.Testing.Platform |
@@ -139,12 +140,36 @@ scripts/publish-release.sh linux-x64    # paquete con la CLI y el agente (en age
 | `PlcMonitor.Engine.Tests` | Validación y carga de la configuración, backoff, motor con driver simulado (que hereda de `DeviceConnectionBase`) y reloj controlado: reconexión, activar/desactivar, 4 PLC independientes, doble llave de escritura, suscripciones y suscriptor lento |
 | `PlcMonitor.Agent.Tests` | API gRPC contra el agente en memoria (`WebApplicationFactory`) con driver simulado; conversión a mensajes protobuf |
 | `PlcMonitor.App.Tests` | ViewModels contra el agente en memoria (conexión, valores en vivo, escritura con confirmación, activar, explorar y añadir, editor con validación y renombrado, bajas) y la ventana real con Avalonia Headless + Skia (capturas PNG con `PLCMON_UI_CAPTURE_DIR`; contra un agente real con `PLCMON_IT_AGENT_URL`) |
+| `PlcMonitor.Deploy.Tests` | Despliegue con SSH simulado (detección, sudo/root, credenciales nuevas o conservadas, Windows, errores, `bash -n` de los scripts) y uno **real** contra un equipo Linux con systemd (`PLCMON_IT_SSH_HOST`, `_PORT`, `_USER`, `_PASSWORD`, `PLCMON_IT_AGENT_PACKAGES`) |
 | `PlcMonitor.Cli.Tests` | Órdenes `plcmon agent ...` con la configuración real de la CLI (`CliApp`), contra el agente en memoria y una consola de prueba (Spectre.Console.Testing) |
 | `PlcMonitor.IntegrationTests` | **PLC real, solo lectura.** Se omiten si no hay variables de entorno: `PLCMON_IT_SYMBOLIC_HOST`, `PLCMON_IT_SECURITY`, `PLCMON_IT_EXPECTED_SECURITY`, `PLCMON_IT_PASSWORD`, `PLCMON_IT_SYMBOL`, `PLCMON_IT_ABSOLUTE_HOST`, `PLCMON_IT_ABSOLUTE_ADDR` |
 
 Estado a 2026-10-15 (rama `feature/s7plus-legacy`): 312 tests correctos y 6 omitidos sin PLC. Contra el S7-1200 real (10.225.188.120, sin TLS y sin PUT/GET): conexión `auto` → `legacy`, exploración (1463 símbolos), lectura y sondeo; integración 4 correctos y 2 omitidos (contraseña y absoluto). Pendiente repetir contra el S7-1517F (TLS + contraseña).
 
 Estado a 2026-10-14 (rama `feature/fase2-agente`): 310 tests correctos y 6 omitidos (integración sin PLC). Un S7-1200 real (FW con PUT/GET deshabilitado) confirmó la conexión y la lectura de estado del driver absoluto, y el agente completo de punta a punta. Fase 1: 228 tests unitarios correctos. Integración contra el S7-1517F: 5 correctos y 1 omitido. El driver absoluto no se prueba contra ese PLC porque tiene PUT/GET deshabilitado; falta un PLC con PUT/GET para validarlo en real.
+
+### Probar el despliegue por SSH
+
+Un contenedor Ubuntu con systemd y SSH hace de equipo remoto:
+
+```bash
+cat > Dockerfile <<'EOF2'
+FROM ubuntu:24.04
+ENV DEBIAN_FRONTEND=noninteractive
+RUN apt-get update && apt-get install -y --no-install-recommends systemd systemd-sysv openssh-server sudo ca-certificates \
+ && useradd -m -s /bin/bash tecnico && echo 'tecnico:clave-de-prueba' | chpasswd && usermod -aG sudo tecnico && systemctl enable ssh
+STOPSIGNAL SIGRTMIN+3
+CMD ["/sbin/init"]
+EOF2
+docker build -t plcmon-sshbox . && docker run -d --name plcmon-sshbox --privileged --cgroupns=host \
+  -v /sys/fs/cgroup:/sys/fs/cgroup:rw -p 2222:22 -p 5311:5311 plcmon-sshbox
+scripts/publish-release.sh linux-x64        # genera artifacts/release/<versión>/agents/
+PLCMON_IT_SSH_HOST=127.0.0.1 PLCMON_IT_SSH_PORT=2222 PLCMON_IT_SSH_USER=tecnico PLCMON_IT_SSH_PASSWORD=clave-de-prueba \
+PLCMON_IT_AGENT_PACKAGES=$PWD/artifacts/release/1.0.0/agents dotnet test --solution PlcMonitor.slnx
+```
+
+La imagen mínima no trae D-Bus: un usuario normal no puede usar `systemctl` y el estado se obtiene con `pidof`.
+**Windows no se ha probado en un equipo real**: sus scripts están cubiertos por tests con SSH simulado.
 
 ### Convenciones
 - .NET 10, `Nullable` activo, `TreatWarningsAsErrors`, `AnalysisLevel latest-recommended`. El código de terceros (`external/`) no hereda estos ajustes (`external/Directory.Build.props` y `Directory.Packages.props` propios).
@@ -164,5 +189,8 @@ Estado a 2026-10-14 (rama `feature/fase2-agente`): 310 tests correctos y 6 omiti
 | Avalonia, SkiaSharp, HarfBuzzSharp | MIT | App de escritorio |
 | CommunityToolkit.Mvvm | MIT | App de escritorio |
 | Fuente Inter | SIL OFL 1.1 | App de escritorio (Avalonia.Fonts.Inter) |
+| Iconos Lucide (trazados) | ISC | App de escritorio (`Controls/Icon.cs`) |
+| SSH.NET | MIT | Despliegue remoto del agente |
+| System.Security.Cryptography.ProtectedData | MIT | Token de los agentes protegido con DPAPI en Windows |
 
 **No se usa** la librería AGLink ni su clave de activación incluidas en el módulo de Ignition: son de Inductive Automation y DELTA LOGIC.

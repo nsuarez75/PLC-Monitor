@@ -14,6 +14,7 @@ public static class HeadlessApp
     public static AppBuilder BuildAvaloniaApp() =>
         AppBuilder.Configure<App>()
             .UseSkia()
+            .WithInterFont()
             .UseHeadless(new AvaloniaHeadlessPlatformOptions { UseHeadlessDrawing = false });
 
     /// <summary>Ejecuta <paramref name="action"/> en el hilo de la UI de Avalonia.</summary>

@@ -11,6 +11,9 @@ public sealed class AppSettings
 
     public string AgentUrl { get; set; } = DefaultAgentUrl;
 
+    /// <summary>Tema: "system", "light" o "dark".</summary>
+    public string Theme { get; set; } = "system";
+
     /// <summary>URLs usadas recientemente (la primera es la última).</summary>
     public List<string> RecentAgents { get; init; } = [];
 

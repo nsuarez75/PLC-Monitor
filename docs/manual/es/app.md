@@ -17,8 +17,8 @@ Antes tiene que estar arrancado el agente (`agent/plcmon-agent`). Por defecto es
 
 ## 2. Conectar con un agente
 
-Arriba, escribe la URL del agente y pulsa **Conectar**. La app recuerda las últimas URL usadas (desplegable).
-A la derecha se ve el estado de la conexión:
+Arriba, elige el agente en el desplegable y pulsa **Conectar**. La primera vez hay uno, «Local»
+(`http://127.0.0.1:5310`). A la derecha se ve el estado de la conexión:
 
 | Estado | Significado |
 |---|---|
@@ -26,7 +26,20 @@ A la derecha se ve el estado de la conexión:
 | **Reconectando…** | Se perdió la conexión con el agente; la app vuelve a suscribirse sola cada 2 s |
 | **Sin conexión** | No hay agente conectado |
 
-Las preferencias se guardan en `~/.config/PLC-Monitor/app.json` (Linux) o `%APPDATA%\PLC-Monitor\app.json` (Windows).
+Las preferencias se guardan en `~/.config/PLC-Monitor/app.json` y los agentes en `agents.json` (Linux; en Windows en
+`%APPDATA%\PLC-Monitor\`). El token de cada agente va protegido: con DPAPI en Windows y, en Linux, en un fichero que
+solo puede leer tu usuario.
+
+### Gestionar agentes
+
+El botón **Agentes** (arriba a la derecha) abre la lista de agentes:
+
+- **Conexión**: nombre, URL, token y huella del certificado. Se rellenan solos al instalar desde la app.
+- **Equipo (SSH)**: IP o nombre, puerto, usuario y clave privada opcional (por defecto las de `~/.ssh`).
+  La contraseña SSH/sudo se escribe solo para la operación y **no se guarda**.
+- **Instalar / actualizar**, **Estado**, **Ver log** y **Desinstalar**: el detalle de cada paso aparece en «Actividad».
+  Ver [Instalar desde la app](agente.md#instalar-desde-la-app-recomendado).
+- **Guardar** guarda el perfil; **Quitar de la lista** lo borra de la app (no desinstala nada).
 
 ## 3. Dispositivos
 
@@ -74,3 +87,8 @@ En la pestaña **Explorar** (con el PLC conectado y un driver que lo permita, co
 | La búsqueda dice «no está conectado» | El PLC tiene que estar conectado para explorar |
 | La búsqueda dice «no permite explorar variables» | El driver `s7-absolute` no explora: añade las direcciones con `plcmon agent tag add` |
 | «Reconectando…» continuo | Se cayó el agente o la red; la app se recupera sola cuando vuelve |
+| «rechaza el token de acceso» | El token del perfil no es el del agente (¿reinstalado con credenciales nuevas?). Instala de nuevo con «Regenerar token y certificado» o copia el token correcto |
+| «El certificado del agente … no es el esperado» | El agente tiene otro certificado (reinstalado, u otro equipo con esa IP). Si es legítimo, regenera las credenciales |
+| «La huella SSH del equipo ha cambiado» | El servidor SSH tiene otra clave. Si el equipo se reinstaló, quita el agente de la lista y créalo de nuevo |
+| «sudo pide contraseña» | Escribe la contraseña SSH (o la de sudo) para esa operación, o configura sudo sin contraseña para ese usuario |
+| «No se encuentra el paquete del agente para …» | Falta `agents/plcmon-agent-<versión>-<rid>` en la carpeta de la release: indica la carpeta en «Paquetes del agente» |

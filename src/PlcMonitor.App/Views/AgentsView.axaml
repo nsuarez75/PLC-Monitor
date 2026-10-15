@@ -1,0 +1,172 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:vm="using:PlcMonitor.App.ViewModels"
+             xmlns:svc="using:PlcMonitor.App.Services"
+             xmlns:c="using:PlcMonitor.App.Controls"
+             x:Class="PlcMonitor.App.Views.AgentsView"
+             x:DataType="vm:AgentsViewModel"
+             Background="{DynamicResource App.Background}">
+  <Grid ColumnDefinitions="270,*" Margin="20,16" ColumnSpacing="16">
+
+    <!-- Lista de agentes -->
+    <Border Classes="card" Padding="12">
+      <DockPanel>
+        <Grid DockPanel.Dock="Top" ColumnDefinitions="*,Auto" Margin="4,0,0,10">
+          <TextBlock Text="AGENTES" Classes="caption" VerticalAlignment="Center" />
+          <Button Grid.Column="1" Classes="ghost" Command="{Binding NewCommand}" ToolTip.Tip="Nuevo agente">
+            <c:Icon Kind="plus" />
+          </Button>
+        </Grid>
+        <ListBox Classes="devices" ItemsSource="{Binding Profiles}" SelectedItem="{Binding Selected}">
+          <ListBox.ItemTemplate>
+            <DataTemplate x:DataType="svc:AgentProfile">
+              <StackPanel Spacing="2">
+                <TextBlock Text="{Binding Name}" FontWeight="SemiBold" TextTrimming="CharacterEllipsis" />
+                <TextBlock Text="{Binding Url}" Classes="muted" FontSize="11.5" TextTrimming="CharacterEllipsis" />
+                <TextBlock Text="{Binding SshHost, StringFormat='SSH: {0}'}" Classes="muted" FontSize="11.5" IsVisible="{Binding IsManaged}" />
+              </StackPanel>
+            </DataTemplate>
+          </ListBox.ItemTemplate>
+        </ListBox>
+      </DockPanel>
+    </Border>
+
+    <!-- Detalle del agente seleccionado -->
+    <ScrollViewer Grid.Column="1">
+      <StackPanel Spacing="14" IsVisible="{Binding Selected, Converter={x:Static ObjectConverters.IsNotNull}}">
+        <Grid ColumnDefinitions="*,Auto">
+          <StackPanel Spacing="2">
+            <TextBlock Text="{Binding Name}" Classes="title" />
+            <TextBlock Text="{Binding Info}" Classes="muted" />
+          </StackPanel>
+          <Button Grid.Column="1" Classes="secondary" VerticalAlignment="Top"
+                  Command="{Binding $parent[Window].((vm:MainViewModel)DataContext).CloseAgentsCommand}">
+            <StackPanel Orientation="Horizontal" Spacing="6">
+              <c:Icon Kind="x" />
+              <TextBlock Text="Cerrar" />
+            </StackPanel>
+          </Button>
+        </Grid>
+
+        <!-- Conexión -->
+        <Border Classes="card" Padding="20">
+          <StackPanel Spacing="12">
+            <TextBlock Text="CONEXIÓN" Classes="caption" />
+            <Grid ColumnDefinitions="170,*" RowDefinitions="Auto,Auto,Auto,Auto" RowSpacing="10" ColumnSpacing="16">
+              <TextBlock Text="Nombre" VerticalAlignment="Center" FontWeight="Medium" />
+              <TextBox Grid.Column="1" Text="{Binding Name}" PlaceholderText="Línea 3" />
+              <TextBlock Grid.Row="1" Text="URL" VerticalAlignment="Center" FontWeight="Medium" />
+              <TextBox Grid.Row="1" Grid.Column="1" Text="{Binding Url}" Classes="mono" PlaceholderText="https://equipo:5311 (se rellena al instalar)" />
+              <TextBlock Grid.Row="2" Text="Token" VerticalAlignment="Center" FontWeight="Medium" />
+              <TextBox Grid.Row="2" Grid.Column="1" Text="{Binding Token}" PasswordChar="•" Classes="mono" PlaceholderText="(sin token)" />
+              <TextBlock Grid.Row="3" Text="Huella del certificado" VerticalAlignment="Center" FontWeight="Medium" />
+              <TextBox Grid.Row="3" Grid.Column="1" Text="{Binding Thumbprint}" Classes="mono" FontSize="11.5" PlaceholderText="(sin TLS)" />
+            </Grid>
+          </StackPanel>
+        </Border>
+
+        <!-- Equipo por SSH -->
+        <Border Classes="card" Padding="20">
+          <StackPanel Spacing="12">
+            <StackPanel Spacing="2">
+              <TextBlock Text="EQUIPO (SSH)" Classes="caption" />
+              <TextBlock Classes="muted" FontSize="12" TextWrapping="Wrap"
+                         Text="Para instalar, actualizar o desinstalar el agente. Linux (con sudo) o Windows con OpenSSH (usuario administrador)." />
+            </StackPanel>
+            <Grid ColumnDefinitions="170,*" RowDefinitions="Auto,Auto,Auto,Auto" RowSpacing="10" ColumnSpacing="16">
+              <TextBlock Text="Equipo" VerticalAlignment="Center" FontWeight="Medium" />
+              <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="8">
+                <TextBox Text="{Binding SshHost}" Width="260" PlaceholderText="192.168.0.20 o pc-linea" />
+                <TextBlock Text="puerto" Classes="muted" VerticalAlignment="Center" />
+                <NumericUpDown Value="{Binding SshPort}" Minimum="1" Maximum="65535" FormatString="0" Width="120" />
+              </StackPanel>
+              <TextBlock Grid.Row="1" Text="Usuario" VerticalAlignment="Center" FontWeight="Medium" />
+              <TextBox Grid.Row="1" Grid.Column="1" Text="{Binding SshUser}" Width="260" HorizontalAlignment="Left" />
+              <TextBlock Grid.Row="2" Text="Clave privada" VerticalAlignment="Center" FontWeight="Medium" />
+              <TextBox Grid.Row="2" Grid.Column="1" Text="{Binding SshKeyFile}" Classes="mono" PlaceholderText="(opcional) por defecto ~/.ssh/id_ed25519, id_ecdsa o id_rsa" />
+              <TextBlock Grid.Row="3" Text="Puerto del agente" VerticalAlignment="Center" FontWeight="Medium" />
+              <NumericUpDown Grid.Row="3" Grid.Column="1" Value="{Binding AgentPort}" Minimum="1" Maximum="65535" FormatString="0" Width="140" HorizontalAlignment="Left" />
+            </Grid>
+
+            <Border Background="{DynamicResource App.SurfaceAlt}" CornerRadius="8" Padding="14" Margin="0,4,0,0">
+              <StackPanel Spacing="10">
+                <TextBlock Text="Para esta operación (no se guarda)" FontWeight="SemiBold" />
+                <Grid ColumnDefinitions="170,*" RowDefinitions="Auto,Auto,Auto" RowSpacing="10" ColumnSpacing="16">
+                  <TextBlock Text="Contraseña SSH / sudo" VerticalAlignment="Center" />
+                  <TextBox Grid.Column="1" Text="{Binding SshPassword}" PasswordChar="•" Width="260" HorizontalAlignment="Left" PlaceholderText="vacía si entras con clave" />
+                  <TextBlock Grid.Row="1" Text="Contraseña de sudo" VerticalAlignment="Center" />
+                  <TextBox Grid.Row="1" Grid.Column="1" Text="{Binding SudoPassword}" PasswordChar="•" Width="260" HorizontalAlignment="Left" PlaceholderText="solo si es distinta" />
+                  <TextBlock Grid.Row="2" Text="Paquetes del agente" VerticalAlignment="Center" />
+                  <TextBox Grid.Row="2" Grid.Column="1" Text="{Binding PackageFolder}" Classes="mono" PlaceholderText="(por defecto la carpeta agents/ de la release)" />
+                </Grid>
+                <StackPanel Orientation="Horizontal" Spacing="20">
+                  <CheckBox Content="Regenerar token y certificado" IsChecked="{Binding RegenerateCredentials}" />
+                  <CheckBox Content="Conservar agent.json al desinstalar" IsChecked="{Binding KeepConfiguration}" />
+                </StackPanel>
+              </StackPanel>
+            </Border>
+
+            <WrapPanel Orientation="Horizontal">
+              <Button Classes="accent" Command="{Binding InstallCommand}" Margin="0,0,8,8">
+                <StackPanel Orientation="Horizontal" Spacing="6">
+                  <c:Icon Kind="server" />
+                  <TextBlock Text="Instalar / actualizar" />
+                </StackPanel>
+              </Button>
+              <Button Classes="secondary" Command="{Binding StatusCommand}" Margin="0,0,8,8">
+                <StackPanel Orientation="Horizontal" Spacing="6">
+                  <c:Icon Kind="pulse" />
+                  <TextBlock Text="Estado" />
+                </StackPanel>
+              </Button>
+              <Button Classes="secondary" Command="{Binding LogsCommand}" Margin="0,0,8,8">
+                <StackPanel Orientation="Horizontal" Spacing="6">
+                  <c:Icon Kind="list" />
+                  <TextBlock Text="Ver log" />
+                </StackPanel>
+              </Button>
+              <Button Classes="secondary danger" Command="{Binding UninstallCommand}" Margin="0,0,8,8">
+                <StackPanel Orientation="Horizontal" Spacing="6">
+                  <c:Icon Kind="trash" />
+                  <TextBlock Text="Desinstalar" />
+                </StackPanel>
+              </Button>
+            </WrapPanel>
+          </StackPanel>
+        </Border>
+
+        <!-- Progreso / resultado -->
+        <Border Classes="card" Padding="16" IsVisible="{Binding Log.Count, Converter={x:Static vm:Converters.IsPositive}}">
+          <StackPanel Spacing="8">
+            <StackPanel Orientation="Horizontal" Spacing="8">
+              <TextBlock Text="ACTIVIDAD" Classes="caption" VerticalAlignment="Center" />
+              <ProgressBar IsIndeterminate="True" Width="120" Height="4" IsVisible="{Binding IsBusy}" VerticalAlignment="Center" />
+            </StackPanel>
+            <ItemsControl ItemsSource="{Binding Log}">
+              <ItemsControl.ItemTemplate>
+                <DataTemplate x:DataType="x:String">
+                  <SelectableTextBlock Text="{Binding}" Classes="mono" FontSize="12" TextWrapping="Wrap" />
+                </DataTemplate>
+              </ItemsControl.ItemTemplate>
+            </ItemsControl>
+          </StackPanel>
+        </Border>
+
+        <StackPanel Orientation="Horizontal" Spacing="8">
+          <Button Classes="accent" Command="{Binding SaveCommand}">
+            <StackPanel Orientation="Horizontal" Spacing="6">
+              <c:Icon Kind="save" />
+              <TextBlock Text="Guardar" />
+            </StackPanel>
+          </Button>
+          <Button Classes="ghost danger" Command="{Binding DeleteCommand}">
+            <StackPanel Orientation="Horizontal" Spacing="6">
+              <c:Icon Kind="trash" />
+              <TextBlock Text="Quitar de la lista" />
+            </StackPanel>
+          </Button>
+        </StackPanel>
+      </StackPanel>
+    </ScrollViewer>
+  </Grid>
+</UserControl>

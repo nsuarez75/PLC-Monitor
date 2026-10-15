@@ -1,0 +1,14 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <Description>Instalación, actualización y desinstalación remota del agente por SSH (Linux con systemd y Windows con OpenSSH).</Description>
+  </PropertyGroup>
+  <ItemGroup>
+    <PackageReference Include="SSH.NET" />
+  </ItemGroup>
+  <ItemGroup>
+    <ProjectReference Include="..\PlcMonitor.Agent.Contracts\PlcMonitor.Agent.Contracts.csproj" />
+  </ItemGroup>
+  <ItemGroup>
+    <InternalsVisibleTo Include="PlcMonitor.Deploy.Tests" />
+  </ItemGroup>
+</Project>

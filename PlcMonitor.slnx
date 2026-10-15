@@ -4,6 +4,7 @@
     <Project Path="src/PlcMonitor.Agent.Contracts/PlcMonitor.Agent.Contracts.csproj" />
     <Project Path="src/PlcMonitor.Agent/PlcMonitor.Agent.csproj" />
     <Project Path="src/PlcMonitor.App/PlcMonitor.App.csproj" />
+    <Project Path="src/PlcMonitor.Deploy/PlcMonitor.Deploy.csproj" />
     <Project Path="src/PlcMonitor.Cli/PlcMonitor.Cli.csproj" />
     <Project Path="src/PlcMonitor.Core/PlcMonitor.Core.csproj" />
     <Project Path="src/PlcMonitor.Drivers.S7Absolute/PlcMonitor.Drivers.S7Absolute.csproj" />
@@ -14,6 +15,7 @@
     <Project Path="tests/PlcMonitor.Agent.Tests/PlcMonitor.Agent.Tests.csproj" />
     <Project Path="tests/PlcMonitor.Cli.Tests/PlcMonitor.Cli.Tests.csproj" />
     <Project Path="tests/PlcMonitor.App.Tests/PlcMonitor.App.Tests.csproj" />
+    <Project Path="tests/PlcMonitor.Deploy.Tests/PlcMonitor.Deploy.Tests.csproj" />
     <Project Path="tests/PlcMonitor.Core.Tests/PlcMonitor.Core.Tests.csproj" />
     <Project Path="tests/PlcMonitor.Drivers.S7Absolute.Tests/PlcMonitor.Drivers.S7Absolute.Tests.csproj" />
     <Project Path="tests/PlcMonitor.Drivers.S7Symbolic.Tests/PlcMonitor.Drivers.S7Symbolic.Tests.csproj" />

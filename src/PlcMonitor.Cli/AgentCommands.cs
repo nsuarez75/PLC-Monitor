@@ -4,6 +4,7 @@ using Google.Protobuf.WellKnownTypes;
 using Grpc.Core;
 using Grpc.Net.Client;
 using PlcMonitor.Agent.Contracts;
+using PlcMonitor.Agent.Contracts.Client;
 using Spectre.Console;
 using Spectre.Console.Cli;
 
@@ -15,9 +16,31 @@ public class AgentSettings : CommandSettings
     public const string AgentEnvironmentVariable = "PLCMON_AGENT";
     public const string DefaultAgentUrl = "http://127.0.0.1:5310";
 
+    public const string TokenEnvironmentVariable = "PLCMON_AGENT_TOKEN";
+    public const string CertEnvironmentVariable = "PLCMON_AGENT_CERT";
+
     [CommandOption("-a|--agent <URL>")]
     [Description("URL del agente. Si se omite: variable PLCMON_AGENT o http://127.0.0.1:5310.")]
     public string? Agent { get; set; }
+
+    [CommandOption("--token <TOKEN>")]
+    [Description("Token de acceso del agente (agentes instalados con seguridad). Si se omite: variable PLCMON_AGENT_TOKEN.")]
+    public string? Token { get; set; }
+
+    [CommandOption("--cert <HUELLA>")]
+    [Description("Huella SHA-256 del certificado del agente (https). Si se omite: variable PLCMON_AGENT_CERT.")]
+    public string? CertificateThumbprint { get; set; }
+
+    /// <summary>URL, token y huella efectivos.</summary>
+    public AgentEndpoint ResolveEndpoint(Func<string, string?>? environment = null)
+    {
+        environment ??= Environment.GetEnvironmentVariable;
+        static string? Pick(string? option, string? env) => option is { Length: > 0 } ? option : env is { Length: > 0 } ? env : null;
+        return new AgentEndpoint(
+            ResolveAgentUrl(environment),
+            Pick(Token, environment(TokenEnvironmentVariable)),
+            Pick(CertificateThumbprint, environment(CertEnvironmentVariable)));
+    }
 
     /// <summary>URL efectiva del agente.</summary>
     public string ResolveAgentUrl(Func<string, string?>? environment = null)
@@ -35,15 +58,16 @@ public class AgentSettings : CommandSettings
 /// <summary>Canal gRPC y consola usados por las órdenes del agente (sustituibles en los tests).</summary>
 public static class AgentRuntime
 {
-    public static Func<string, GrpcChannel> ChannelFactory { get; set; } = url => GrpcChannel.ForAddress(url);
+    public static Func<AgentEndpoint, GrpcChannel> ChannelFactory { get; set; } = AgentChannelFactory.Create;
 
     public static IAnsiConsole Console { get; set; } = AnsiConsole.Console;
 
     /// <summary>Ejecuta <paramref name="action"/> con un cliente del agente y traduce los errores gRPC a mensajes legibles.</summary>
     public static async Task<int> RunAsync(AgentSettings settings, Func<AgentService.AgentServiceClient, Task<int>> action)
     {
-        var url = settings.ResolveAgentUrl();
-        using var channel = ChannelFactory(url);
+        var endpoint = settings.ResolveEndpoint();
+        var url = endpoint.Url;
+        using var channel = ChannelFactory(endpoint);
         try
         {
             return await action(new AgentService.AgentServiceClient(channel));
@@ -59,13 +83,7 @@ public static class AgentRuntime
         }
     }
 
-    public static string Describe(RpcException ex, string url) => ex.StatusCode switch
-    {
-        StatusCode.Unavailable => $"No se puede conectar con el agente en {url}. ¿Está arrancado? ({ex.Status.Detail})",
-        StatusCode.DeadlineExceeded => $"El agente en {url} no responde a tiempo.",
-        StatusCode.Unimplemented => $"{url} no es un agente de PLC-Monitor (o es de otra versión).",
-        _ => ex.Status.Detail is { Length: > 0 } detail ? detail : ex.Status.StatusCode.ToString(),
-    };
+    public static string Describe(RpcException ex, string url) => AgentErrors.Describe(ex, url);
 
     public static string StateMarkup(ConnectionState state) => state switch
     {
