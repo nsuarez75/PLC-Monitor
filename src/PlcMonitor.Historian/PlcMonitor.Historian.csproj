@@ -1,0 +1,14 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <Description>Historiador de PLC-Monitor: muestreo por tag (frecuencia mínima, banda muerta, tiempo máximo), almacén SQLite por meses y consultas agregadas.</Description>
+  </PropertyGroup>
+  <ItemGroup>
+    <PackageReference Include="Microsoft.Data.Sqlite" />
+  </ItemGroup>
+  <ItemGroup>
+    <ProjectReference Include="..\PlcMonitor.Engine\PlcMonitor.Engine.csproj" />
+  </ItemGroup>
+  <ItemGroup>
+    <InternalsVisibleTo Include="PlcMonitor.Historian.Tests" />
+  </ItemGroup>
+</Project>

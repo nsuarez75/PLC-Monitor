@@ -12,7 +12,13 @@ public readonly record struct TagKey(string Device, string Tag)
 public sealed record TagUpdate(TagKey Key, TagValue Value);
 
 /// <summary>Definición de un tag tal como la usa el motor.</summary>
-public sealed record TagDefinition(TagKey Key, string Address, string Group, TimeSpan Interval, bool Writable, TagDataType? DataType);
+public sealed record TagDefinition(TagKey Key, string Address, string Group, TimeSpan Interval, bool Writable, TagDataType? DataType)
+{
+    /// <summary>Historización (null o Enabled=false = no se historiza).</summary>
+    public Configuration.TagHistorySettings? History { get; init; }
+
+    public bool IsHistorized => History is { Enabled: true };
+}
 
 /// <summary>Definición de un tag con su último valor conocido.</summary>
 public sealed record TagSnapshot(TagDefinition Definition, TagValue Value);
