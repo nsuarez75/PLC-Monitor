@@ -117,6 +117,49 @@ public sealed class AgentsViewModelTests : IDisposable
     }
 
     [Fact]
+    public async Task Selection_and_activity_survive_an_operation()
+    {
+        var (main, agents) = Create(Linux());
+        var profile = agents.Selected!;
+        main.SelectedProfile = profile;
+        agents.SshHost = "192.168.0.20";
+        agents.SshUser = "tecnico";
+        agents.SshPassword = "clave";
+
+        await agents.InstallCommand.ExecuteAsync(null);
+
+        // Antes se sustituía el perfil en la colección: se perdía la selección y se borraba la actividad.
+        main.SelectedProfile.ShouldBeSameAs(profile);
+        agents.Selected.ShouldBeSameAs(profile);
+        main.Profiles.ShouldContain(profile);
+        agents.Log.ShouldContain("✔ Hecho");
+        agents.Url.ShouldBe("https://192.168.0.20:5311");
+        agents.Token.ShouldBe(profile.Token);
+    }
+
+    [Fact]
+    public void Package_folder_is_remembered()
+    {
+        var (main, agents) = Create(new FakeSsh());
+        agents.PackageFolder = "/srv/paquetes";
+
+        AppSettings.Load(Path.Combine(_dir, "app.json")).AgentPackagesFolder.ShouldBe("/srv/paquetes");
+        main.OpenAgentsCommand.Execute(null);
+        main.Agents!.PackageFolder.ShouldBe("/srv/paquetes");
+    }
+
+    [Fact]
+    public void Release_packages_are_found_from_a_build_folder()
+    {
+        var repo = Path.Combine(_dir, "repo");
+        var agentsDir = Directory.CreateDirectory(Path.Combine(repo, "artifacts", "release", "1.1.0", "agents")).FullName;
+        File.WriteAllBytes(Path.Combine(agentsDir, "plcmon-agent-1.1.0-linux-x64.tar.gz"), [1]);
+        var bin = Directory.CreateDirectory(Path.Combine(repo, "src", "PlcMonitor.App", "bin", "Debug", "net10.0")).FullName;
+
+        AgentPackages.Find("linux-x64", AgentPackages.DefaultFolders(bin)).ShouldBe(Path.Combine(agentsDir, "plcmon-agent-1.1.0-linux-x64.tar.gz"));
+    }
+
+    [Fact]
     public async Task Failures_are_shown_without_losing_the_profile()
     {
         var (main, agents) = Create(Linux());

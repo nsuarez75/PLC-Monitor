@@ -39,6 +39,8 @@ El botón **Agentes** (arriba a la derecha) abre la lista de agentes:
   La contraseña SSH/sudo se escribe solo para la operación y **no se guarda**.
 - **Instalar / actualizar**, **Estado**, **Ver log** y **Desinstalar**: el detalle de cada paso aparece en «Actividad».
   Ver [Instalar desde la app](agente.md#instalar-desde-la-app-recomendado).
+- **Paquetes del agente**: la carpeta se recuerda. Si se deja vacía, la app busca `agents/` junto a ella (paquete de la
+  release) y, si se ejecuta desde el código, la release más reciente en `artifacts/release/<versión>/agents`.
 - **Guardar** guarda el perfil; **Quitar de la lista** lo borra de la app (no desinstala nada).
 
 ## 3. Dispositivos

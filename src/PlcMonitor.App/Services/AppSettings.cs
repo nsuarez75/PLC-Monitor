@@ -11,6 +11,9 @@ public sealed class AppSettings
 
     public string AgentUrl { get; set; } = DefaultAgentUrl;
 
+    /// <summary>Carpeta con los paquetes del agente elegida por el usuario (vacía = buscar la de la release).</summary>
+    public string? AgentPackagesFolder { get; set; }
+
     /// <summary>Tema: "system", "light" o "dark".</summary>
     public string Theme { get; set; } = "system";
 

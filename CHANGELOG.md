@@ -1,5 +1,11 @@
 # Changelog
 
+## [Sin publicar / Unreleased]
+
+### Corregido / Fixed
+- App, panel Agentes: tras instalar o consultar se perdía el agente seleccionado arriba y no se veía «Actividad».
+- App: la carpeta de paquetes del agente se recuerda y, desde el código, se encuentra sola la de `artifacts/release`.
+
 ## [1.1.0] - 2026-10-15
 
 Agente multi-PLC con API gRPC, app de escritorio, acceso simbólico sin TLS y agentes remotos instalables por SSH.

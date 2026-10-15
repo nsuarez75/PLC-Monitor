@@ -3,6 +3,7 @@ using System.Security.Cryptography;
 using System.Text;
 using System.Text.Json;
 using System.Text.Json.Serialization;
+using CommunityToolkit.Mvvm.ComponentModel;
 using PlcMonitor.Agent.Contracts.Client;
 
 namespace PlcMonitor.App.Services;
@@ -11,13 +12,15 @@ namespace PlcMonitor.App.Services;
 /// Un agente conocido por la app: cómo conectar con él y, si se gestiona por SSH, en qué equipo está.
 /// Las contraseñas SSH no se guardan nunca.
 /// </summary>
-public sealed class AgentProfile
+public sealed partial class AgentProfile : ObservableObject
 {
     public string Id { get; set; } = Guid.NewGuid().ToString("N");
 
-    public string Name { get; set; } = "";
+    [ObservableProperty]
+    public partial string Name { get; set; } = "";
 
-    public string Url { get; set; } = AppSettings.DefaultAgentUrl;
+    [ObservableProperty]
+    public partial string Url { get; set; } = AppSettings.DefaultAgentUrl;
 
     /// <summary>Token de acceso (en disco va protegido: DPAPI en Windows; en Linux, fichero solo legible por el usuario).</summary>
     [JsonIgnore]
@@ -26,7 +29,9 @@ public sealed class AgentProfile
     public string? CertificateThumbprint { get; set; }
 
     /// <summary>Equipo SSH (vacío = no gestionado por SSH).</summary>
-    public string? SshHost { get; set; }
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(IsManaged))]
+    public partial string? SshHost { get; set; }
 
     public int SshPort { get; set; } = 22;
 
@@ -54,7 +59,12 @@ public sealed class AgentProfile
     [JsonIgnore]
     public bool IsManaged => !string.IsNullOrWhiteSpace(SshHost);
 
-    public AgentProfile Clone() => (AgentProfile)MemberwiseClone();
+    public AgentProfile Clone() => new()
+    {
+        Id = Id, Name = Name, Url = Url, Token = Token, CertificateThumbprint = CertificateThumbprint, SshHost = SshHost, SshPort = SshPort,
+        SshUser = SshUser, SshKeyFile = SshKeyFile, SshHostKey = SshHostKey, Platform = Platform, AgentPort = AgentPort, InstalledAt = InstalledAt,
+        StoredToken = StoredToken,
+    };
 }
 
 /// <summary>Lista de agentes guardada en <c>agents.json</c> junto a las preferencias.</summary>

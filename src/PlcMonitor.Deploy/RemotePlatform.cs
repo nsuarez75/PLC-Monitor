@@ -42,11 +42,25 @@ public sealed record RemotePlatform(RemoteOs Os, string Rid, string Description)
 public static class AgentPackages
 {
     /// <summary>Carpetas por defecto: <c>agents/</c> junto a la app y en la carpeta superior (paquete de la release).</summary>
-    public static IEnumerable<string> DefaultFolders()
+    public static IEnumerable<string> DefaultFolders() => DefaultFolders(AppContext.BaseDirectory);
+
+    /// <summary>
+    /// <c>agents/</c> junto a la app y en la carpeta superior (paquete de la release) y, si la app corre desde el código,
+    /// la release más reciente en <c>artifacts/release/&lt;versión&gt;/agents</c> del repositorio.
+    /// </summary>
+    public static IEnumerable<string> DefaultFolders(string baseDir)
     {
-        var baseDir = AppContext.BaseDirectory;
         yield return Path.Combine(baseDir, "agents");
         yield return Path.GetFullPath(Path.Combine(baseDir, "..", "agents"));
+        for (var dir = new DirectoryInfo(baseDir); dir is not null; dir = dir.Parent)
+        {
+            var releases = Path.Combine(dir.FullName, "artifacts", "release");
+            if (!Directory.Exists(releases))
+                continue;
+            foreach (var release in Directory.EnumerateDirectories(releases).OrderByDescending(d => Directory.GetLastWriteTimeUtc(d)))
+                yield return Path.Combine(release, "agents");
+            yield break;
+        }
     }
 
     public static string? Find(string rid, IEnumerable<string> folders)
