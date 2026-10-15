@@ -23,6 +23,7 @@
 - El paquete de la release incluye el agente en `agent/`.
 
 ### Corregido / Fixed
+- `s7-symbolic`: un valor que la librería rechaza al asignarlo (p. ej. STRING más largo que su longitud) daba «Exception has been thrown by the target of an invocation»; ahora `BadTypeMismatch` con el motivo.
 - `s7-absolute`: el error S7 0x8104 (PUT/GET deshabilitado) se daba como `BadAddressInvalid` con los bytes de la respuesta; ahora es `BadAccessDenied` con la indicación de habilitar PUT/GET.
 - Paquetes Linux (`publish-release.sh`): los directorios se empaquetaban sin permiso de ejecución (`drw-r--r--`) y un usuario normal no podía entrar en ellos tras descomprimir. Afecta a los `.tar.gz` de la v1.0.0.
 
@@ -30,6 +31,7 @@
 - S7-1200 real (10.225.188.120, PUT/GET deshabilitado): conexión y estado de la CPU con `s7-absolute`; agente completo de punta a punta (estado, `GetDeviceInfo`, `ListTags`, `Subscribe`) también desde el paquete linux-x64 extraído como usuario normal.
 - 310 tests correctos, 6 omitidos (integración sin PLC).
 - S7-1200 real sin TLS ni PUT/GET (10.225.188.120): `s7-symbolic` en modo `auto` → `legacy`; exploración (1463 símbolos), lectura y sondeo, también desde el paquete linux-x64. Integración: 4 correctos, 2 omitidos. 312 tests unitarios correctos.
+- Escritura en el S7-1200 sin TLS (laboratorio): Real, Int, Time, STRING (con `ñ`) y Word con `plcmon write`, y a través del agente con doble llave, validación de tipo y log de auditoría. Valores restaurados.
 
 ## [1.0.0] - 2026-10-14
 
