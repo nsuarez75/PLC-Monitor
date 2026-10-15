@@ -1,6 +1,6 @@
 # PLC-Monitor — Manual técnico
 
-> Versión 1.1.0 · Última actualización: 2026-10-15 · [English](../en/technical.md)
+> Versión 1.1.1 · Última actualización: 2026-10-15 · [English](../en/technical.md)
 
 ## 1. Arquitectura
 

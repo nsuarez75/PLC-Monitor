@@ -1,10 +1,13 @@
 # Changelog
 
-## [Sin publicar / Unreleased]
+## [1.1.1] - 2026-10-15
 
 ### Corregido / Fixed
 - App, panel Agentes: tras instalar o consultar se perdía el agente seleccionado arriba y no se veía «Actividad».
 - App: la carpeta de paquetes del agente se recuerda y, desde el código, se encuentra sola la de `artifacts/release`.
+
+### Añadido / Added
+- Icono de la app (`src/PlcMonitor.App/Assets/plc-monitor.svg`) para lanzadores de escritorio.
 
 ## [1.1.0] - 2026-10-15
 
