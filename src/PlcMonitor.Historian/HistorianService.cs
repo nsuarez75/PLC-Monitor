@@ -27,6 +27,8 @@ public sealed class HistorianService : IAsyncDisposable
     private CancellationTokenSource? _cts;
     private Task _events = Task.CompletedTask;
     private Task _clock = Task.CompletedTask;
+    private Task? _stopping;
+    private int _disposed;
 
     public HistorianService(TagEngine engine, HistorianSettings settings, string baseDirectory, ILogger<HistorianService> logger, TimeProvider? timeProvider = null)
     {
@@ -59,15 +61,21 @@ public sealed class HistorianService : IAsyncDisposable
         return Task.CompletedTask;
     }
 
-    public async Task StopAsync()
+    /// <summary>Para el historiador y vuelca lo pendiente. Idempotente: varias llamadas (incluso a la vez) esperan la misma parada.</summary>
+    public Task StopAsync()
     {
-        if (_cts is null)
+        lock (_sync)
+            return _stopping ??= StopCoreAsync();
+    }
+
+    private async Task StopCoreAsync()
+    {
+        if (_cts is not { } cts)
             return;
-        await _cts.CancelAsync();
+        await cts.CancelAsync();
         await Task.WhenAll(_events, _clock);
         await FlushAsync(CancellationToken.None);
-        _cts.Dispose();
-        _cts = null;
+        cts.Dispose();
     }
 
     public HistorianStats GetStats()
@@ -108,7 +116,7 @@ public sealed class HistorianService : IAsyncDisposable
     /// <summary>Vuelca a disco las muestras acumuladas.</summary>
     public async Task FlushAsync(CancellationToken cancellationToken = default)
     {
-        if (_store is null)
+        if (_store is null || Volatile.Read(ref _disposed) == 1)
             return;
         await _flushLock.WaitAsync(cancellationToken);
         try
@@ -143,8 +151,12 @@ public sealed class HistorianService : IAsyncDisposable
     public async ValueTask DisposeAsync()
     {
         await StopAsync();
+        if (Interlocked.Exchange(ref _disposed, 1) == 1)
+            return;
+        // Se espera a un volcado en curso antes de cerrar los ficheros (el semáforo no se libera: no hace falta).
+        await _flushLock.WaitAsync();
         _store?.Dispose();
-        _flushLock.Dispose();
+        _flushLock.Release();
     }
 
     private async Task ListenAsync(CancellationToken token)
@@ -221,6 +233,18 @@ public sealed class HistorianService : IAsyncDisposable
     }
 
     private async Task ClockAsync(CancellationToken token)
+    {
+        try
+        {
+            await ClockLoopAsync(token);
+        }
+        catch (OperationCanceledException) when (token.IsCancellationRequested)
+        {
+            // Parada durante un volcado o una purga: el volcado final lo hace StopAsync.
+        }
+    }
+
+    private async Task ClockLoopAsync(CancellationToken token)
     {
         var lastFlush = _time.GetUtcNow();
         var lastPurge = DateTimeOffset.MinValue;

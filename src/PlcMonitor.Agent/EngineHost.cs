@@ -2,6 +2,7 @@ using Microsoft.Extensions.Options;
 using PlcMonitor.Core;
 using PlcMonitor.Engine;
 using PlcMonitor.Engine.Configuration;
+using PlcMonitor.Historian;
 
 namespace PlcMonitor.Agent;
 
@@ -18,6 +19,7 @@ public sealed class EngineHost(IOptions<AgentOptions> options, DriverRegistry re
 {
     private readonly SemaphoreSlim _saveLock = new(1, 1);
     private TagEngine? _engine;
+    private HistorianService? _historian;
     private int _disposed;
 
     public string ConfigPath { get; } = Path.GetFullPath(options.Value.ConfigPath, AppContext.BaseDirectory);
@@ -25,6 +27,9 @@ public sealed class EngineHost(IOptions<AgentOptions> options, DriverRegistry re
     public DateTimeOffset Started { get; private set; }
 
     public TagEngine Engine => _engine ?? throw new InvalidOperationException("El motor no está arrancado.");
+
+    /// <summary>Historiador (su carpeta es relativa a la del fichero de configuración).</summary>
+    public HistorianService Historian => _historian ?? throw new InvalidOperationException("El motor no está arrancado.");
 
     public async Task StartAsync(CancellationToken cancellationToken)
     {
@@ -41,6 +46,10 @@ public sealed class EngineHost(IOptions<AgentOptions> options, DriverRegistry re
         }
 
         _engine = new TagEngine(configuration, registry, loggerFactory);
+        // El historiador se suscribe antes de arrancar el motor para no perder los primeros valores.
+        _historian = new HistorianService(_engine, configuration.Historian ?? new HistorianSettings(), Path.GetDirectoryName(ConfigPath)!,
+            loggerFactory.CreateLogger<HistorianService>());
+        await _historian.StartAsync();
         await _engine.StartAsync();
         Started = DateTimeOffset.UtcNow;
     }
@@ -49,6 +58,8 @@ public sealed class EngineHost(IOptions<AgentOptions> options, DriverRegistry re
     {
         if (_engine is not null)
             await _engine.StopAsync();
+        if (_historian is not null)
+            await _historian.StopAsync();
     }
 
     /// <summary>Guarda en disco la configuración actual del motor (con los cambios hechos en caliente).</summary>
@@ -71,6 +82,8 @@ public sealed class EngineHost(IOptions<AgentOptions> options, DriverRegistry re
         // El contenedor lo libera dos veces: como singleton y como servicio alojado.
         if (Interlocked.Exchange(ref _disposed, 1) == 1)
             return;
+        if (_historian is not null)
+            await _historian.DisposeAsync();
         if (_engine is not null)
             await _engine.DisposeAsync();
         _saveLock.Dispose();

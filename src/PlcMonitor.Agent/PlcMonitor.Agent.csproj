@@ -11,6 +11,7 @@
   <ItemGroup>
     <ProjectReference Include="..\PlcMonitor.Agent.Contracts\PlcMonitor.Agent.Contracts.csproj" />
     <ProjectReference Include="..\PlcMonitor.Engine\PlcMonitor.Engine.csproj" />
+    <ProjectReference Include="..\PlcMonitor.Historian\PlcMonitor.Historian.csproj" />
     <ProjectReference Include="..\PlcMonitor.Drivers.S7Absolute\PlcMonitor.Drivers.S7Absolute.csproj" />
     <ProjectReference Include="..\PlcMonitor.Drivers.S7Symbolic\PlcMonitor.Drivers.S7Symbolic.csproj" />
   </ItemGroup>
