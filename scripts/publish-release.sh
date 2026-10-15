@@ -9,6 +9,8 @@ VERSION=$(grep -oE '<Version>[^<]+' Directory.Build.props | sed 's/<Version>//')
 RIDS=("${@:-win-x64 linux-x64 linux-arm64}")
 [ $# -eq 0 ] && RIDS=(win-x64 linux-x64 linux-arm64)
 OUT="$ROOT/artifacts/release/$VERSION"
+# bsdtar sabe crear zip (en Windows: tar.exe del sistema); el GNU tar de Git Bash no.
+ZIPTAR=$(command -v bsdtar || echo /c/Windows/System32/tar.exe)
 rm -rf "$OUT" && mkdir -p "$OUT"
 
 for RID in "${RIDS[@]}"; do
@@ -26,8 +28,6 @@ for RID in "${RIDS[@]}"; do
   cp THIRD-PARTY-NOTICES.md CHANGELOG.md README.md "$DIR/"
   cp -r docs/manual "$DIR/docs/"
   if [[ "$RID" == win-* ]]; then
-    # bsdtar sabe crear zip (en Windows: tar.exe del sistema); el GNU tar de Git Bash no.
-    ZIPTAR=$(command -v bsdtar || echo /c/Windows/System32/tar.exe)
     (cd "$OUT" && "$ZIPTAR" -a -c -f "plcmon-$VERSION-$RID.zip" "plcmon-$VERSION-$RID")
   else
     # Desde Windows se pierde el bit de ejecución: se fija dentro del tar (ejecutables 0755, resto 0644).
@@ -38,6 +38,18 @@ for RID in "${RIDS[@]}"; do
       && tar -rf "$P.tar" --owner=0 --group=0 --mode=0755 "${EXES[@]}" \
       && gzip -9f "$P.tar")
   fi
+  # Paquete suelto del agente para este RID: es el que la app sube al instalar agentes remotos por SSH.
+  mkdir -p "$OUT/agents"
+  AP="plcmon-agent-$VERSION-$RID"
+  rm -rf "$OUT/$AP" && mkdir -p "$OUT/$AP" && cp -r "$DIR/agent" "$OUT/$AP/plcmon-agent"
+  if [[ "$RID" == win-* ]]; then
+    (cd "$OUT/$AP" && "$ZIPTAR" -a -c -f "$OUT/agents/$AP.zip" plcmon-agent)
+  else
+    (cd "$OUT/$AP" && tar -cf "$OUT/agents/$AP.tar" --owner=0 --group=0 --mode=u+rw,go+r,a-x,a+X --exclude=plcmon-agent/plcmon-agent --exclude=plcmon-agent/createdump plcmon-agent \
+      && tar -rf "$OUT/agents/$AP.tar" --owner=0 --group=0 --mode=0755 plcmon-agent/plcmon-agent $( [ -f plcmon-agent/createdump ] && echo plcmon-agent/createdump ) \
+      && gzip -9f "$OUT/agents/$AP.tar")
+  fi
+  rm -rf "$OUT/$AP"
 done
-(cd "$OUT" && sha256sum plcmon-* 2>/dev/null | grep -E '\.(zip|tar\.gz)$' > SHA256SUMS.txt || true)
+(cd "$OUT" && sha256sum plcmon-* agents/* 2>/dev/null | grep -E '\.(zip|tar\.gz)$' > SHA256SUMS.txt || true)
 ls -la "$OUT"
