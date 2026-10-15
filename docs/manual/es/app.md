@@ -1,6 +1,6 @@
 # PLC-Monitor — Aplicación de escritorio
 
-> Versión 1.1.0 · Última actualización: 2026-10-15 · [English](../en/app.md)
+> Versión 1.1.1 · Última actualización: 2026-10-15 · [English](../en/app.md)
 
 `plcmon-app` es la aplicación de escritorio (Windows y Linux). **No habla con los PLC**: se conecta a un
 [agente](agente.md) (local o remoto) y trabaja sobre él. Cerrar la app no corta la recogida de datos.
