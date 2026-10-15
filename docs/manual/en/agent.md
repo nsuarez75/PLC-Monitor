@@ -143,6 +143,9 @@ Each value (`TagValue`) travels as text (`text`, invariant culture) and typed (`
 If a subscriber does not keep up, the agent closes its stream with `RESOURCE_EXHAUSTED`; the client must subscribe
 again and will receive a fresh snapshot.
 
+To try the API from a terminal use `plcmon agent ...` (`info`, `devices`, `tags`, `read`, `write`, `enable`, `disable`,
+`watch`): see the [user guide](user-guide.md#plcmon-agent--talking-to-an-agent).
+
 Minimal C# example:
 
 ```csharp

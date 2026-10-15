@@ -97,6 +97,26 @@ plcmon write DB1.DBX0.3 true -d s7-absolute -H 192.168.0.10
   - Hex bytes: `01 0A FF`.
 - ⚠️ **This writes to a real PLC.** Be extra careful with safety (F) CPUs. Safety variables cannot be written from outside.
 
+### `plcmon agent ...` — talking to an agent
+These commands do not connect to the PLC: they talk to a `plcmon-agent` (see the [agent manual](agent.md)), local or remote.
+The URL is given with `-a, --agent` or the `PLCMON_AGENT` variable; the default is `http://127.0.0.1:5310`.
+
+| Command | What it does |
+|---|---|
+| `plcmon agent info` | Agent version, machine, configuration file and drivers |
+| `plcmon agent devices` | Configured devices: enabled, writes enabled, state, since when, tag count, last error and next retry |
+| `plcmon agent tags [DEVICE]` | Configured tags with their last value, quality and scan group (✎ = writable) |
+| `plcmon agent read DEVICE ADDRESS...` | Reads any addresses through the agent (they do not need to be configured) |
+| `plcmon agent write DEVICE TAG VALUE [-y] [--user U]` | Writes a configured tag. Asks for confirmation; the agent applies the two-key rule and logs it in its audit log with the user |
+| `plcmon agent enable/disable DEVICE [--persist]` | Enables or disables a device on the fly. With `--persist` it is saved to `agent.json` |
+| `plcmon agent watch [DEVICE...]` | Initial snapshot, then live value and state changes (Ctrl+C to quit). If the agent drops the subscription for being slow, it resubscribes by itself |
+
+```
+plcmon agent devices
+plcmon agent watch prensa1 -a http://192.168.0.5:5310
+plcmon agent write prensa1 marcha true
+```
+
 ## 4. Address syntax
 
 ### Symbolic (`s7-symbolic`)

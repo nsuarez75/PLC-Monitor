@@ -11,6 +11,7 @@
   </Folder>
   <Folder Name="/tests/">
     <Project Path="tests/PlcMonitor.Agent.Tests/PlcMonitor.Agent.Tests.csproj" />
+    <Project Path="tests/PlcMonitor.Cli.Tests/PlcMonitor.Cli.Tests.csproj" />
     <Project Path="tests/PlcMonitor.Core.Tests/PlcMonitor.Core.Tests.csproj" />
     <Project Path="tests/PlcMonitor.Drivers.S7Absolute.Tests/PlcMonitor.Drivers.S7Absolute.Tests.csproj" />
     <Project Path="tests/PlcMonitor.Drivers.S7Symbolic.Tests/PlcMonitor.Drivers.S7Symbolic.Tests.csproj" />

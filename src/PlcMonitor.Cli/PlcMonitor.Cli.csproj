@@ -8,8 +8,10 @@
     <PackageReference Include="Spectre.Console" />
     <PackageReference Include="Spectre.Console.Cli" />
     <PackageReference Include="Microsoft.Extensions.Logging.Console" />
+    <PackageReference Include="Grpc.Net.Client" />
   </ItemGroup>
   <ItemGroup>
+    <ProjectReference Include="..\PlcMonitor.Agent.Contracts\PlcMonitor.Agent.Contracts.csproj" />
     <ProjectReference Include="..\PlcMonitor.Core\PlcMonitor.Core.csproj" />
     <ProjectReference Include="..\PlcMonitor.Drivers.S7Absolute\PlcMonitor.Drivers.S7Absolute.csproj" />
     <ProjectReference Include="..\PlcMonitor.Drivers.S7Symbolic\PlcMonitor.Drivers.S7Symbolic.csproj" />
