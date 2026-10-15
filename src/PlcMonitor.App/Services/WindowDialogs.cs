@@ -7,4 +7,6 @@ namespace PlcMonitor.App.Services;
 public sealed class WindowDialogs(Window owner) : IDialogs
 {
     public Task<bool> ConfirmAsync(string title, string message) => new ConfirmWindow(title, message).ShowDialog<bool>(owner);
+
+    public Task ShowTagDetailsAsync(ViewModels.TagDetailsViewModel details) => new TagDetailsWindow { DataContext = details }.ShowDialog(owner);
 }

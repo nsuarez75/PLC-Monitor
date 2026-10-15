@@ -205,7 +205,7 @@
                       <TextBlock Text="Sin tags" FontWeight="SemiBold" HorizontalAlignment="Center" />
                       <TextBlock Classes="muted" Text="Añádelos desde la pestaña «Explorar» con el PLC conectado." HorizontalAlignment="Center" />
                     </StackPanel>
-                    <ListBox Classes="table" ItemsSource="{Binding SelectedDevice.Tags}">
+                    <ListBox x:Name="TagsList" Classes="table" ItemsSource="{Binding SelectedDevice.Tags}" ToolTip.Tip="Doble clic para ver el detalle y la configuración del tag">
                       <ListBox.ItemTemplate>
                         <DataTemplate x:DataType="vm:TagViewModel">
                           <Grid ColumnDefinitions="2*,2.2*,1.6*,90,130,100,250" ColumnSpacing="12">
@@ -285,7 +285,7 @@
                       <TextBlock Text="SÍMBOLO" />
                       <TextBlock Grid.Column="1" Text="TIPO PLC" />
                       <TextBlock Grid.Column="2" Text="TIPO" />
-                      <TextBlock Grid.Column="3" Text="" Width="86" />
+                      <TextBlock Grid.Column="3" Text="" Width="96" />
                     </Grid>
                     <ListBox Classes="table" ItemsSource="{Binding Results}" SelectedItem="{Binding SelectedItem}">
                       <ListBox.ItemTemplate>
@@ -294,13 +294,19 @@
                             <TextBlock Text="{Binding Address}" Classes="mono" FontSize="12.5" VerticalAlignment="Center" TextTrimming="CharacterEllipsis" />
                             <TextBlock Grid.Column="1" Text="{Binding NativeType}" Classes="muted" VerticalAlignment="Center" />
                             <TextBlock Grid.Column="2" Text="{Binding DataType}" Classes="muted" VerticalAlignment="Center" />
-                            <Button Grid.Column="3" Classes="secondary" Padding="10,4" Width="86"
+                            <Button Grid.Column="3" Classes="secondary" Padding="10,4" Width="96" IsVisible="{Binding !IsAdded}"
                                     Command="{Binding $parent[ListBox].((vm:BrowseViewModel)DataContext).AddCommand}" CommandParameter="{Binding}">
                               <StackPanel Orientation="Horizontal" Spacing="5">
                                 <c:Icon Kind="plus" Width="14" Height="14" />
                                 <TextBlock Text="Añadir" />
                               </StackPanel>
                             </Button>
+                            <Border Grid.Column="3" Classes="pill good" Width="96" IsVisible="{Binding IsAdded}" ToolTip.Tip="Ya es un tag de este dispositivo">
+                              <StackPanel Orientation="Horizontal" Spacing="5" HorizontalAlignment="Center">
+                                <c:Icon Kind="check" Width="12" Height="12" Foreground="{DynamicResource App.Good}" />
+                                <TextBlock Text="Añadido" />
+                              </StackPanel>
+                            </Border>
                           </Grid>
                         </DataTemplate>
                       </ListBox.ItemTemplate>

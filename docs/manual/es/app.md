@@ -70,6 +70,10 @@ La pestaña **Tags** muestra los tags del PLC seleccionado con su valor, tipo, c
 - **Escribir**: solo en tags escribibles (segunda llave). Escribe el valor (punto decimal; `true/false`), pulsa **Escribir**
   y confirma. El agente comprueba las dos llaves y anota la escritura con tu usuario en su log de auditoría.
 - **Quitar**: elimina el tag de la configuración (pide confirmación).
+- **Doble clic** en un tag abre su ventana de detalle: valor, calidad, tipo y hora en vivo, y su configuración
+  (nombre, dirección, grupo de escaneo y periodo, escribible, tipo para escribir). Al cambiar el periodo de un grupo
+  existente se avisa de que afecta a todos sus tags. **Guardar** lo valida en el agente. La sección «Histórico» se
+  activará con el historiador (fase 4).
 
 ## 5. Explorar y añadir tags
 
@@ -78,7 +82,8 @@ En la pestaña **Explorar** (con el PLC conectado y un driver que lo permita, co
 1. Escribe parte del nombre y pulsa **Buscar** (Intro). La primera búsqueda explora la CPU; las siguientes usan la
    caché del agente. **Volver a explorar la CPU** la refresca (tras cargar un programa nuevo).
 2. Elige el **grupo** de escaneo (se crea con el **periodo** indicado si no existe) y si el tag será **escribible**.
-3. Pulsa **Añadir** en el símbolo. Aparece en la pestaña Tags con su valor en cuanto el agente lo lee.
+3. Pulsa **Añadir** en el símbolo. Aparece en la pestaña Tags con su valor en cuanto el agente lo lee. Los símbolos que
+   ya son tags del dispositivo salen marcados como **Añadido**.
 
 ## 6. Solución de problemas
 

@@ -1,5 +1,11 @@
 # Changelog
 
+## [Sin publicar / Unreleased]
+
+### Añadido / Added
+- App: doble clic en un tag abre su ventana de detalle (valor en vivo y configuración editable: nombre, dirección, grupo y periodo, escribible, tipo). Sección «Histórico» preparada para la fase 4.
+- App, Explorar: los símbolos que ya son tags salen marcados como «Añadido».
+
 ## [1.1.1] - 2026-10-15
 
 ### Corregido / Fixed

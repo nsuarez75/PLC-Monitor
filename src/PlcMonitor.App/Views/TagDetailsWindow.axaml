@@ -1,0 +1,101 @@
+<Window xmlns="https://github.com/avaloniaui"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:vm="using:PlcMonitor.App.ViewModels"
+        xmlns:c="using:PlcMonitor.App.Controls"
+        x:Class="PlcMonitor.App.Views.TagDetailsWindow"
+        x:DataType="vm:TagDetailsViewModel"
+        Title="{Binding Tag.Name, StringFormat='Tag {0}'}"
+        Width="640" SizeToContent="Height" MaxHeight="900" CanResize="False"
+        WindowStartupLocation="CenterOwner" ShowInTaskbar="False">
+  <ScrollViewer>
+    <StackPanel Margin="24" Spacing="16">
+
+      <!-- Cabecera y valor en vivo -->
+      <Grid ColumnDefinitions="Auto,*" ColumnSpacing="14">
+        <Border Width="44" Height="44" CornerRadius="12" Background="{DynamicResource App.AccentSoft}" VerticalAlignment="Top">
+          <c:Icon Kind="pulse" Width="22" Height="22" Foreground="{DynamicResource App.Accent}" />
+        </Border>
+        <StackPanel Grid.Column="1" Spacing="2">
+          <TextBlock Text="{Binding Tag.Name}" Classes="title" TextTrimming="CharacterEllipsis" />
+          <TextBlock Classes="muted mono" FontSize="12" Text="{Binding Tag.Address}" TextWrapping="Wrap" />
+          <TextBlock Classes="muted" FontSize="12" Text="{Binding Device, StringFormat='Dispositivo {0}'}" />
+        </StackPanel>
+      </Grid>
+
+      <Border Classes="card" Padding="16">
+        <Grid ColumnDefinitions="*,Auto,Auto" ColumnSpacing="14">
+          <StackPanel Spacing="2">
+            <TextBlock Text="VALOR ACTUAL" Classes="caption" />
+            <TextBlock Text="{Binding Tag.ValueText}" Classes="mono" FontSize="22" FontWeight="SemiBold"
+                       Classes.error="{Binding Tag.IsBad}" TextWrapping="Wrap" />
+          </StackPanel>
+          <StackPanel Grid.Column="1" Spacing="6" VerticalAlignment="Center" HorizontalAlignment="Right">
+            <Border Classes="pill" Classes.good="{Binding Tag.IsGood}" Classes.warn="{Binding Tag.IsUncertain}" Classes.bad="{Binding Tag.IsBad}" HorizontalAlignment="Right">
+              <TextBlock Text="{Binding Tag.Quality}" />
+            </Border>
+            <TextBlock Classes="muted" FontSize="12" HorizontalAlignment="Right">
+              <Run Text="{Binding Tag.DataType}" /><Run Text="  ·  " /><Run Text="{Binding Tag.Time}" />
+            </TextBlock>
+          </StackPanel>
+        </Grid>
+      </Border>
+
+      <!-- Configuración -->
+      <Border Classes="card" Padding="20">
+        <StackPanel Spacing="12">
+          <TextBlock Text="CONFIGURACIÓN" Classes="caption" />
+          <Grid ColumnDefinitions="150,*" RowDefinitions="Auto,Auto,Auto,Auto,Auto,Auto" RowSpacing="10" ColumnSpacing="16">
+            <TextBlock Text="Nombre" VerticalAlignment="Center" FontWeight="Medium" />
+            <TextBox Grid.Column="1" Text="{Binding Name}" />
+            <TextBlock Grid.Row="1" Text="Dirección" VerticalAlignment="Center" FontWeight="Medium" />
+            <TextBox Grid.Row="1" Grid.Column="1" Text="{Binding Address}" Classes="mono" FontSize="12.5" />
+            <TextBlock Grid.Row="2" Text="Grupo de escaneo" VerticalAlignment="Center" FontWeight="Medium" />
+            <StackPanel Grid.Row="2" Grid.Column="1" Orientation="Horizontal" Spacing="8">
+              <AutoCompleteBox Text="{Binding GroupName}" ItemsSource="{Binding Groups}" MinimumPrefixLength="0" Width="180" />
+              <TextBlock Text="cada" Classes="muted" VerticalAlignment="Center" />
+              <NumericUpDown Value="{Binding IntervalMs}" Minimum="50" Increment="250" FormatString="0" Width="130" />
+              <TextBlock Text="ms" Classes="muted" VerticalAlignment="Center" />
+            </StackPanel>
+            <TextBlock Grid.Row="3" Grid.Column="1" Text="{Binding GroupNote}" Classes="muted" FontSize="12" TextWrapping="Wrap" />
+            <TextBlock Grid.Row="4" Text="Escritura" VerticalAlignment="Center" FontWeight="Medium" />
+            <StackPanel Grid.Row="4" Grid.Column="1" Spacing="4">
+              <CheckBox Content="Escribible (2.ª llave)" IsChecked="{Binding Writable}" />
+              <TextBlock Classes="muted" FontSize="12" TextWrapping="Wrap" IsVisible="{Binding !WritesEnabled}"
+                         Text="El dispositivo tiene las escrituras deshabilitadas (1.ª llave): actívalas en «Editar» del dispositivo." />
+            </StackPanel>
+            <TextBlock Grid.Row="5" Text="Tipo para escribir" VerticalAlignment="Center" FontWeight="Medium" />
+            <ComboBox Grid.Row="5" Grid.Column="1" ItemsSource="{Binding DataTypes}" SelectedItem="{Binding SelectedDataType}" MinWidth="180" />
+          </Grid>
+        </StackPanel>
+      </Border>
+
+      <!-- Histórico (fase 4) -->
+      <Border Classes="card" Padding="20" Opacity="0.6">
+        <StackPanel Spacing="10">
+          <StackPanel Orientation="Horizontal" Spacing="8">
+            <TextBlock Text="HISTÓRICO" Classes="caption" VerticalAlignment="Center" />
+            <Border Classes="pill accent"><TextBlock Text="Próximamente" /></Border>
+          </StackPanel>
+          <CheckBox Content="Historizar este tag" IsEnabled="False" />
+          <TextBlock Classes="muted" FontSize="12" TextWrapping="Wrap"
+                     Text="Con el historiador (fase 4) se podrá activar por tag con frecuencia mínima, banda muerta y tiempo máximo entre muestras." />
+        </StackPanel>
+      </Border>
+
+      <Border Classes="pill bad" CornerRadius="8" Padding="12,8" HorizontalAlignment="Stretch"
+              IsVisible="{Binding Errors, Converter={x:Static StringConverters.IsNotNullOrEmpty}}">
+        <TextBlock Text="{Binding Errors}" TextWrapping="Wrap" />
+      </Border>
+
+      <StackPanel Orientation="Horizontal" Spacing="8" HorizontalAlignment="Right">
+        <Button x:Name="CloseButton" Classes="secondary" Content="Cerrar" IsCancel="True" />
+        <Button Classes="accent" Command="{Binding SaveCommand}" IsDefault="True">
+          <StackPanel Orientation="Horizontal" Spacing="6">
+            <c:Icon Kind="save" />
+            <TextBlock Text="Guardar" />
+          </StackPanel>
+        </Button>
+      </StackPanel>
+    </StackPanel>
+  </ScrollViewer>
+</Window>
