@@ -109,12 +109,23 @@ The URL is given with `-a, --agent` or the `PLCMON_AGENT` variable; the default 
 | `plcmon agent read DEVICE ADDRESS...` | Reads any addresses through the agent (they do not need to be configured) |
 | `plcmon agent write DEVICE TAG VALUE [-y] [--user U]` | Writes a configured tag. Asks for confirmation; the agent applies the two-key rule and logs it in its audit log with the user |
 | `plcmon agent enable/disable DEVICE [--persist]` | Enables or disables a device on the fly. With `--persist` it is saved to `agent.json` |
+| `plcmon agent browse DEVICE [FILTER] [-n N] [--refresh]` | Browses the variables of a connected device through the agent |
+| `plcmon agent config [DEVICE]` | Configuration as a tree: devices, settings, groups and tags |
+| `plcmon agent device add NAME -d DRIVER -s JSON [--disabled] [--writes]` | Adds a device or changes its settings (keeps its tags) |
+| `plcmon agent device remove DEVICE [-y]` | Removes a device and its tags (asks for confirmation) |
+| `plcmon agent tag add DEVICE ADDRESS [--name N] [-g GROUP] [-i MS] [--writable] [--type T]` | Adds a tag (or replaces the one with that name). The group is created if missing, with period `-i` |
+| `plcmon agent tag remove DEVICE TAG` | Removes a tag; empty groups are deleted |
 | `plcmon agent watch [DEVICE...]` | Initial snapshot, then live value and state changes (Ctrl+C to quit). If the agent drops the subscription for being slow, it resubscribes by itself |
+
+Configuration changes (`device`, `tag`) are saved to the agent's `agent.json` unless `--no-persist` is given.
 
 ```
 plcmon agent devices
 plcmon agent watch prensa1 -a http://192.168.0.5:5310
 plcmon agent write prensa1 marcha true
+plcmon agent device add prensa1 -d s7-symbolic -s '{"host":"192.168.0.10","security":"auto"}' --writes
+plcmon agent browse prensa1 Motor
+plcmon agent tag add prensa1 "MiDB".Velocidad --name velocidad -g rapido -i 250
 ```
 
 ## 4. Address syntax

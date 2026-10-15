@@ -129,14 +129,20 @@ generated client.
 
 | Method | What it does |
 |---|---|
-| `GetInfo` | Version, machine, OS, configuration file and drivers |
+| `GetInfo` | Version, machine, OS, configuration file and drivers (with their default settings and whether they can browse/write) |
 | `ListDevices` | Devices with state, reason, next retry and tag count |
 | `SetDeviceEnabled` | Enables or disables a device (`persist` to save it) |
 | `GetDeviceInfo` | Data reported by the PLC itself (model, CPU state...) |
 | `ListTags` | Configured tags with their last value (one device or all) |
 | `Read` | On-demand read of arbitrary addresses |
 | `Write` | Write to a configured tag (two keys, audited) |
-| `Subscribe` | Stream: first a full `snapshot`, then `tag_updates` and `device_status` with no gaps |
+| `Subscribe` | Stream: first a full `snapshot`, then `tag_updates`, `device_status`, `device_configured` (added or changed: replaces all the device's tags) and `device_removed`, with no gaps |
+| `Browse` | Browses the variables of a connected device (filter, max, `refresh`). If not connected: `FAILED_PRECONDITION` |
+| `GetConfiguration` / `GetDeviceConfig` | Configuration in use, whole or for one device (driver settings as JSON) |
+| `PutDevice` | Adds or changes a device with its groups and tags (`original_name` to rename). Everything is validated first: on errors, `INVALID_ARGUMENT` with the full list and nothing changes. The device restarts with the new configuration |
+| `DeleteDevice` | Removes a device |
+
+`SetDeviceEnabled`, `PutDevice` and `DeleteDevice` save to `agent.json` only with `persist = true` (atomic write).
 
 Each value (`TagValue`) travels as text (`text`, invariant culture) and typed (`bool_value`, `int_value`,
 `double_value`...), with quality, timestamp and error. Unknown devices fail with `NOT_FOUND`.
@@ -144,7 +150,7 @@ If a subscriber does not keep up, the agent closes its stream with `RESOURCE_EXH
 again and will receive a fresh snapshot.
 
 To try the API from a terminal use `plcmon agent ...` (`info`, `devices`, `tags`, `read`, `write`, `enable`, `disable`,
-`watch`): see the [user guide](user-guide.md#plcmon-agent--talking-to-an-agent).
+`watch`, `browse`, `config`, `device add/remove`, `tag add/remove`): see the [user guide](user-guide.md#plcmon-agent--talking-to-an-agent).
 
 Minimal C# example:
 

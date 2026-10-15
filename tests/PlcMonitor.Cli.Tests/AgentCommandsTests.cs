@@ -200,6 +200,66 @@ public sealed class AgentCommandsTests : IDisposable
     }
 
     [Fact]
+    public async Task Browse_lists_symbols_of_a_connected_device()
+    {
+        await using var agent = new AgentFactory(Device("plc1"));
+        var plc = agent.Driver.Plc("plc1");
+        plc.Values["DB1.Motor"] = 1;
+        plc.Values["DB1.Bomba"] = 2;
+        UseAgent(agent);
+        await EventuallyAsync(
+            async () => (await agent.CreateGrpcClient().ListDevicesAsync(new())).Devices[0].State,
+            s => s == ConnectionState.Connected);
+
+        (await RunAsync("agent", "browse", "plc1", "motor")).ShouldBe(0);
+
+        Output.ShouldContain("DB1.Motor");
+        Output.ShouldNotContain("DB1.Bomba");
+        Output.ShouldContain("1 mostrados de 1 coincidencias · 2 símbolos");
+    }
+
+    [Fact]
+    public async Task Device_and_tag_commands_edit_and_persist_the_configuration()
+    {
+        await using var agent = new AgentFactory(Device("plc1", enabled: false));
+        UseAgent(agent);
+        var client = agent.CreateGrpcClient();
+
+        (await RunAsync("agent", "device", "add", "prensa", "-d", "fake", "-s", "{\"host\":\"10.1.1.1\"}", "--disabled", "--writes")).ShouldBe(0);
+        (await RunAsync("agent", "tag", "add", "prensa", "DB1.DBW0", "--name", "velocidad", "-g", "rapido", "-i", "250", "--writable", "--type", "int16")).ShouldBe(0);
+        (await RunAsync("agent", "tag", "add", "prensa", "DB1.DBW2")).ShouldBe(0);
+        (await RunAsync("agent", "config", "prensa")).ShouldBe(0);
+
+        Output.ShouldContain("velocidad = DB1.DBW0");
+        Output.ShouldContain("rapido");
+        var device = await client.GetDeviceConfigAsync(new DeviceRequest { Device = "prensa" });
+        device.Enabled.ShouldBeFalse();
+        device.WritesEnabled.ShouldBeTrue();
+        device.ScanGroups.Select(g => (g.Name, g.IntervalMs, g.Tags.Count)).ShouldBe([("rapido", 250, 1), ("default", 1000, 1)]);
+        device.ScanGroups[0].Tags[0].DataType.ShouldBe(DataType.Int16);
+        device.ScanGroups[0].Tags[0].Writable.ShouldBeTrue();
+
+        (await RunAsync("agent", "tag", "remove", "prensa", "velocidad")).ShouldBe(0);
+        (await RunAsync("agent", "tag", "remove", "prensa", "noexiste")).ShouldBe(1);
+        (await client.GetDeviceConfigAsync(new DeviceRequest { Device = "prensa" })).ScanGroups.Select(g => g.Name).ShouldBe(["default"]);
+
+        (await RunAsync("agent", "device", "remove", "plc1", "-y")).ShouldBe(0);
+        var saved = await PlcMonitor.Engine.Configuration.ConfigurationFile.LoadAsync(agent.ConfigPath);
+        saved.Devices.Select(d => d.Name).ShouldBe(["prensa"]);
+    }
+
+    [Fact]
+    public async Task Invalid_device_shows_the_agent_validation_errors()
+    {
+        await using var agent = new AgentFactory();
+        UseAgent(agent);
+
+        (await RunAsync("agent", "device", "add", "x", "-d", "fake", "-s", "{}")).ShouldBe(1);
+
+        Output.ShouldContain("Falta host");
+    }
+
+    [Fact]
     public async Task Unreachable_agent_gives_a_readable_error()
     {
         AgentRuntime.ChannelFactory = url => GrpcChannel.ForAddress(url);

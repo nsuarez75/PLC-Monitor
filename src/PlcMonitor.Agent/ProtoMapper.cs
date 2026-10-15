@@ -98,7 +98,7 @@ internal static class ProtoMapper
             Driver = device.Driver,
             Enabled = device.Enabled,
             WritesEnabled = device.WritesEnabled,
-            SettingsJson = device.Settings.ValueKind == JsonValueKind.Undefined ? "{}" : device.Settings.GetRawText(),
+            SettingsJson = device.Settings.ValueKind == JsonValueKind.Undefined ? "{}" : JsonSerializer.Serialize(device.Settings),
             Reconnect = new Api.ReconnectConfig
             {
                 InitialDelayMs = device.Reconnect.InitialDelayMs,
