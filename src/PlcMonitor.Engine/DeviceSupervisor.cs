@@ -21,7 +21,7 @@ internal sealed class DeviceSupervisor : IAsyncDisposable
 {
     internal const string DisabledDetail = "Dispositivo deshabilitado";
 
-    private readonly DeviceConfiguration _config;
+    private DeviceConfiguration _config;
     private readonly IDriverFactory _factory;
     private readonly ILoggerFactory _loggerFactory;
     private readonly ILogger _logger;
@@ -36,6 +36,8 @@ internal sealed class DeviceSupervisor : IAsyncDisposable
     private DeviceStatus _status;
     private int _disposed;
     private IReadOnlyList<TagKey> _pollableKeys = [];
+    // Corta los grupos de escaneo en marcha para rehacerlos con los tags nuevos sin cerrar la conexión.
+    private CancellationTokenSource? _regroup;
 
     public DeviceSupervisor(DeviceConfiguration config, IDriverFactory factory, ILoggerFactory loggerFactory, TimeProvider time, IEngineSink sink)
     {
@@ -46,20 +48,47 @@ internal sealed class DeviceSupervisor : IAsyncDisposable
         _audit = loggerFactory.CreateLogger("PlcMonitor.Audit");
         _time = time;
         _sink = sink;
-        Tags = config.ScanGroups
-            .SelectMany(g => g.Tags.Select(t => new TagDefinition(
-                new TagKey(config.Name, t.EffectiveName), t.Address, g.Name, TimeSpan.FromMilliseconds(g.IntervalMs), t.Writable, t.DataType)
-            {
-                History = t.History,
-            }))
-            .ToArray();
+        Tags = BuildTags(config);
         _status = new DeviceStatus(config.Name, config.Driver, Enabled: false, config.WritesEnabled,
             ConnectionState.Disconnected, DisabledDetail, time.GetUtcNow());
     }
 
     public string Name => _config.Name;
 
-    public IReadOnlyList<TagDefinition> Tags { get; }
+    public IReadOnlyList<TagDefinition> Tags { get; private set; }
+
+    /// <summary>Definiciones de los tags de una configuración de dispositivo.</summary>
+    public static TagDefinition[] BuildTags(DeviceConfiguration config) => config.ScanGroups
+        .SelectMany(g => g.Tags.Select(t => new TagDefinition(
+            new TagKey(config.Name, t.EffectiveName), t.Address, g.Name, TimeSpan.FromMilliseconds(g.IntervalMs), t.Writable, t.DataType)
+        {
+            History = t.History,
+        }))
+        .ToArray();
+
+    /// <summary>
+    /// Cambia en caliente los grupos, los tags y la llave de escritura sin tocar la conexión: los grupos de escaneo se
+    /// rehacen y siguen leyendo con la misma sesión. Solo vale si driver, ajustes de conexión y reconexión no cambian.
+    /// </summary>
+    public void Reconfigure(DeviceConfiguration config)
+    {
+        CancellationTokenSource? regroup;
+        lock (_sync)
+        {
+            _config = config;
+            Tags = BuildTags(config);
+            regroup = _regroup;
+        }
+        SetStatus(s => s with { WritesEnabled = config.WritesEnabled });
+        try
+        {
+            regroup?.Cancel();
+        }
+        catch (ObjectDisposedException)
+        {
+            // Los grupos ya se estaban rehaciendo: leerán los tags nuevos.
+        }
+    }
 
     public DeviceStatus Status
     {
@@ -204,7 +233,6 @@ internal sealed class DeviceSupervisor : IAsyncDisposable
 
         await using (connection)
         {
-            var groups = PrepareGroups(connection);
             var backoff = new ReconnectBackoff(_config.Reconnect);
             while (!token.IsCancellationRequested)
             {
@@ -216,7 +244,7 @@ internal sealed class DeviceSupervisor : IAsyncDisposable
                     backoff.Reset();
                     _connection = connection;
                     SetStatus(s => s with { State = ConnectionState.Connected, Detail = null, NextRetry = null });
-                    detail = await RunGroupsAsync(connection, groups, token);
+                    detail = await RunGroupsAsync(connection, token);
                 }
                 catch (OperationCanceledException) when (token.IsCancellationRequested)
                 {
@@ -252,8 +280,11 @@ internal sealed class DeviceSupervisor : IAsyncDisposable
         }
     }
 
-    /// <summary>Lee los grupos hasta que se pierde la conexión o se cancela. Devuelve el motivo de la pérdida.</summary>
-    private async Task<string> RunGroupsAsync(IDeviceConnection connection, IReadOnlyList<ScanGroup> groups, CancellationToken token)
+    /// <summary>
+    /// Lee los grupos hasta que se pierde la conexión o se cancela. Devuelve el motivo de la pérdida. Si los tags cambian
+    /// (<see cref="Reconfigure"/>), rehace los grupos y sigue con la misma conexión.
+    /// </summary>
+    private async Task<string> RunGroupsAsync(IDeviceConnection connection, CancellationToken token)
     {
         using var lost = CancellationTokenSource.CreateLinkedTokenSource(token);
         string? detail = null;
@@ -276,10 +307,30 @@ internal sealed class DeviceSupervisor : IAsyncDisposable
         {
             if (connection.State != ConnectionState.Connected)
                 return "Conexión perdida";
-            if (groups.Count == 0)
-                await Task.Delay(Timeout.InfiniteTimeSpan, _time, lost.Token);
-            else
-                await Task.WhenAll(groups.Select(g => RunGroupAsync(connection, g, lost.Token)));
+            while (true)
+            {
+                var regroup = CancellationTokenSource.CreateLinkedTokenSource(lost.Token);
+                lock (_sync)
+                    _regroup = regroup;
+                try
+                {
+                    var groups = PrepareGroups(connection);
+                    if (groups.Count == 0)
+                        await Task.Delay(Timeout.InfiniteTimeSpan, _time, regroup.Token);
+                    else
+                        await Task.WhenAll(groups.Select(g => RunGroupAsync(connection, g, regroup.Token)));
+                }
+                catch (OperationCanceledException) when (regroup.IsCancellationRequested && !lost.IsCancellationRequested)
+                {
+                    _logger.LogInformation("{Device}: tags reconfigurados en caliente", Name);
+                }
+                finally
+                {
+                    lock (_sync)
+                        _regroup = null;
+                    regroup.Dispose();
+                }
+            }
         }
         catch (OperationCanceledException) when (lost.IsCancellationRequested)
         {

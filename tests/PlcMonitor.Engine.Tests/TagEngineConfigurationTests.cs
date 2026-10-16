@@ -36,7 +36,7 @@ public class TagEngineConfigurationTests
     }
 
     [Fact]
-    public async Task Existing_device_is_restarted_with_its_new_tags()
+    public async Task Tag_changes_are_applied_without_reconnecting()
     {
         await using var h = new EngineHarness(Device("plc1", tags: [Tag("DB1.DBW0", "viejo")]));
         var plc = h.Driver.Plc("plc1");
@@ -52,7 +52,49 @@ public class TagEngineConfigurationTests
         h.Value("plc1", "nuevo").Value.ShouldBe(2);
         h.Engine.GetDevice("plc1").WritesEnabled.ShouldBeTrue();
         h.Engine.SnapshotConfiguration().Devices.ShouldHaveSingleItem().ScanGroups[0].Tags.ShouldHaveSingleItem().Name.ShouldBe("nuevo");
-        plc.ConnectCount.ShouldBe(2);
+        plc.ConnectCount.ShouldBe(1);
+    }
+
+    [Fact]
+    public async Task Unchanged_tags_keep_their_value_while_others_are_edited()
+    {
+        await using var h = new EngineHarness(Device("plc1", tags: [Tag("DB1.DBW0", "fijo"), Tag("DB1.DBW2", "otro")]));
+        var plc = h.Driver.Plc("plc1");
+        plc.Values["DB1.DBW0"] = 7;
+        plc.Values["DB1.DBW2"] = 2;
+        plc.Values["DB1.DBW4"] = 4;
+        await h.Engine.StartAsync();
+        await WaitUntilAsync(() => h.Value("plc1", "fijo").Quality == QualityCode.Good && h.Value("plc1", "otro").Quality == QualityCode.Good);
+        using var subscription = h.Engine.Subscribe();
+
+        await h.Engine.PutDeviceAsync(Device("plc1", tags: [Tag("DB1.DBW0", "fijo"), Tag("DB1.DBW4", "otro"), Tag("DB1.DBW2", "nuevo")]));
+
+        var events = await DrainAsync(subscription, e => e.OfType<DeviceConfigured>().Any());
+        events.OfType<DeviceConfigured>().Single().Tags.Single(t => t.Definition.Key.Tag == "fijo").Value.Quality.ShouldBe(QualityCode.Good);
+        await WaitUntilAsync(() => h.Value("plc1", "otro").Value is 4 && h.Value("plc1", "nuevo").Value is 2);
+        h.Value("plc1", "fijo").Value.ShouldBe(7);
+        // Ni el dispositivo se desconecta ni el tag que no cambia pasa por mala calidad.
+        while (subscription.Events.TryRead(out var pending))
+            events.Add(pending);
+        events.OfType<DeviceStatusChanged>().ShouldNotContain(e => e.Status.State != ConnectionState.Connected);
+        events.OfType<TagValuesChanged>().SelectMany(e => e.Updates).ShouldNotContain(u => u.Key.Tag == "fijo");
+        plc.ConnectCount.ShouldBe(1);
+    }
+
+    [Fact]
+    public async Task Connection_changes_restart_the_device()
+    {
+        await using var h = new EngineHarness(Device("plc1", tags: [Tag("DB1.DBW0", "a")]));
+        var plc = h.Driver.Plc("plc1");
+        plc.Values["DB1.DBW0"] = 1;
+        await h.Engine.StartAsync();
+        await WaitUntilAsync(() => h.Value("plc1", "a").Quality == QualityCode.Good);
+
+        var changed = Device("plc1", tags: [Tag("DB1.DBW0", "a")]);
+        changed.Reconnect.MaxDelayMs = 5000;
+        await h.Engine.PutDeviceAsync(changed);
+
+        await WaitUntilAsync(() => plc.ConnectCount == 2);
     }
 
     [Fact]
