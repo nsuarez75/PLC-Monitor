@@ -119,12 +119,20 @@ public sealed class AgentDeployer(ISshSession session, IProgress<string>? progre
             values.GetValueOrDefault("since") is { Length: > 0 } since ? since : null);
     }
 
-    /// <summary>Últimas líneas del log del servicio (Linux: journald).</summary>
+    /// <summary>Últimas líneas del log del servicio (Linux: journald; Windows: los ficheros de logs\ del agente).</summary>
     public async Task<string> GetLogsAsync(string? password, string? sudoPassword = null, int lines = 200, CancellationToken cancellationToken = default)
     {
         var platform = await DetectPlatformAsync(cancellationToken);
         if (platform.Os == RemoteOs.Windows)
-            return "En Windows el agente escribe en el Visor de eventos (Registro de Windows → Aplicación, origen «plcmon-agent»).";
+        {
+            // Program Files se puede leer sin ser administrador: no hace falta UAC.
+            var log = await RunPlatformAsync(platform, AgentScripts.WindowsLogs(lines), password, sudoPassword, elevated: false, cancellationToken);
+            if (!log.Success)
+                throw new DeployException($"No se pudo leer el log: {log.Detail}");
+            return log.Output.Trim() == "nolog"
+                ? "Este agente aún no ha escrito ningún log en fichero (las versiones anteriores a la 1.3.0 solo escriben avisos y errores en el Visor de eventos, origen «plcmon-agent»). Actualízalo con «Instalar / actualizar»."
+                : log.Output;
+        }
         if (session.IsLocal)
         {
             // Si el usuario puede leer el diario del sistema (grupos wheel, adm o systemd-journal) no hace falta pedir permiso.

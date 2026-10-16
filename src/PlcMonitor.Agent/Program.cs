@@ -27,6 +27,14 @@ builder.Configuration.Sources.Insert(0, new MemoryConfigurationSource
 builder.Configuration.AddJsonFile(Path.Combine(AppContext.BaseDirectory, "agent.settings.json"), optional: true, reloadOnChange: false);
 builder.Configuration.AddEnvironmentVariables("PLCMON_");
 builder.Services.AddWindowsService(o => o.ServiceName = "PLC-Monitor Agent");
+// Log a fichero: en Windows siempre (logs\ junto al ejecutable; el Visor de eventos solo guarda avisos y errores); en
+// Linux ya está journald, solo si se pide con Logging:File:Path.
+if (!string.IsNullOrEmpty(builder.Configuration["Logging:File:Path"]) || OperatingSystem.IsWindows())
+{
+    var directory = Path.GetFullPath(builder.Configuration["Logging:File:Path"] is { Length: > 0 } configured ? configured : "logs", AppContext.BaseDirectory);
+    var retention = builder.Configuration.GetValue("Logging:File:RetentionDays", 7);
+    builder.Logging.AddProvider(new FileLoggerProvider(directory, retention));
+}
 builder.Services.AddSystemd();
 builder.WebHost.ConfigureKestrel(k => k.ConfigureEndpointDefaults(e => e.Protocols = HttpProtocols.Http2));
 

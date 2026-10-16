@@ -189,6 +189,39 @@ public sealed class AgentDeployerTests : IDisposable
         _progress.ShouldContain("Firewall: abierto el puerto 5311/tcp");
     }
 
+    private static FakeSsh Windows(Func<string, SshResult> powerShell) => new FakeSsh()
+        .On("uname -sm", Fail("no se reconoce"))
+        .On(c => c.StartsWith("powershell", StringComparison.Ordinal), (c, _) =>
+        {
+            var script = Encoding.Unicode.GetString(Convert.FromBase64String(c[(c.LastIndexOf(' ') + 1)..]));
+            return script == "$env:PROCESSOR_ARCHITECTURE" ? Ok("AMD64") : powerShell(script);
+        });
+
+    [Fact]
+    public async Task Windows_logs_are_read_from_the_agent_files_without_elevation()
+    {
+        var ssh = Windows(script => script.Contains("plcmon-agent-*.log", StringComparison.Ordinal)
+            ? Ok("2026-10-17 09:30:00.000 INF PlcMonitor.Engine.TagEngine: Motor arrancado\r\n")
+            : Fail("script no previsto"));
+
+        (await Deployer(ssh).GetLogsAsync(null, lines: 50, cancellationToken: Ct)).ShouldContain("Motor arrancado");
+        ssh.ElevatedScripts.ShouldBeEmpty();
+        ssh.PowerShellScripts.Single(s => s.Contains("logs", StringComparison.Ordinal)).ShouldContain("-Tail 50");
+    }
+
+    [Fact]
+    public async Task Windows_agent_without_log_files_says_how_to_get_them()
+    {
+        var ssh = Windows(_ => Ok("nolog\r\n"));
+        (await Deployer(ssh).GetLogsAsync(null, cancellationToken: Ct)).ShouldContain("Instalar / actualizar");
+    }
+
+    [Fact]
+    public void Windows_update_keeps_the_logs()
+    {
+        AgentScripts.WindowsInstall(@"C:\Temp\a.exe", null, 5311).ShouldContain("'history', 'logs'");
+    }
+
     [Fact]
     public async Task Status_is_parsed()
     {
