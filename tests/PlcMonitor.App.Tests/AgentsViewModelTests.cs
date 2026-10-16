@@ -19,7 +19,7 @@ public sealed class AgentsViewModelTests : IDisposable
     public AgentsViewModelTests()
     {
         Directory.CreateDirectory(Path.Combine(_dir, "agents"));
-        File.WriteAllBytes(Path.Combine(_dir, "agents", "plcmon-agent-1.0.0-linux-x64.tar.gz"), [1, 2, 3]);
+        File.WriteAllBytes(Path.Combine(_dir, "agents", "plcmon-agent-1.0.0-linux-x64"), [1, 2, 3]);
     }
 
     private string ProfilesPath => Path.Combine(_dir, "agents.json");
@@ -199,10 +199,10 @@ public sealed class AgentsViewModelTests : IDisposable
     {
         var repo = Path.Combine(_dir, "repo");
         var agentsDir = Directory.CreateDirectory(Path.Combine(repo, "artifacts", "release", "1.1.0", "agents")).FullName;
-        File.WriteAllBytes(Path.Combine(agentsDir, "plcmon-agent-1.1.0-linux-x64.tar.gz"), [1]);
+        File.WriteAllBytes(Path.Combine(agentsDir, "plcmon-agent-1.1.0-linux-x64"), [1]);
         var bin = Directory.CreateDirectory(Path.Combine(repo, "src", "PlcMonitor.App", "bin", "Debug", "net10.0")).FullName;
 
-        AgentPackages.Find("linux-x64", AgentPackages.DefaultFolders(bin)).ShouldBe(Path.Combine(agentsDir, "plcmon-agent-1.1.0-linux-x64.tar.gz"));
+        AgentPackages.Find("linux-x64", AgentPackages.DefaultFolders(bin)).ShouldBe(Path.Combine(agentsDir, "plcmon-agent-1.1.0-linux-x64"));
     }
 
     [Fact]

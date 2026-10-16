@@ -112,7 +112,7 @@ public class MainWindowTests
         agents.SshUser = "tecnico";
         agents.Log.Add("Instalando: conectando por SSH con tecnico@192.168.0.20:22…");
         agents.Log.Add("Equipo: Linux x86_64 (paquete linux-x64)");
-        agents.Log.Add("Subiendo plcmon-agent-1.0.0-linux-x64.tar.gz (49 MB)…");
+        agents.Log.Add("Subiendo plcmon-agent-1.0.0-linux-x64 (49 MB)…");
         agents.Log.Add("Agente en marcha: https://192.168.0.20:5311");
         agents.Log.Add("✔ Hecho");
         window.UpdateLayout();

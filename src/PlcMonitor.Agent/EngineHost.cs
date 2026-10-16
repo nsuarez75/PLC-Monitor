@@ -6,7 +6,7 @@ using PlcMonitor.Historian;
 
 namespace PlcMonitor.Agent;
 
-/// <summary>Opciones del agente (sección "Agent" de appsettings.json, variables PLCMON_Agent__* o --Agent:*).</summary>
+/// <summary>Opciones del agente (sección "Agent" de agent.settings.json, variables PLCMON_Agent__* o --Agent:*).</summary>
 public sealed class AgentOptions
 {
     /// <summary>Fichero con los dispositivos y tags. Relativo a la carpeta del ejecutable.</summary>

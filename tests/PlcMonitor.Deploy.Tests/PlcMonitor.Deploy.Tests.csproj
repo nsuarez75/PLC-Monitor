@@ -2,4 +2,8 @@
   <ItemGroup>
     <ProjectReference Include="..\..\src\PlcMonitor.Deploy\PlcMonitor.Deploy.csproj" />
   </ItemGroup>
+  <ItemGroup>
+    <!-- Simula un agente incluido en la app (como hace la release con PlcMonAgentsDir). -->
+    <EmbeddedResource Include="TestData/plcmon-agent-linux-riscv64" LogicalName="agents/plcmon-agent-linux-riscv64" />
+  </ItemGroup>
 </Project>

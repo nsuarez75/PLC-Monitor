@@ -11,8 +11,8 @@ public sealed class LocalInstallTests : IDisposable
 
     public LocalInstallTests()
     {
-        File.WriteAllBytes(Path.Combine(_packages, "plcmon-agent-1.0.0-linux-x64.tar.gz"), [1, 2, 3]);
-        File.WriteAllBytes(Path.Combine(_packages, "plcmon-agent-1.0.0-win-x64.zip"), [4, 5]);
+        File.WriteAllBytes(Path.Combine(_packages, "plcmon-agent-1.0.0-linux-x64"), [1, 2, 3]);
+        File.WriteAllBytes(Path.Combine(_packages, "plcmon-agent-1.0.0-win-x64.exe"), [4, 5]);
     }
 
     private static CancellationToken Ct => TestContext.Current.CancellationToken;
@@ -155,8 +155,8 @@ public sealed class LocalInstallTests : IDisposable
     public async Task Local_session_upload_copies_the_package()
     {
         using var local = new LocalSession();
-        var target = Path.Combine(_packages, "copia.tar.gz");
-        await using (var source = File.OpenRead(Path.Combine(_packages, "plcmon-agent-1.0.0-linux-x64.tar.gz")))
+        var target = Path.Combine(_packages, "copia");
+        await using (var source = File.OpenRead(Path.Combine(_packages, "plcmon-agent-1.0.0-linux-x64")))
             await local.UploadAsync(source, target, Ct);
         File.ReadAllBytes(target).ShouldBe(new byte[] { 1, 2, 3 });
     }

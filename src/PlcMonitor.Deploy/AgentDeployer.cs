@@ -53,7 +53,7 @@ public sealed class AgentDeployer(ISshSession session, IProgress<string>? progre
         ArgumentNullException.ThrowIfNull(options);
         var platform = await DetectPlatformAsync(cancellationToken);
         var package = AgentPackages.Find(platform.Rid, options.PackageFolders)
-            ?? throw new DeployException($"No se encuentra el paquete del agente para {platform.Rid} (plcmon-agent-*-{platform.Rid}{(platform.Os == RemoteOs.Windows ? ".zip" : ".tar.gz")}) en: {string.Join(", ", options.PackageFolders)}");
+            ?? throw new DeployException($"No se encuentra el ejecutable del agente para {platform.Rid} ({AgentPackages.FileName(platform.Rid)}) en: {string.Join(", ", options.PackageFolders)}");
 
         var hasSecurity = (await RunPlatformAsync(platform, platform.Os == RemoteOs.Linux ? AgentScripts.LinuxHasSecurity : AgentScripts.WindowsHasSecurity, password, options.SudoPassword, elevated: !session.IsLocal, cancellationToken)).Output.Trim() == "yes";
         string? token = null;
@@ -141,13 +141,13 @@ public sealed class AgentDeployer(ISshSession session, IProgress<string>? progre
         string remote;
         if (platform.Os == RemoteOs.Linux)
         {
-            remote = $"/tmp/plcmon-agent-{Guid.NewGuid():N}.tar.gz";
+            remote = $"/tmp/plcmon-agent-{Guid.NewGuid():N}";
         }
         else
         {
             var temp = (await session.RunAsync(AgentScripts.PowerShell("[IO.Path]::GetTempPath()"), cancellationToken: cancellationToken)).Output.Trim();
             // Ruta de Windows construida a mano (Path.Combine no entiende '\\' fuera de Windows); SFTP usa /C:/...
-            remote = "/" + (temp.TrimEnd('\\', '/') + $"/plcmon-agent-{Guid.NewGuid():N}.zip").Replace('\\', '/');
+            remote = "/" + (temp.TrimEnd('\\', '/') + $"/plcmon-agent-{Guid.NewGuid():N}.exe").Replace('\\', '/');
         }
         Report($"Subiendo {Path.GetFileName(package)} ({new FileInfo(package).Length / (1024 * 1024)} MB)…");
         await using var stream = File.OpenRead(package);

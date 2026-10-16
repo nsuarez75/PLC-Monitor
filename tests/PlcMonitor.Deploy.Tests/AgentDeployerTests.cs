@@ -13,8 +13,8 @@ public sealed class AgentDeployerTests : IDisposable
 
     public AgentDeployerTests()
     {
-        File.WriteAllBytes(Path.Combine(_packages, "plcmon-agent-1.0.0-linux-x64.tar.gz"), [1, 2, 3]);
-        File.WriteAllBytes(Path.Combine(_packages, "plcmon-agent-1.0.0-win-x64.zip"), [4, 5]);
+        File.WriteAllBytes(Path.Combine(_packages, "plcmon-agent-1.0.0-linux-x64"), [1, 2, 3]);
+        File.WriteAllBytes(Path.Combine(_packages, "plcmon-agent-1.0.0-win-x64.exe"), [4, 5]);
     }
 
     private static CancellationToken Ct => TestContext.Current.CancellationToken;
@@ -179,7 +179,7 @@ public sealed class AgentDeployerTests : IDisposable
         result.Token.ShouldNotBeNull();
         var upload = ssh.Uploads.ShouldHaveSingleItem();
         upload.Key.ShouldStartWith("/C:/Users/admin/AppData/Local/Temp/plcmon-agent-");
-        upload.Key.ShouldEndWith(".zip");
+        upload.Key.ShouldEndWith(".exe");
         var install = ssh.PowerShellScripts.Single(s => s.Contains("Start-Service", StringComparison.Ordinal));
         install.ShouldContain(@"$A = 'C:\Users\admin\AppData\Local\Temp\plcmon-agent-");
         install.ShouldContain("New-Service -Name PLCMonitorAgent");
@@ -217,8 +217,8 @@ public sealed class AgentDeployerTests : IDisposable
         var files = new AgentSecurityFiles(AgentScripts.SettingsJson("ABC", 5311, "clave"), [1, 2, 3]);
         foreach (var script in new[]
                  {
-                     AgentScripts.LinuxInstall("/tmp/x.tar.gz", files, 5311),
-                     AgentScripts.LinuxInstall("/tmp/x.tar.gz", null, 5311),
+                     AgentScripts.LinuxInstall("/tmp/x", files, 5311),
+                     AgentScripts.LinuxInstall("/tmp/x", null, 5311),
                      AgentScripts.LinuxUninstall(true, 5311),
                      AgentScripts.LinuxUninstall(false, 5311),
                      AgentScripts.LinuxStatus,
@@ -235,9 +235,34 @@ public sealed class AgentDeployerTests : IDisposable
     [Fact]
     public void Packages_are_found_by_runtime()
     {
-        AgentPackages.Find("linux-x64", [_packages]).ShouldEndWith("plcmon-agent-1.0.0-linux-x64.tar.gz");
-        AgentPackages.Find("win-x64", [_packages, "/no/existe"]).ShouldEndWith("plcmon-agent-1.0.0-win-x64.zip");
+        AgentPackages.Find("linux-x64", [_packages]).ShouldEndWith("plcmon-agent-1.0.0-linux-x64");
+        AgentPackages.Find("win-x64", [_packages, "/no/existe"]).ShouldEndWith("plcmon-agent-1.0.0-win-x64.exe");
         AgentPackages.Find("linux-arm64", [_packages]).ShouldBeNull();
+    }
+
+    [Fact]
+    public void Embedded_agent_is_used_when_no_folder_has_it()
+    {
+        var bundle = typeof(AgentDeployerTests).Assembly;
+        AgentPackages.Embedded(bundle).ShouldBe(["linux-riscv64"]);
+
+        var path = AgentPackages.Find("linux-riscv64", [_packages], bundle).ShouldNotBeNull();
+
+        File.ReadAllText(path).ShouldBe("agente-de-prueba");
+        Path.GetFileName(path).ShouldEndWith("-linux-riscv64");
+        // Una carpeta con el agente tiene preferencia (para probar otra versión).
+        AgentPackages.Find("linux-x64", [_packages], bundle).ShouldEndWith("plcmon-agent-1.0.0-linux-x64");
+        AgentPackages.Find("win-arm64", [_packages], bundle).ShouldBeNull();
+    }
+
+    [Fact]
+    public void Linux_install_replaces_everything_but_configuration_and_history()
+    {
+        var script = AgentScripts.LinuxInstall("/tmp/plcmon-agent-x", null, 5311);
+        script.ShouldContain("! -name agent.json ! -name agent.settings.json ! -name agent.pfx ! -name history -exec rm -rf {} +");
+        script.ShouldContain("install -m 0755 \"$A\" \"$D/plcmon-agent\"");
+        script.ShouldContain("Environment=DOTNET_BUNDLE_EXTRACT_BASE_DIR=/opt/plc-monitor/agent/.bundle");
+        script.ShouldNotContain("tar ");
     }
 
     /// <summary>Saca de un script el contenido en base64 que se escribe en <paramref name="file"/>.</summary>
