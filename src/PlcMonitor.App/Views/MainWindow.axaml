@@ -23,32 +23,32 @@
           </StackPanel>
         </StackPanel>
 
-        <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="8" HorizontalAlignment="Center" VerticalAlignment="Center">
-          <ComboBox ItemsSource="{Binding Profiles}" SelectedItem="{Binding SelectedProfile}" Width="320"
+        <Grid Grid.Column="1" ColumnDefinitions="*,Auto" ColumnSpacing="8" HorizontalAlignment="Center" VerticalAlignment="Center">
+          <ComboBox ItemsSource="{Binding Profiles}" SelectedItem="{Binding SelectedProfile}" MaxWidth="320" MinWidth="120" HorizontalAlignment="Stretch"
                     IsEnabled="{Binding !IsConnected}" PlaceholderText="Elige un agente">
             <ComboBox.ItemTemplate>
               <DataTemplate x:DataType="svc:AgentProfile">
-                <StackPanel Orientation="Horizontal" Spacing="8">
-                  <c:Icon Kind="server" Width="14" Height="14" Foreground="{DynamicResource App.TextMuted}" />
-                  <TextBlock Text="{Binding Name}" FontWeight="SemiBold" />
-                  <TextBlock Text="{Binding Url}" Classes="muted" FontSize="12" />
-                </StackPanel>
+                <DockPanel>
+                  <c:Icon DockPanel.Dock="Left" Kind="server" Width="14" Height="14" Margin="0,0,8,0" Foreground="{DynamicResource App.TextMuted}" />
+                  <TextBlock DockPanel.Dock="Left" Text="{Binding Name}" FontWeight="SemiBold" Margin="0,0,8,0" TextTrimming="CharacterEllipsis" />
+                  <TextBlock Text="{Binding Url}" Classes="muted" FontSize="12" TextTrimming="CharacterEllipsis" VerticalAlignment="Center" />
+                </DockPanel>
               </DataTemplate>
             </ComboBox.ItemTemplate>
           </ComboBox>
-          <Button Classes="accent" Command="{Binding ConnectCommand}" IsVisible="{Binding !IsConnected}">
+          <Button Grid.Column="1" Classes="accent" Command="{Binding ConnectCommand}" IsVisible="{Binding !IsConnected}">
             <StackPanel Orientation="Horizontal" Spacing="6">
               <c:Icon Kind="link" />
               <TextBlock Text="Conectar" />
             </StackPanel>
           </Button>
-          <Button Classes="secondary" Command="{Binding DisconnectCommand}" IsVisible="{Binding IsConnected}">
+          <Button Grid.Column="1" Classes="secondary" Command="{Binding DisconnectCommand}" IsVisible="{Binding IsConnected}">
             <StackPanel Orientation="Horizontal" Spacing="6">
               <c:Icon Kind="unlink" />
               <TextBlock Text="Desconectar" />
             </StackPanel>
           </Button>
-        </StackPanel>
+        </Grid>
 
         <Border Grid.Column="2" Classes="pill" Padding="10,4"
                 Classes.good="{Binding IsOnline}" Classes.warn="{Binding IsReconnecting}">
@@ -62,19 +62,19 @@
         <Button Classes="ghost" Command="{Binding OpenTrendsCommand}" ToolTip.Tip="Vistas de tendencia en vivo con tags de cualquier dispositivo">
           <StackPanel Orientation="Horizontal" Spacing="6">
             <c:Icon Kind="pulse" Width="16" Height="16" />
-            <TextBlock Text="Tendencias" />
+            <TextBlock Text="Tendencias" Classes="barlabel" />
           </StackPanel>
         </Button>
         <Button Classes="ghost" Command="{Binding OpenCsvCommand}" ToolTip.Tip="Ver un CSV exportado del histórico (sin conexión)">
           <StackPanel Orientation="Horizontal" Spacing="6">
             <c:Icon Kind="chart" Width="16" Height="16" />
-            <TextBlock Text="Abrir CSV" />
+            <TextBlock Text="Abrir CSV" Classes="barlabel" />
           </StackPanel>
         </Button>
         <Button Classes="ghost" Command="{Binding OpenAgentsCommand}" ToolTip.Tip="Gestionar agentes (instalar en equipos por SSH)">
           <StackPanel Orientation="Horizontal" Spacing="6">
             <c:Icon Kind="server" Width="16" Height="16" />
-            <TextBlock Text="Agentes" />
+            <TextBlock Text="Agentes" Classes="barlabel" />
           </StackPanel>
         </Button>
         <Button Classes="ghost" Command="{Binding ToggleThemeCommand}" ToolTip.Tip="{Binding ThemeText, StringFormat='Tema: {0}'}">
@@ -203,7 +203,7 @@
 
                 <Border Classes="card" ClipToBounds="True">
                   <DockPanel>
-                    <Grid DockPanel.Dock="Top" Classes="tablehead" ColumnDefinitions="2*,2.2*,1.6*,90,130,100,250" ColumnSpacing="12" Margin="16,12,16,10">
+                    <c:TableRow DockPanel.Dock="Top" Classes="tablehead" Columns="2*,2.2*,1.6*,90,130,100,250" HideOrder="3,5,1" MinStarWidth="45" ColumnSpacing="12" Margin="16,12,16,10">
                       <TextBlock Text="TAG" />
                       <TextBlock Grid.Column="1" Text="DIRECCIÓN" />
                       <TextBlock Grid.Column="2" Text="VALOR" />
@@ -211,7 +211,7 @@
                       <TextBlock Grid.Column="4" Text="CALIDAD" />
                       <TextBlock Grid.Column="5" Text="ACTUALIZADO" />
                       <TextBlock Grid.Column="6" Text="ESCRIBIR" />
-                    </Grid>
+                    </c:TableRow>
                     <StackPanel DockPanel.Dock="Top" Margin="16,24" Spacing="6" HorizontalAlignment="Center"
                                 IsVisible="{Binding !SelectedDevice.HasTags, FallbackValue=False}">
                       <TextBlock Text="Sin tags" FontWeight="SemiBold" HorizontalAlignment="Center" />
@@ -220,24 +220,24 @@
                     <ListBox x:Name="TagsList" Classes="table" ItemsSource="{Binding SelectedDevice.Tags}" ToolTip.Tip="Doble clic para ver el detalle y la configuración del tag">
                       <ListBox.ItemTemplate>
                         <DataTemplate x:DataType="vm:TagViewModel">
-                          <Grid ColumnDefinitions="2*,2.2*,1.6*,90,130,100,250" ColumnSpacing="12">
+                          <c:TableRow Columns="2*,2.2*,1.6*,90,130,100,250" HideOrder="3,5,1" MinStarWidth="45" ColumnSpacing="12">
                             <StackPanel VerticalAlignment="Center">
-                              <StackPanel Orientation="Horizontal" Spacing="6">
-                                <TextBlock Text="{Binding Name}" FontWeight="SemiBold" TextTrimming="CharacterEllipsis" />
-                                <c:Icon Kind="history" Width="13" Height="13" Foreground="{DynamicResource App.Accent}" IsVisible="{Binding Historized}"
-                                        ToolTip.Tip="Se guarda en el histórico" />
-                              </StackPanel>
-                              <TextBlock Text="{Binding Group}" Classes="muted" FontSize="11" />
+                              <DockPanel>
+                                <c:Icon DockPanel.Dock="Left" Kind="history" Width="13" Height="13" Margin="0,0,6,0" Foreground="{DynamicResource App.Accent}"
+                                        IsVisible="{Binding Historized}" ToolTip.Tip="Se guarda en el histórico" />
+                                <TextBlock Text="{Binding Name}" FontWeight="SemiBold" TextTrimming="CharacterEllipsis" ToolTip.Tip="{Binding Name}" />
+                              </DockPanel>
+                              <TextBlock Text="{Binding Group}" Classes="muted" FontSize="11" TextTrimming="CharacterEllipsis" />
                             </StackPanel>
                             <TextBlock Grid.Column="1" Text="{Binding Address}" Classes="muted mono" FontSize="12" TextTrimming="CharacterEllipsis"
                                        VerticalAlignment="Center" ToolTip.Tip="{Binding Address}" />
                             <TextBlock Grid.Column="2" Text="{Binding ValueText}" Classes="mono" FontSize="13.5" FontWeight="SemiBold"
                                        Classes.error="{Binding IsBad}" TextTrimming="CharacterEllipsis" VerticalAlignment="Center" ToolTip.Tip="{Binding ValueText}" />
-                            <TextBlock Grid.Column="3" Text="{Binding DataType}" Classes="muted" VerticalAlignment="Center" />
-                            <Border Grid.Column="4" Classes="pill" Classes.good="{Binding IsGood}" Classes.warn="{Binding IsUncertain}" Classes.bad="{Binding IsBad}">
-                              <TextBlock Text="{Binding Quality}" TextTrimming="CharacterEllipsis" MaxWidth="110" />
+                            <TextBlock Grid.Column="3" Text="{Binding DataType}" Classes="muted" VerticalAlignment="Center" TextTrimming="CharacterEllipsis" />
+                            <Border Grid.Column="4" Classes="pill" HorizontalAlignment="Left" Classes.good="{Binding IsGood}" Classes.warn="{Binding IsUncertain}" Classes.bad="{Binding IsBad}">
+                              <TextBlock Text="{Binding Quality}" TextTrimming="CharacterEllipsis" ToolTip.Tip="{Binding Quality}" />
                             </Border>
-                            <TextBlock Grid.Column="5" Text="{Binding Time}" Classes="muted mono" FontSize="11.5" VerticalAlignment="Center" />
+                            <TextBlock Grid.Column="5" Text="{Binding Time}" Classes="muted mono" FontSize="11.5" VerticalAlignment="Center" TextTrimming="CharacterEllipsis" />
                             <StackPanel Grid.Column="6" Orientation="Horizontal" Spacing="4" VerticalAlignment="Center">
                               <TextBox Text="{Binding NewValue}" Width="120" IsVisible="{Binding ShowTextWrite}" PlaceholderText="nuevo valor" Classes="mono" />
                               <Button Classes="accent" Padding="9,6" Command="{Binding WriteCommand}" IsVisible="{Binding ShowTextWrite}" ToolTip.Tip="Escribir">
@@ -254,7 +254,7 @@
                                 <c:Icon Kind="x" Width="14" Height="14" />
                               </Button>
                             </StackPanel>
-                          </Grid>
+                          </c:TableRow>
                         </DataTemplate>
                       </ListBox.ItemTemplate>
                     </ListBox>

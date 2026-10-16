@@ -59,6 +59,36 @@ public class MainWindowTests
     });
 
     [Fact]
+    public Task Narrow_window_keeps_the_tag_columns_apart() => HeadlessApp.RunAsync(() =>
+    {
+        Avalonia.Application.Current!.RequestedThemeVariant = Avalonia.Styling.ThemeVariant.Light;
+        var vm = ViewModelWithData();
+        var window = new MainWindow { DataContext = vm };
+        window.Width = window.MinWidth;
+        window.Show();
+        window.UpdateLayout();
+
+        // Cada texto de una fila queda dentro de su columna (si no cabe, se recorta con «…» o la columna se oculta).
+        var list = window.FindControl<ListBox>("TagsList")!;
+        var rows = list.GetVisualDescendants().OfType<PlcMonitor.App.Controls.TableRow>().ToArray();
+        rows.ShouldNotBeEmpty();
+        foreach (var row in rows)
+        {
+            var widths = row.Layout(row.Bounds.Width);
+            widths[0].ShouldBeGreaterThan(80); // el nombre del tag sigue a la vista
+            foreach (var text in row.GetVisualDescendants().OfType<TextBlock>().Where(t => t.IsEffectivelyVisible && !string.IsNullOrEmpty(t.Text)))
+            {
+                var cell = row.Children.First(c => c == text || c.IsVisualAncestorOf(text));
+                if (cell.Opacity == 0)
+                    continue;
+                var right = Avalonia.VisualExtensions.TranslatePoint(text, new Avalonia.Point(text.Bounds.Width, 0), row)!.Value.X;
+                right.ShouldBeLessThanOrEqualTo(cell.Bounds.Right + 0.5, $"«{text.Text}» se sale de la columna {Grid.GetColumn(cell)}");
+            }
+        }
+        Capture(window, "main-window-narrow.png");
+    });
+
+    [Fact]
     public Task Device_editor_covers_the_content() => HeadlessApp.RunAsync(() =>
     {
         var vm = ViewModelWithData();

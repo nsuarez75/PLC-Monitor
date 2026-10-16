@@ -10,6 +10,9 @@ namespace PlcMonitor.App.Views;
 
 public sealed partial class MainWindow : Window
 {
+    /// <summary>Por debajo de este ancho los botones de la barra superior se quedan solo con el icono.</summary>
+    private const double NarrowWidth = 1200;
+
     public MainWindow()
     {
         AvaloniaXamlLoader.Load(this);
@@ -18,6 +21,7 @@ public sealed partial class MainWindow : Window
         var trend = new DispatcherTimer { Interval = TimeSpan.FromMilliseconds(500) };
         trend.Tick += (_, _) => (DataContext as MainViewModel)?.Trends?.Refresh(DateTimeOffset.UtcNow);
         Opened += (_, _) => trend.Start();
+        SizeChanged += (_, e) => Classes.Set("narrow", e.NewSize.Width < NarrowWidth);
         Closed += (_, _) => trend.Stop();
     }
 
