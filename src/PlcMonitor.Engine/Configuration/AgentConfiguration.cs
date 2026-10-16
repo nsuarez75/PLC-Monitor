@@ -48,6 +48,89 @@ public sealed class TagHistorySettings
 
     /// <summary>Tiempo máximo sin guardar: se repite el valor actual aunque no cambie (0 = nunca).</summary>
     public int MaxIntervalMs { get; set; }
+
+    /// <summary>Historizar solo mientras otro tag del dispositivo cumple una condición; null = siempre.</summary>
+    public HistoryTrigger? Trigger { get; set; }
+}
+
+public enum TriggerCondition
+{
+    Equal,
+    NotEqual,
+    Greater,
+    GreaterOrEqual,
+    Less,
+    LessOrEqual,
+}
+
+/// <summary>
+/// Disparo del histórico: el tag se guarda mientras <see cref="Tag"/> (del mismo dispositivo) cumple
+/// <see cref="Condition"/> con <see cref="Value"/>, y <see cref="HoldMs"/> más después de que deje de cumplirse.
+/// </summary>
+public sealed class HistoryTrigger
+{
+    /// <summary>Nombre del tag que dispara (del mismo dispositivo).</summary>
+    public string Tag { get; set; } = "";
+
+    public TriggerCondition Condition { get; set; } = TriggerCondition.Equal;
+
+    /// <summary>Valor con el que se compara: true/false para booleanos, un número para los demás (= y ≠ admiten texto).</summary>
+    public string Value { get; set; } = "true";
+
+    /// <summary>Tiempo que se sigue guardando después de que la condición deje de cumplirse.</summary>
+    public int HoldMs { get; set; }
+
+    /// <summary>¿Cumple <paramref name="value"/> la condición? Un valor ausente o no comparable no la cumple.</summary>
+    public bool IsMet(object? value)
+    {
+        if (value is null)
+            return false;
+        if (TryNumber(value, out var actual) && TryNumber(Value.Trim(), out var target))
+        {
+            return Condition switch
+            {
+                TriggerCondition.Equal => actual == target,
+                TriggerCondition.NotEqual => actual != target,
+                TriggerCondition.Greater => actual > target,
+                TriggerCondition.GreaterOrEqual => actual >= target,
+                TriggerCondition.Less => actual < target,
+                TriggerCondition.LessOrEqual => actual <= target,
+                _ => false,
+            };
+        }
+        var text = Convert.ToString(value, System.Globalization.CultureInfo.InvariantCulture);
+        return Condition switch
+        {
+            TriggerCondition.Equal => string.Equals(text, Value.Trim(), StringComparison.Ordinal),
+            TriggerCondition.NotEqual => !string.Equals(text, Value.Trim(), StringComparison.Ordinal),
+            _ => false,
+        };
+    }
+
+    /// <summary>Número de un valor (bool como 0/1; "true"/"false" también).</summary>
+    public static bool TryNumber(object? value, out double number)
+    {
+        switch (value)
+        {
+            case bool b:
+                number = b ? 1 : 0;
+                return true;
+            case string s when bool.TryParse(s, out var b):
+                number = b ? 1 : 0;
+                return true;
+            case string s:
+                return double.TryParse(s.Replace(',', '.'), System.Globalization.NumberStyles.Float, System.Globalization.CultureInfo.InvariantCulture, out number);
+            case float f:
+                number = double.Parse(f.ToString("R", System.Globalization.CultureInfo.InvariantCulture), System.Globalization.CultureInfo.InvariantCulture);
+                return true;
+            case sbyte or byte or short or ushort or int or uint or long or ulong or double or decimal:
+                number = Convert.ToDouble(value, System.Globalization.CultureInfo.InvariantCulture);
+                return true;
+            default:
+                number = 0;
+                return false;
+        }
+    }
 }
 
 /// <summary>Un dispositivo: driver, ajustes del driver, reconexión y grupos de escaneo con sus tags.</summary>

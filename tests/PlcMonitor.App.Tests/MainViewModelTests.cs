@@ -266,6 +266,51 @@ public sealed class MainViewModelTests : IDisposable
     }
 
     [Fact]
+    public async Task History_trigger_is_configured_in_the_tag_window()
+    {
+        await using var agent = new AgentFactory(Device("plc1", tags: [T("DB1.DBW0", "velocidad"), T("DB1.DBX2.0", "marcha"), T("DB1.DBW4", "modo")]));
+        var plc = agent.Driver.Plc("plc1");
+        plc.Values["DB1.DBW0"] = 5;
+        plc.Values["DB1.DBX2.0"] = true;
+        plc.Values["DB1.DBW4"] = 2;
+        await using var vm = await ConnectAsync(agent);
+        await Wait.UntilAsync(() => _ui.Read(() => TagOf(vm, "plc1", "marcha").IsBoolean), "tipo del tag disparo");
+
+        await vm.OpenTagDetailsCommand.ExecuteAsync(TagOf(vm, "plc1", "velocidad"));
+        var details = _dialogs.TagDetails.Single();
+        details.TriggerTags.ShouldBe(["marcha", "modo"]);
+        details.HistoryEnabled = true;
+        details.TriggerEnabled = true;
+        details.TriggerTag = "marcha";
+        details.IsBooleanTrigger.ShouldBeTrue();
+        details.TriggerBool = TagDetailsViewModel.BoolChoices[1];
+        details.TriggerHoldMs = 3000;
+        await details.SaveCommand.ExecuteAsync(null);
+        details.Saved.ShouldBeTrue(details.Errors);
+
+        var trigger = (await ConfigurationFileLoad(agent)).Devices[0].ScanGroups.SelectMany(g => g.Tags).Single(t => t.Name == "velocidad").History!.Trigger!;
+        (trigger.Tag, trigger.Condition, trigger.Value, trigger.HoldMs).ShouldBe(("marcha", PlcMonitor.Engine.Configuration.TriggerCondition.Equal, "false", 3000));
+
+        // Al volver a abrir se ve lo guardado; un tag numérico pide condición y valor.
+        await Wait.UntilAsync(() => _ui.Read(() => TagOf(vm, "plc1", "velocidad").Historized), "reconfigurado");
+        await vm.OpenTagDetailsCommand.ExecuteAsync(TagOf(vm, "plc1", "velocidad"));
+        var again = _dialogs.TagDetails.Last();
+        (again.TriggerEnabled, again.TriggerTag, again.TriggerOnTrue, again.TriggerHoldMs).ShouldBe((true, "marcha", false, 3000));
+        again.TriggerTag = "modo";
+        again.IsBooleanTrigger.ShouldBeFalse();
+        again.TriggerCondition = TagDetailsViewModel.Conditions.Single(c => c.Text == "≥");
+        again.TriggerValue = "x";
+        await again.SaveCommand.ExecuteAsync(null);
+        again.Saved.ShouldBeFalse();
+        again.Errors.ShouldContain("debe ser un número");
+        again.TriggerValue = "3";
+        await again.SaveCommand.ExecuteAsync(null);
+        again.Saved.ShouldBeTrue(again.Errors);
+        trigger = (await ConfigurationFileLoad(agent)).Devices[0].ScanGroups.SelectMany(g => g.Tags).Single(t => t.Name == "velocidad").History!.Trigger!;
+        (trigger.Tag, trigger.Condition, trigger.Value).ShouldBe(("modo", PlcMonitor.Engine.Configuration.TriggerCondition.GreaterOrEqual, "3"));
+    }
+
+    [Fact]
     public async Task History_is_configured_in_the_tag_window_and_queried_in_the_history_tab()
     {
         await using var agent = new AgentFactory(Device("plc1", tags: [T("DB1.DBW0", "velocidad"), T("DB1.DBW2", "otro")]));

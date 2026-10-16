@@ -1,0 +1,185 @@
+using System.Collections.ObjectModel;
+using System.ComponentModel;
+using CommunityToolkit.Mvvm.ComponentModel;
+using CommunityToolkit.Mvvm.Input;
+
+namespace PlcMonitor.App.Charts;
+
+/// <summary>Tag que se puede mostrar en la gráfica (casilla con su color).</summary>
+public sealed partial class ChartSeriesOption(string name, int colorIndex) : ObservableObject
+{
+    public string Name { get; } = name;
+
+    public int ColorIndex { get; } = colorIndex;
+
+    [ObservableProperty]
+    public partial bool IsSelected { get; set; }
+
+    internal IReadOnlyList<ChartPoint> Points { get; set; } = [];
+
+    internal bool Step { get; set; } = true;
+
+    internal bool IsBoolean { get; set; }
+}
+
+/// <summary>Datos de una serie para cargar en la gráfica.</summary>
+public sealed record ChartSeriesData(string Name, IReadOnlyList<ChartPoint> Points, bool Step = true, bool IsBoolean = false);
+
+/// <summary>
+/// Estado de una gráfica (la misma para la tendencia en vivo, el histórico y el visor de CSV): qué tags se ven, la
+/// ventana de tiempo (con zoom) y los límites del eje Y (automáticos o fijados a mano).
+/// </summary>
+public sealed partial class ChartViewModel : ObservableObject
+{
+    // Cada nombre conserva su color aunque cambie la lista.
+    private readonly Dictionary<string, int> _colors = new(StringComparer.Ordinal);
+
+    public ObservableCollection<ChartSeriesOption> Options { get; } = [];
+
+    [ObservableProperty]
+    public partial IReadOnlyList<ChartSeries> Series { get; private set; } = [];
+
+    /// <summary>Ventana visible.</summary>
+    [ObservableProperty]
+    public partial DateTimeOffset? From { get; set; }
+
+    [ObservableProperty]
+    public partial DateTimeOffset? To { get; set; }
+
+    /// <summary>Ventana completa de los datos (a la que vuelve «Ajustar»).</summary>
+    public DateTimeOffset? DataFrom { get; private set; }
+
+    public DateTimeOffset? DataTo { get; private set; }
+
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(YMin), nameof(YMax), nameof(IsManualY))]
+    public partial bool AutoY { get; set; } = true;
+
+    public bool IsManualY => !AutoY;
+
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(YMin))]
+    public partial decimal? YMinInput { get; set; }
+
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(YMax))]
+    public partial decimal? YMaxInput { get; set; }
+
+    public double? YMin => AutoY ? null : (double?)YMinInput;
+
+    public double? YMax => AutoY ? null : (double?)YMaxInput;
+
+    /// <summary>Cambia al añadir puntos a las series para que la gráfica se redibuje.</summary>
+    [ObservableProperty]
+    public partial int Revision { get; private set; }
+
+    [ObservableProperty]
+    public partial bool IsZoomed { get; private set; }
+
+    [ObservableProperty]
+    public partial string EmptyText { get; set; } = "Marca uno o más tags";
+
+    public bool HasOptions => Options.Count > 0;
+
+    /// <summary>El usuario ha hecho zoom o lo ha quitado (la tendencia en vivo se pausa con el zoom).</summary>
+    public event EventHandler? ZoomChanged;
+
+    /// <summary>
+    /// Carga las series. Conserva lo marcado por nombre; si no había nada, marca las <paramref name="selectFirst"/>
+    /// primeras. La ventana vuelve a la de los datos.
+    /// </summary>
+    public void SetData(IEnumerable<ChartSeriesData> data, DateTimeOffset? from = null, DateTimeOffset? to = null, int selectFirst = int.MaxValue)
+    {
+        ArgumentNullException.ThrowIfNull(data);
+        var selected = Options.Where(o => o.IsSelected).Select(o => o.Name).ToHashSet(StringComparer.Ordinal);
+        var keepSelection = selected.Count > 0;
+        foreach (var option in Options)
+            option.PropertyChanged -= OnOptionChanged;
+        Options.Clear();
+        foreach (var d in data)
+        {
+            if (!_colors.TryGetValue(d.Name, out var color))
+                _colors[d.Name] = color = _colors.Count;
+            var option = new ChartSeriesOption(d.Name, color)
+            {
+                Points = d.Points,
+                Step = d.Step,
+                IsBoolean = d.IsBoolean,
+                IsSelected = keepSelection ? selected.Contains(d.Name) : Options.Count < selectFirst,
+            };
+            option.PropertyChanged += OnOptionChanged;
+            Options.Add(option);
+        }
+        OnPropertyChanged(nameof(HasOptions));
+        var all = Options.SelectMany(o => o.Points).Select(p => p.Time).ToArray();
+        DataFrom = from ?? (all.Length > 0 ? all.Min() : null);
+        DataTo = to ?? (all.Length > 0 ? all.Max() : null);
+        From = DataFrom;
+        To = DataTo;
+        IsZoomed = false;
+        Rebuild();
+    }
+
+    /// <summary>Mueve la ventana sin zoom (la tendencia en vivo la desplaza con el reloj).</summary>
+    public void SetWindow(DateTimeOffset from, DateTimeOffset to)
+    {
+        DataFrom = from;
+        DataTo = to;
+        if (IsZoomed)
+            return;
+        From = from;
+        To = to;
+    }
+
+    /// <summary>Zoom a un tramo (al arrastrar sobre la gráfica).</summary>
+    public void Zoom(DateTimeOffset from, DateTimeOffset to)
+    {
+        if (to <= from)
+            return;
+        From = from;
+        To = to;
+        IsZoomed = true;
+        ZoomChanged?.Invoke(this, EventArgs.Empty);
+    }
+
+    /// <summary>Vuelve a la ventana completa de los datos.</summary>
+    [RelayCommand]
+    private void ResetZoom()
+    {
+        From = DataFrom;
+        To = DataTo;
+        IsZoomed = false;
+        ZoomChanged?.Invoke(this, EventArgs.Empty);
+    }
+
+    /// <summary>Pone en el eje Y los límites de lo que se ve ahora (para ajustarlos a partir de ahí).</summary>
+    partial void OnAutoYChanged(bool value)
+    {
+        if (value || (YMinInput is not null && YMaxInput is not null))
+            return;
+        var values = Series.SelectMany(s => s.Points).Where(p => p.Value is not null && (From is null || p.Time >= From) && (To is null || p.Time <= To))
+            .Select(p => p.Value!.Value).ToArray();
+        if (values.Length == 0)
+            return;
+        var (min, max, _) = ChartAxis.NiceRange(values.Min(), values.Max());
+        YMinInput ??= (decimal)min;
+        YMaxInput ??= (decimal)max;
+    }
+
+    /// <summary>Hay puntos nuevos en las series (mismas listas): redibujar.</summary>
+    public void Touch() => Revision++;
+
+    private void OnOptionChanged(object? sender, PropertyChangedEventArgs e)
+    {
+        if (e.PropertyName == nameof(ChartSeriesOption.IsSelected))
+            Rebuild();
+    }
+
+    private void Rebuild()
+    {
+        Series = Options.Where(o => o.IsSelected)
+            .Select(o => new ChartSeries(o.Name, o.Points, o.Step) { IsBoolean = o.IsBoolean, ColorIndex = o.ColorIndex })
+            .ToArray();
+        Revision++;
+    }
+}

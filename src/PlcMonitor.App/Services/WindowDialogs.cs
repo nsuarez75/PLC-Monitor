@@ -23,4 +23,17 @@ public sealed class WindowDialogs(Window owner) : IDialogs
     }
 
     public Task ShowTagDetailsAsync(ViewModels.TagDetailsViewModel details) => new TagDetailsWindow { DataContext = details }.ShowDialog(owner);
+
+    public async Task<string?> OpenFileAsync(string title, string extension)
+    {
+        var files = await owner.StorageProvider.OpenFilePickerAsync(new FilePickerOpenOptions
+        {
+            Title = title,
+            AllowMultiple = false,
+            FileTypeFilter = [new FilePickerFileType(extension.ToUpperInvariant()) { Patterns = [$"*.{extension}"] }],
+        });
+        return files.Count == 0 ? null : files[0].TryGetLocalPath();
+    }
+
+    public void ShowCsvViewer(ViewModels.CsvViewerViewModel viewer) => new CsvViewerWindow { DataContext = viewer }.Show(owner);
 }

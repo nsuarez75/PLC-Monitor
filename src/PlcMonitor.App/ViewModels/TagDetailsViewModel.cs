@@ -3,6 +3,7 @@ using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using Grpc.Core;
 using PlcMonitor.Agent.Contracts;
+using PlcMonitor.App.Charts;
 
 namespace PlcMonitor.App.ViewModels;
 
@@ -18,7 +19,8 @@ public sealed partial class TagDetailsViewModel : ObservableObject
     private readonly string _originalName;
     private readonly Dictionary<string, int> _groupIntervals;
 
-    public TagDetailsViewModel(IAgentContext context, TagViewModel tag, DeviceConfig device, bool historianEnabled = true)
+    /// <param name="isBoolean">Si un tag del dispositivo (por nombre) es booleano según sus valores en vivo.</param>
+    public TagDetailsViewModel(IAgentContext context, TagViewModel tag, DeviceConfig device, bool historianEnabled = true, Func<string, bool>? isBoolean = null)
     {
         HistorianEnabled = historianEnabled;
         ArgumentNullException.ThrowIfNull(tag);
@@ -39,6 +41,15 @@ public sealed partial class TagDetailsViewModel : ObservableObject
         SelectedDataType = config is null || config.DataType == Agent.Contracts.DataType.Unknown ? AutomaticType : config.DataType.ToString();
         GroupName = group?.Name ?? "default";
         IntervalMs = group?.IntervalMs ?? 1000;
+
+        // Disparo: cualquier otro tag del dispositivo.
+        var others = device.ScanGroups.SelectMany(g => g.Tags).Where(t => t != config).ToArray();
+        _booleanTags = new HashSet<string>(
+            others.Select(t => EffectiveName(t)).Where(n => isBoolean?.Invoke(n) == true)
+                .Concat(others.Where(t => t.DataType == Agent.Contracts.DataType.Boolean).Select(EffectiveName)),
+            StringComparer.Ordinal);
+        TriggerTags = [.. others.Select(EffectiveName).Order(StringComparer.OrdinalIgnoreCase)];
+        TriggerCondition = Conditions[0];
         if (config?.History is { } history)
         {
             HistoryEnabled = history.Enabled;
@@ -46,8 +57,87 @@ public sealed partial class TagDetailsViewModel : ObservableObject
             HistoryMaxIntervalMs = history.MaxIntervalMs;
             HistoryDeadband = history.Deadband;
             HistoryDeadbandPercent = history.DeadbandPercent;
+            if (history.Trigger is { } trigger)
+            {
+                TriggerEnabled = true;
+                TriggerTag = trigger.Tag;
+                TriggerCondition = Conditions.FirstOrDefault(c => c.Value == trigger.Condition) ?? Conditions[0];
+                TriggerValue = trigger.Value;
+                TriggerOnTrue = !string.Equals(trigger.Value.Trim(), "false", StringComparison.OrdinalIgnoreCase);
+                TriggerHoldMs = trigger.HoldMs;
+            }
         }
     }
+
+    private readonly HashSet<string> _booleanTags;
+
+    private static string EffectiveName(TagConfig tag) => string.IsNullOrEmpty(tag.Name) ? tag.Address : tag.Name;
+
+    public static IReadOnlyList<Choice<TriggerCondition>> Conditions { get; } =
+    [
+        new("=", Agent.Contracts.TriggerCondition.Equal),
+        new("≠", Agent.Contracts.TriggerCondition.NotEqual),
+        new(">", Agent.Contracts.TriggerCondition.Greater),
+        new("≥", Agent.Contracts.TriggerCondition.GreaterOrEqual),
+        new("<", Agent.Contracts.TriggerCondition.Less),
+        new("≤", Agent.Contracts.TriggerCondition.LessOrEqual),
+    ];
+
+    /// <summary>Historizar solo mientras otro tag cumple una condición.</summary>
+    [ObservableProperty]
+    public partial bool TriggerEnabled { get; set; }
+
+    /// <summary>Otros tags del dispositivo que pueden disparar.</summary>
+    public IReadOnlyList<string> TriggerTags { get; }
+
+    public bool HasTriggerTags => TriggerTags.Count > 0;
+
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(IsBooleanTrigger), nameof(IsValueTrigger))]
+    public partial string? TriggerTag { get; set; }
+
+    /// <summary>El tag disparo es booleano: se elige true o false; si no, condición y valor.</summary>
+    public bool IsBooleanTrigger => TriggerTag is { } t && _booleanTags.Contains(t);
+
+    public bool IsValueTrigger => !IsBooleanTrigger;
+
+    [ObservableProperty]
+    public partial Choice<TriggerCondition> TriggerCondition { get; set; }
+
+    [ObservableProperty]
+    public partial string TriggerValue { get; set; } = "";
+
+    /// <summary>Disparo booleano: se historiza mientras vale true (o false).</summary>
+    [ObservableProperty]
+    public partial bool TriggerOnTrue { get; set; } = true;
+
+    public static IReadOnlyList<Choice<bool>> BoolChoices { get; } = [new("true", true), new("false", false)];
+
+    public Choice<bool> TriggerBool
+    {
+        get => BoolChoices[TriggerOnTrue ? 0 : 1];
+        set
+        {
+            if (value is not null)
+                TriggerOnTrue = value.Value;
+        }
+    }
+
+    partial void OnTriggerOnTrueChanged(bool value) => OnPropertyChanged(nameof(TriggerBool));
+
+    /// <summary>Tiempo que se sigue guardando después de que la condición deje de cumplirse.</summary>
+    [ObservableProperty]
+    public partial int TriggerHoldMs { get; set; }
+
+    private HistoryTrigger? BuildTrigger() => TriggerEnabled
+        ? new HistoryTrigger
+        {
+            Tag = TriggerTag ?? "",
+            Condition = IsBooleanTrigger ? Agent.Contracts.TriggerCondition.Equal : TriggerCondition.Value,
+            Value = IsBooleanTrigger ? (TriggerOnTrue ? "true" : "false") : TriggerValue.Trim(),
+            HoldMs = TriggerHoldMs,
+        }
+        : null;
 
     /// <summary>El agente tiene el historiador activado.</summary>
     public bool HistorianEnabled { get; }
@@ -71,6 +161,31 @@ public sealed partial class TagDetailsViewModel : ObservableObject
 
     /// <summary>Tag en vivo (valor, calidad, hora).</summary>
     public TagViewModel Tag { get; }
+
+    /// <summary>Ventana de la mini tendencia.</summary>
+    public static readonly TimeSpan TrendWindow = TimeSpan.FromMinutes(5);
+
+    /// <summary>Mini tendencia de los últimos minutos (los valores que ha recibido la app).</summary>
+    public IReadOnlyList<ChartSeries> Trend => _trend ??= [new ChartSeries(Tag.Name, Tag.TrendPoints) { IsBoolean = Tag.IsBoolean }];
+
+    private IReadOnlyList<ChartSeries>? _trend;
+
+    [ObservableProperty]
+    public partial DateTimeOffset TrendFrom { get; private set; }
+
+    [ObservableProperty]
+    public partial DateTimeOffset TrendTo { get; private set; }
+
+    [ObservableProperty]
+    public partial int TrendRevision { get; private set; }
+
+    /// <summary>Avanza la mini tendencia hasta <paramref name="now"/> (lo llama un temporizador de la ventana).</summary>
+    public void RefreshTrend(DateTimeOffset now)
+    {
+        TrendFrom = now - TrendWindow;
+        TrendTo = now;
+        TrendRevision++;
+    }
 
     public string Device { get; }
 
@@ -170,7 +285,7 @@ public sealed partial class TagDetailsViewModel : ObservableObject
                 Address = address,
                 Writable = Writable,
                 DataType = SelectedDataType == AutomaticType ? Agent.Contracts.DataType.Unknown : Enum.Parse<DataType>(SelectedDataType),
-                History = HistoryEnabled || HistoryMinIntervalMs > 0 || HistoryMaxIntervalMs > 0 || HistoryDeadband > 0
+                History = HistoryEnabled || HistoryMinIntervalMs > 0 || HistoryMaxIntervalMs > 0 || HistoryDeadband > 0 || TriggerEnabled
                     ? new HistoryConfig
                     {
                         Enabled = HistoryEnabled,
@@ -178,6 +293,7 @@ public sealed partial class TagDetailsViewModel : ObservableObject
                         MaxIntervalMs = HistoryMaxIntervalMs,
                         Deadband = HistoryDeadband,
                         DeadbandPercent = HistoryDeadbandPercent,
+                        Trigger = BuildTrigger(),
                     }
                     : null,
             });

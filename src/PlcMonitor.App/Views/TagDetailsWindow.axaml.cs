@@ -1,6 +1,7 @@
 using System.ComponentModel;
 using Avalonia.Controls;
 using Avalonia.Markup.Xaml;
+using Avalonia.Threading;
 using PlcMonitor.App.ViewModels;
 
 namespace PlcMonitor.App.Views;
@@ -12,6 +13,14 @@ public sealed partial class TagDetailsWindow : Window
     {
         AvaloniaXamlLoader.Load(this);
         this.FindControl<Button>("CloseButton")!.Click += (_, _) => Close();
+        var trend = new DispatcherTimer { Interval = TimeSpan.FromSeconds(1) };
+        trend.Tick += (_, _) => (DataContext as TagDetailsViewModel)?.RefreshTrend(DateTimeOffset.UtcNow);
+        Opened += (_, _) =>
+        {
+            (DataContext as TagDetailsViewModel)?.RefreshTrend(DateTimeOffset.UtcNow);
+            trend.Start();
+        };
+        Closed += (_, _) => trend.Stop();
     }
 
     protected override void OnDataContextChanged(EventArgs e)

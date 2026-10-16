@@ -12,9 +12,9 @@ namespace PlcMonitor.App.Tests;
 /// <summary>La ventana principal se construye y enlaza con el ViewModel (sin agente: eventos sintéticos).</summary>
 public class MainWindowTests
 {
-    private static MainViewModel ViewModelWithData()
+    internal static MainViewModel ViewModelWithData(string? settingsPath = null)
     {
-        var vm = new MainViewModel(new GrpcAgentConnector(), new ImmediateDispatcher(), new FakeDialogs(), new AppSettings(), Path.GetTempFileName(), Path.Combine(Path.GetTempPath(), $"plcmon-agents-{Guid.NewGuid():N}.json"));
+        var vm = new MainViewModel(new GrpcAgentConnector(), new ImmediateDispatcher(), new FakeDialogs(), new AppSettings(), settingsPath ?? Path.GetTempFileName(), Path.Combine(Path.GetTempPath(), $"plcmon-agents-{Guid.NewGuid():N}.json"));
         var now = Timestamp.FromDateTime(DateTime.UtcNow);
         var snapshot = new Snapshot();
         snapshot.Devices.Add(new Device { Name = "casa1200", Driver = "s7-symbolic", Enabled = true, WritesEnabled = true, State = ConnectionState.Connected, Since = now, TagCount = 3 });
@@ -56,6 +56,36 @@ public class MainWindowTests
         Avalonia.Application.Current!.RequestedThemeVariant = Avalonia.Styling.ThemeVariant.Dark;
         Capture(window, "main-window-dark.png");
         Avalonia.Application.Current.RequestedThemeVariant = Avalonia.Styling.ThemeVariant.Light;
+    });
+
+    [Fact]
+    public Task Narrow_window_keeps_the_tag_columns_apart() => HeadlessApp.RunAsync(() =>
+    {
+        Avalonia.Application.Current!.RequestedThemeVariant = Avalonia.Styling.ThemeVariant.Light;
+        var vm = ViewModelWithData();
+        var window = new MainWindow { DataContext = vm };
+        window.Width = window.MinWidth;
+        window.Show();
+        window.UpdateLayout();
+
+        // Cada texto de una fila queda dentro de su columna (si no cabe, se recorta con «…» o la columna se oculta).
+        var list = window.FindControl<ListBox>("TagsList")!;
+        var rows = list.GetVisualDescendants().OfType<PlcMonitor.App.Controls.TableRow>().ToArray();
+        rows.ShouldNotBeEmpty();
+        foreach (var row in rows)
+        {
+            var widths = row.Layout(row.Bounds.Width);
+            widths[0].ShouldBeGreaterThan(80); // el nombre del tag sigue a la vista
+            foreach (var text in row.GetVisualDescendants().OfType<TextBlock>().Where(t => t.IsEffectivelyVisible && !string.IsNullOrEmpty(t.Text)))
+            {
+                var cell = row.Children.First(c => c == text || c.IsVisualAncestorOf(text));
+                if (cell.Opacity == 0)
+                    continue;
+                var right = Avalonia.VisualExtensions.TranslatePoint(text, new Avalonia.Point(text.Bounds.Width, 0), row)!.Value.X;
+                right.ShouldBeLessThanOrEqualTo(cell.Bounds.Right + 0.5, $"«{text.Text}» se sale de la columna {Grid.GetColumn(cell)}");
+            }
+        }
+        Capture(window, "main-window-narrow.png");
     });
 
     [Fact]
@@ -141,14 +171,24 @@ public class MainWindowTests
         var tag = vm.Devices[0].Tags.Single(t => t.Name == "peso");
         var config = new DeviceConfig { Name = "casa1200", WritesEnabled = true };
         var group = new ScanGroupConfig { Name = "rapido", IntervalMs = 250 };
-        group.Tags.Add(new TagConfig { Name = "peso", Address = "Viruta_Datos.Viruta.Peso", Writable = true });
+        group.Tags.Add(new TagConfig
+        {
+            Name = "peso", Address = "Viruta_Datos.Viruta.Peso", Writable = true,
+            History = new HistoryConfig { Enabled = true, Trigger = new HistoryTrigger { Tag = "clock", Value = "true", HoldMs = 5000 } },
+        });
+        group.Tags.Add(new TagConfig { Name = "clock", Address = "Maquinas_Transfer_DB.Maquina_9.Clock_1s" });
         config.ScanGroups.Add(group);
         config.ScanGroups.Add(new ScanGroupConfig { Name = "lento", IntervalMs = 2000 });
-        var window = new TagDetailsWindow { DataContext = new TagDetailsViewModel(vm, tag, config) };
+        var details = new TagDetailsViewModel(vm, tag, config, isBoolean: name => vm.FindTag("casa1200", name)?.IsBoolean == true);
+        var window = new TagDetailsWindow { DataContext = details };
         window.Show();
 
         window.GetVisualDescendants().OfType<TextBlock>().Select(t => t.Text).ShouldContain("HISTÓRICO");
+        (details.TriggerEnabled, details.TriggerTag, details.IsBooleanTrigger).ShouldBe((true, "clock", true));
         Capture(window, "tag-details.png");
+        window.GetVisualDescendants().OfType<ScrollViewer>().First().ScrollToEnd();
+        window.UpdateLayout();
+        Capture(window, "tag-details-history.png");
         Avalonia.Application.Current.RequestedThemeVariant = Avalonia.Styling.ThemeVariant.Dark;
         Capture(window, "tag-details-dark.png");
         Avalonia.Application.Current.RequestedThemeVariant = Avalonia.Styling.ThemeVariant.Light;
@@ -168,10 +208,97 @@ public class MainWindowTests
             vm.History.Rows.Add(new HistoryRowViewModel(now.AddSeconds(-10 * i), "peso", (12.5 - i * 0.5).ToString(System.Globalization.CultureInfo.InvariantCulture), Quality.Good));
         vm.History.Rows.Add(new HistoryRowViewModel(now.AddMinutes(-2), "peso", "", Quality.BadNotConnected));
         vm.History.Summary = "7 puntos de 1 tags · última hora";
+        vm.History.Chart.SetData([new PlcMonitor.App.Charts.ChartSeriesData("peso",
+            vm.History.Rows.Where(r => r.IsGood).Select(r => new PlcMonitor.App.Charts.ChartPoint(r.Timestamp, double.Parse(r.Value, System.Globalization.CultureInfo.InvariantCulture))).OrderBy(p => p.Time).ToArray())],
+            now.AddMinutes(-1), now);
         SelectTab(window, "Histórico");
 
         window.GetVisualDescendants().OfType<TextBlock>().Select(t => t.Text).ShouldContain("7 puntos de 1 tags · última hora");
         Capture(window, "history.png");
+        vm.History.ShowTable = true;
+        Capture(window, "history-table.png");
+    });
+
+    [Fact]
+    public Task Trend_views_draw_live_values() => HeadlessApp.RunAsync(() =>
+    {
+        Avalonia.Application.Current!.RequestedThemeVariant = Avalonia.Styling.ThemeVariant.Light;
+        var dir = Directory.CreateTempSubdirectory("plcmon-trends-").FullName;
+        var vm = ViewModelWithData(Path.Combine(dir, "app.json"));
+        var window = new MainWindow { DataContext = vm };
+        window.Show();
+        // Después del valor inicial de la foto (las horas del búfer no van hacia atrás).
+        var now = DateTimeOffset.UtcNow.AddSeconds(241);
+        for (var i = 240; i >= 0; i--)
+        {
+            var t = Timestamp.FromDateTimeOffset(now.AddSeconds(-i));
+            var updates = new TagUpdates();
+            updates.Updates.Add(new TagUpdate { Device = "casa1200", Tag = "peso", Value = new TagValue
+            {
+                Quality = i is > 100 and < 115 ? Quality.BadNotConnected : Quality.Good, DataType = DataType.Float,
+                DoubleValue = 12 + (3 * Math.Sin(i / 20.0)), Timestamp = t,
+            } });
+            if (i % 15 == 0)
+                updates.Updates.Add(new TagUpdate { Device = "casa1200", Tag = "clock", Value = new TagValue { Quality = Quality.Good, DataType = DataType.Boolean, BoolValue = i % 30 == 0, Timestamp = t } });
+            vm.Apply(new SubscribeEvent { TagUpdates = updates });
+        }
+
+        vm.OpenTrendsCommand.Execute(null);
+        var trends = vm.Trends.ShouldNotBeNull();
+        trends.NewCommand.Execute(null);
+        trends.Name = "Báscula";
+        trends.AddTagCommand.Execute(trends.Available.Single(c => c.Tag == "peso"));
+        window.UpdateLayout();
+        window.GetVisualDescendants().OfType<TextBlock>().Select(t => t.Text).ShouldContain("TAGS DE LA VISTA");
+        Capture(window, "trends-edit.png");
+
+        trends.OpenCommand.Execute(null);
+        var live = trends.Live.ShouldNotBeNull();
+        trends.Refresh(now);
+        live.Chart.Series.ShouldHaveSingleItem().Points.Count.ShouldBeGreaterThan(200);
+        Capture(window, "trend.png");
+        trends.EditCommand.Execute(null);
+        trends.AddTagCommand.Execute(trends.Available.Single(c => c.Tag == "clock"));
+        trends.OpenCommand.Execute(null);
+        trends.Refresh(now);
+        trends.Live!.Chart.Series.Count.ShouldBe(2);
+        Avalonia.Application.Current.RequestedThemeVariant = Avalonia.Styling.ThemeVariant.Dark;
+        Capture(window, "trend-dark.png");
+        Avalonia.Application.Current.RequestedThemeVariant = Avalonia.Styling.ThemeVariant.Light;
+        vm.CloseTrendsCommand.Execute(null);
+        Directory.Delete(dir, recursive: true);
+    });
+
+    [Fact]
+    public Task Csv_viewer_shows_an_exported_history() => HeadlessApp.RunAsync(() =>
+    {
+        Avalonia.Application.Current!.RequestedThemeVariant = Avalonia.Styling.ThemeVariant.Light;
+        var path = Path.Combine(Path.GetTempPath(), $"plcmon-{Guid.NewGuid():N}.csv");
+        var start = new DateTimeOffset(2026, 10, 17, 8, 0, 0, TimeSpan.Zero);
+        var csv = new System.Text.StringBuilder("device,tag,timestamp,value,quality\n");
+        for (var i = 0; i < 600; i++)
+        {
+            var t = start.AddSeconds(i * 6).UtcDateTime.ToString("yyyy-MM-ddTHH:mm:ss.fffZ", System.Globalization.CultureInfo.InvariantCulture);
+            csv.Append(System.Globalization.CultureInfo.InvariantCulture, $"casa1200,temperatura,{t},{20 + (5 * Math.Sin(i / 40.0)):0.##},Good\n");
+            csv.Append(System.Globalization.CultureInfo.InvariantCulture, $"casa1200,presion,{t},{3 + Math.Cos(i / 25.0):0.###},Good\n");
+        }
+        File.WriteAllText(path, csv.ToString());
+        var viewer = new CsvViewerViewModel(new FakeDialogs());
+        viewer.Load(path).ShouldBeTrue(viewer.Error);
+        var window = new CsvViewerWindow { DataContext = viewer };
+        window.Show();
+
+        viewer.Chart.Series.Select(s => s.Name).ShouldBe(["presion", "temperatura"]);
+        viewer.Summary.ShouldContain("2 tags · 1200 puntos");
+        Capture(window, "csv-viewer.png");
+        viewer.Chart.AutoY = false;
+        viewer.Chart.YMinInput = 0;
+        viewer.Chart.YMaxInput = 40;
+        viewer.Chart.Zoom(start.AddMinutes(10), start.AddMinutes(30));
+        Avalonia.Application.Current.RequestedThemeVariant = Avalonia.Styling.ThemeVariant.Dark;
+        Capture(window, "csv-viewer-dark.png");
+        Avalonia.Application.Current.RequestedThemeVariant = Avalonia.Styling.ThemeVariant.Light;
+        File.Delete(path);
     });
 
     /// <summary>

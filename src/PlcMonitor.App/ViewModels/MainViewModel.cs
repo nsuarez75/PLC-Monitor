@@ -122,6 +122,48 @@ public sealed partial class MainViewModel : ObservableObject, IAgentContext, IAs
     /// <summary>Consulta del histórico del dispositivo seleccionado.</summary>
     public HistoryViewModel History { get; }
 
+    /// <summary>Panel de vistas de tendencia abierto; null si no.</summary>
+    [ObservableProperty]
+    public partial TrendsViewModel? Trends { get; set; }
+
+    /// <summary>Agente al que pertenecen las vistas de tendencia: el id de su perfil o, sin perfil, su URL.</summary>
+    public string AgentKey => SelectedProfile?.Id ?? AgentUrl.Trim();
+
+    /// <summary>Han cambiado los tags del agente (foto nueva, dispositivo reconfigurado o quitado).</summary>
+    public event EventHandler? TagsChanged;
+
+    /// <summary>Tag del agente conectado; null si no existe.</summary>
+    public TagViewModel? FindTag(string device, string tag) => _tagIndex.GetValueOrDefault((device, tag));
+
+    [RelayCommand]
+    private void OpenTrends()
+    {
+        Trends?.Dispose();
+        Trends = new TrendsViewModel(this, TrendViewStore.PathNextTo(_settingsPath));
+    }
+
+    [RelayCommand]
+    private void CloseTrends()
+    {
+        Trends?.Dispose();
+        Trends = null;
+    }
+
+    /// <summary>Abre un CSV exportado del histórico en un visor aparte (no hace falta estar conectado).</summary>
+    [RelayCommand]
+    private async Task OpenCsvAsync()
+    {
+        if (await Dialogs.OpenFileAsync("Abrir histórico (CSV)", "csv") is not { } path)
+            return;
+        var viewer = new CsvViewerViewModel(Dialogs);
+        if (!viewer.Load(path))
+        {
+            Report($"No se pudo abrir {Path.GetFileName(path)}: {viewer.Error}", isError: true);
+            return;
+        }
+        Dialogs.ShowCsvViewer(viewer);
+    }
+
     /// <summary>El agente conectado tiene el historiador activado.</summary>
     [ObservableProperty]
     public partial bool HistorianEnabled { get; set; }
@@ -271,6 +313,7 @@ public sealed partial class MainViewModel : ObservableObject, IAgentContext, IAs
         _tagIndex.Clear();
         SelectedDevice = null;
         AgentDescription = "";
+        TagsChanged?.Invoke(this, EventArgs.Empty);
         Report("Desconectado");
     }
 
@@ -307,7 +350,7 @@ public sealed partial class MainViewModel : ObservableObject, IAgentContext, IAs
         try
         {
             var config = await client.GetDeviceConfigAsync(new DeviceRequest { Device = tag.Device });
-            await Dialogs.ShowTagDetailsAsync(new TagDetailsViewModel(this, tag, config, HistorianEnabled));
+            await Dialogs.ShowTagDetailsAsync(new TagDetailsViewModel(this, tag, config, HistorianEnabled, name => FindTag(tag.Device, name)?.IsBoolean == true));
         }
         catch (RpcException ex)
         {
@@ -433,11 +476,13 @@ public sealed partial class MainViewModel : ObservableObject, IAgentContext, IAs
         }
         SelectedDevice = Find(selected) ?? Devices.FirstOrDefault();
         IsLive = true;
+        TagsChanged?.Invoke(this, EventArgs.Empty);
     }
 
     private void ApplyConfigured(DeviceConfigured configured)
     {
         var device = Find(configured.Device.Name);
+        Dictionary<string, TagViewModel> previous = new(StringComparer.Ordinal);
         if (device is null)
         {
             device = new DeviceViewModel(this, configured.Device);
@@ -447,12 +492,22 @@ public sealed partial class MainViewModel : ObservableObject, IAgentContext, IAs
         {
             device.Apply(configured.Device);
             foreach (var tag in device.Tags)
+            {
                 _tagIndex.Remove((tag.Device, tag.Name));
+                previous[tag.Name] = tag;
+            }
             device.Tags.Clear();
         }
         AddTags(device, configured.Tags);
+        // La tendencia en vivo sigue con lo recibido antes del cambio (si el tag lee la misma dirección).
+        foreach (var tag in device.Tags)
+        {
+            if (previous.TryGetValue(tag.Name, out var old) && old.Address == tag.Address)
+                tag.AdoptTrend(old);
+        }
         if (device == SelectedDevice)
             History.RefreshTags();
+        TagsChanged?.Invoke(this, EventArgs.Empty);
         if (_pendingSelection == device.Name)
         {
             SelectedDevice = device;
@@ -470,6 +525,7 @@ public sealed partial class MainViewModel : ObservableObject, IAgentContext, IAs
         Devices.Remove(device);
         if (wasSelected)
             SelectedDevice = Devices.FirstOrDefault();
+        TagsChanged?.Invoke(this, EventArgs.Empty);
     }
 
     private void AddTags(DeviceViewModel device, IEnumerable<Tag> tags)

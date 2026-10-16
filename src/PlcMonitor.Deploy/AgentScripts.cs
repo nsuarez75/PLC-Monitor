@@ -121,8 +121,8 @@ internal static class AgentScripts
         if ($svc -and $svc.Status -ne 'Stopped') { Stop-Service -Name {{WindowsService}} -Force; $svc.WaitForStatus('Stopped', '00:00:30') }
         New-Item -ItemType Directory -Force -Path $D | Out-Null
         if (-not (Test-Path $A)) { throw 'No llegó el ejecutable del agente' }
-        # Se conserva la configuración del equipo y el histórico; lo demás se sustituye por el ejecutable único.
-        Get-ChildItem -Path $D -Force | Where-Object { $_.Name -notin 'agent.json', 'agent.settings.json', 'agent.pfx', 'history' } | Remove-Item -Recurse -Force
+        # Se conserva la configuración del equipo, el histórico y los logs; lo demás se sustituye por el ejecutable único.
+        Get-ChildItem -Path $D -Force | Where-Object { $_.Name -notin 'agent.json', 'agent.settings.json', 'agent.pfx', 'history', 'logs' } | Remove-Item -Recurse -Force
         Move-Item -Path $A -Destination (Join-Path $D 'plcmon-agent.exe') -Force
         {{(security is null ? "" : $"""
         [IO.File]::WriteAllBytes((Join-Path $D 'agent.settings.json'), [Convert]::FromBase64String('{Convert.ToBase64String(Encoding.UTF8.GetBytes(security.SettingsJson))}'))
@@ -162,6 +162,16 @@ internal static class AgentScripts
         if (Test-Path (Join-Path $D 'plcmon-agent.exe')) { 'installed=yes' } else { 'installed=no' }
         $s = Get-Service -Name {{WindowsService}} -ErrorAction SilentlyContinue
         if ($s -and $s.Status -eq 'Running') { 'active=active' } elseif ($s) { 'active=' + $s.Status.ToString().ToLowerInvariant() } else { 'active=inactive' }
+        """;
+
+    /// <summary>Últimas líneas de los ficheros de log del agente (los dos últimos días, por si acaba de cambiar).</summary>
+    public static string WindowsLogs(int lines) => $$"""
+        $L = Join-Path "{{WindowsDirExpression}}" 'logs'
+        $files = @(Get-ChildItem -Path $L -Filter 'plcmon-agent-*.log' -ErrorAction SilentlyContinue | Sort-Object Name | Select-Object -Last 2)
+        if ($files.Count -eq 0) { 'nolog'; return }
+        $out = @()
+        foreach ($f in $files) { $out += @(Get-Content -LiteralPath $f.FullName -Tail {{lines}} -Encoding UTF8) }
+        $out | Select-Object -Last {{lines}}
         """;
 
     /// <summary>

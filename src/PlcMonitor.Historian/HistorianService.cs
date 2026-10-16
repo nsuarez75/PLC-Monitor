@@ -21,6 +21,8 @@ public sealed class HistorianService : IAsyncDisposable
     private readonly TimeProvider _time;
     private readonly Lock _sync = new();
     private readonly Dictionary<TagKey, HistorySampler> _samplers = [];
+    // Tags que disparan el histórico de otros → muestreadores que dependen de ellos (se sigue su valor aunque no se historicen).
+    private readonly Dictionary<TagKey, List<HistorySampler>> _byTrigger = [];
     private readonly List<HistorySample> _buffer = [];
     private readonly SemaphoreSlim _flushLock = new(1, 1);
     private SqliteHistorianStore? _store;
@@ -171,6 +173,7 @@ public sealed class HistorianService : IAsyncDisposable
                     _samplers.Clear();
                     foreach (var tag in subscription.InitialTags)
                         Configure(tag.Definition);
+                    IndexTriggers();
                     var now = _time.GetUtcNow();
                     foreach (var tag in subscription.InitialTags)
                         Offer(tag.Definition.Key, tag.Value, now);
@@ -205,14 +208,15 @@ public sealed class HistorianService : IAsyncDisposable
                     foreach (var key in _samplers.Keys.Where(k => k.Device == configured.Status.Device).ToArray())
                         _samplers.Remove(key);
                     foreach (var tag in configured.Tags)
-                    {
                         Configure(tag.Definition);
+                    IndexTriggers();
+                    foreach (var tag in configured.Tags)
                         Offer(tag.Definition.Key, tag.Value, now);
-                    }
                     break;
                 case DeviceRemoved removed:
                     foreach (var key in _samplers.Keys.Where(k => k.Device == removed.Device).ToArray())
                         _samplers.Remove(key);
+                    IndexTriggers();
                     break;
                 default:
                     break;
@@ -226,8 +230,30 @@ public sealed class HistorianService : IAsyncDisposable
             _samplers[definition.Key] = new HistorySampler(definition.Key, definition.History!);
     }
 
+    private void IndexTriggers()
+    {
+        _byTrigger.Clear();
+        foreach (var sampler in _samplers.Values)
+        {
+            if (sampler.TriggerKey is { } trigger)
+            {
+                if (!_byTrigger.TryGetValue(trigger, out var list))
+                    _byTrigger[trigger] = list = [];
+                list.Add(sampler);
+            }
+        }
+    }
+
     private void Offer(TagKey key, Abstractions.TagValue value, DateTimeOffset now)
     {
+        if (_byTrigger.TryGetValue(key, out var dependents))
+        {
+            foreach (var dependent in dependents)
+            {
+                if (dependent.OfferTrigger(value, now) is { } triggered)
+                    _buffer.Add(triggered);
+            }
+        }
         if (_samplers.TryGetValue(key, out var sampler) && sampler.Offer(value, now) is { } sample)
             _buffer.Add(sample);
     }

@@ -64,6 +64,7 @@ public static class ConfigurationValidator
     {
         var groupNames = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
         var tagNames = new HashSet<string>(StringComparer.Ordinal);
+        var triggers = new List<(string Where, string Tag, HistoryTrigger Trigger)>();
         foreach (var group in device.ScanGroups)
         {
             var groupWhere = $"{where}, grupo '{group.Name}'";
@@ -92,8 +93,26 @@ public static class ConfigurationValidator
                         errors.Add($"{tagWhere}: history.maxIntervalMs no puede ser menor que minIntervalMs.");
                     if (h.Deadband < 0)
                         errors.Add($"{tagWhere}: la banda muerta no puede ser negativa.");
+                    if (h.Trigger is { } trigger)
+                        triggers.Add((tagWhere, tag.EffectiveName, trigger));
                 }
             }
+        }
+        // Los disparos se comprueban con todos los tags del dispositivo ya vistos (pueden estar en otro grupo).
+        foreach (var (tagWhere, tag, trigger) in triggers)
+        {
+            if (string.IsNullOrWhiteSpace(trigger.Tag))
+                errors.Add($"{tagWhere}: falta el tag que dispara el histórico.");
+            else if (trigger.Tag == tag)
+                errors.Add($"{tagWhere}: un tag no puede dispararse a sí mismo.");
+            else if (!tagNames.Contains(trigger.Tag))
+                errors.Add($"{tagWhere}: el tag de disparo '{trigger.Tag}' no existe en el dispositivo.");
+            if (trigger.HoldMs < 0)
+                errors.Add($"{tagWhere}: el tiempo tras el disparo no puede ser negativo.");
+            if (string.IsNullOrWhiteSpace(trigger.Value))
+                errors.Add($"{tagWhere}: falta el valor del disparo.");
+            else if (trigger.Condition is not (TriggerCondition.Equal or TriggerCondition.NotEqual) && !HistoryTrigger.TryNumber(trigger.Value.Trim(), out _))
+                errors.Add($"{tagWhere}: el valor del disparo debe ser un número para comparar con >, ≥, < o ≤.");
         }
     }
 }
