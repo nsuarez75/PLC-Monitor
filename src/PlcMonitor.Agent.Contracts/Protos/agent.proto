@@ -314,6 +314,27 @@ message HistoryConfig {
   bool deadband_percent = 4;
   // Tiempo máximo sin guardar: se repite el valor actual (0 = nunca).
   int32 max_interval_ms = 5;
+  // Historizar solo mientras otro tag del dispositivo cumple una condición; ausente = siempre.
+  HistoryTrigger trigger = 6;
+}
+
+enum TriggerCondition {
+  TRIGGER_CONDITION_EQUAL = 0;
+  TRIGGER_CONDITION_NOT_EQUAL = 1;
+  TRIGGER_CONDITION_GREATER = 2;
+  TRIGGER_CONDITION_GREATER_OR_EQUAL = 3;
+  TRIGGER_CONDITION_LESS = 4;
+  TRIGGER_CONDITION_LESS_OR_EQUAL = 5;
+}
+
+message HistoryTrigger {
+  // Tag del mismo dispositivo que dispara.
+  string tag = 1;
+  TriggerCondition condition = 2;
+  // true/false para booleanos; un número para los demás (= y ≠ admiten texto).
+  string value = 3;
+  // Se sigue guardando este tiempo después de que la condición deje de cumplirse.
+  int32 hold_ms = 4;
 }
 
 enum HistoryAggregate {

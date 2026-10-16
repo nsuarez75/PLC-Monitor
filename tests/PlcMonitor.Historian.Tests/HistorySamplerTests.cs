@@ -13,6 +13,81 @@ public class HistorySamplerTests
     private static HistorySampler Sampler(int minMs = 0, double deadband = 0, DeadbandMode mode = DeadbandMode.Absolute, int maxMs = 0) =>
         new(new TagKey("plc", "t"), new TagHistorySettings { Enabled = true, MinIntervalMs = minMs, Deadband = deadband, DeadbandMode = mode, MaxIntervalMs = maxMs });
 
+    private static HistorySampler Triggered(int holdMs = 0, int maxMs = 0) =>
+        new(new TagKey("plc", "t"), new TagHistorySettings { Enabled = true, MaxIntervalMs = maxMs, Trigger = new HistoryTrigger { Tag = "marcha", Value = "true", HoldMs = holdMs } });
+
+    private static TagValue Run(bool on, double atSeconds) => TagValue.Good(on, TagDataType.Boolean, T0.AddSeconds(atSeconds));
+
+    [Fact]
+    public void Triggered_tag_is_stored_only_while_the_trigger_is_on()
+    {
+        var s = Triggered();
+        s.TriggerKey.ShouldBe(new TagKey("plc", "marcha"));
+        s.Active.ShouldBeFalse();
+        s.Offer(Good(1.0, 0), T0).ShouldBeNull();
+        s.Offer(Good(2.0, 1), T0.AddSeconds(1)).ShouldBeNull();
+
+        // Al activarse guarda el valor actual (con la hora de la activación).
+        var first = s.OfferTrigger(Run(true, 2), T0.AddSeconds(2)).ShouldNotBeNull();
+        (first.Value, first.Timestamp).ShouldBe((2.0, T0.AddSeconds(2)));
+        s.Offer(Good(3.0, 3), T0.AddSeconds(3)).ShouldNotBeNull().Value.ShouldBe(3.0);
+        s.OfferTrigger(Run(true, 3.5), T0.AddSeconds(3.5)).ShouldBeNull(); // sigue activo: nada nuevo
+
+        // Sin tiempo extra: se para en cuanto cae, con un último punto.
+        s.OfferTrigger(Run(false, 4), T0.AddSeconds(4)).ShouldNotBeNull().Timestamp.ShouldBe(T0.AddSeconds(4));
+        s.Active.ShouldBeFalse();
+        s.Offer(Good(4.0, 5), T0.AddSeconds(5)).ShouldBeNull();
+        s.Tick(T0.AddSeconds(100)).ShouldBeNull();
+    }
+
+    [Fact]
+    public void Triggered_tag_keeps_storing_for_the_hold_time()
+    {
+        var s = Triggered(holdMs: 5000);
+        s.Offer(Good(1.0, 0), T0);
+        s.OfferTrigger(Run(true, 1), T0.AddSeconds(1)).ShouldNotBeNull();
+
+        s.OfferTrigger(Run(false, 2), T0.AddSeconds(2)).ShouldBeNull();
+        s.Active.ShouldBeTrue();
+        s.Offer(Good(5.0, 3), T0.AddSeconds(3)).ShouldNotBeNull();
+        s.Tick(T0.AddSeconds(6.9)).ShouldBeNull();
+
+        var last = s.Tick(T0.AddSeconds(7)).ShouldNotBeNull();
+        (last.Value, last.Timestamp).ShouldBe((5.0, T0.AddSeconds(7)));
+        s.Active.ShouldBeFalse();
+    }
+
+    [Fact]
+    public void Trigger_back_on_during_the_hold_time_continues_without_a_gap()
+    {
+        var s = Triggered(holdMs: 5000);
+        s.Offer(Good(1.0, 0), T0);
+        s.OfferTrigger(Run(true, 1), T0.AddSeconds(1));
+        s.OfferTrigger(Run(false, 2), T0.AddSeconds(2));
+        s.OfferTrigger(Run(true, 3), T0.AddSeconds(3)).ShouldBeNull();
+
+        s.Tick(T0.AddSeconds(20)).ShouldBeNull();
+        s.Active.ShouldBeTrue();
+    }
+
+    [Fact]
+    public void Bad_quality_trigger_counts_as_off()
+    {
+        var s = Triggered();
+        s.Offer(Good(1.0, 0), T0);
+        s.OfferTrigger(Run(true, 1), T0.AddSeconds(1));
+        s.OfferTrigger(TagValue.Bad(QualityCode.BadNotConnected, T0.AddSeconds(2), "sin conexión"), T0.AddSeconds(2)).ShouldNotBeNull();
+        s.Active.ShouldBeFalse();
+    }
+
+    [Fact]
+    public void Maximum_interval_does_not_write_while_the_trigger_is_off()
+    {
+        var s = Triggered(maxMs: 1000);
+        s.Offer(Good(1.0, 0), T0);
+        s.Tick(T0.AddSeconds(10)).ShouldBeNull();
+    }
+
     [Fact]
     public void First_value_and_quality_changes_are_always_stored()
     {

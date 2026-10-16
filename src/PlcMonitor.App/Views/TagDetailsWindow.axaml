@@ -105,6 +105,28 @@
               <TextBlock Text="ms sin guardar como mucho (0 = nunca)" Classes="muted" VerticalAlignment="Center" />
             </StackPanel>
           </Grid>
+          <!-- Disparo -->
+          <StackPanel Spacing="10" IsEnabled="{Binding HistoryEnabled}">
+            <CheckBox Content="Solo mientras otro tag cumpla una condición (disparo)" IsChecked="{Binding TriggerEnabled}" IsEnabled="{Binding HasTriggerTags}" />
+            <Grid ColumnDefinitions="150,*" RowDefinitions="Auto,Auto,Auto" RowSpacing="10" ColumnSpacing="16" IsVisible="{Binding TriggerEnabled}">
+              <TextBlock Text="Tag de disparo" VerticalAlignment="Center" />
+              <ComboBox Grid.Column="1" ItemsSource="{Binding TriggerTags}" SelectedItem="{Binding TriggerTag}" MinWidth="240" PlaceholderText="Elige un tag del dispositivo" />
+              <TextBlock Grid.Row="1" Text="Guardar mientras" VerticalAlignment="Center" />
+              <StackPanel Grid.Row="1" Grid.Column="1" Orientation="Horizontal" Spacing="8">
+                <TextBlock Text="valga" Classes="muted" VerticalAlignment="Center" IsVisible="{Binding IsBooleanTrigger}" />
+                <ComboBox ItemsSource="{x:Static vm:TagDetailsViewModel.BoolChoices}" SelectedItem="{Binding TriggerBool}" MinWidth="100" IsVisible="{Binding IsBooleanTrigger}" />
+                <ComboBox ItemsSource="{x:Static vm:TagDetailsViewModel.Conditions}" SelectedItem="{Binding TriggerCondition}" MinWidth="70" IsVisible="{Binding IsValueTrigger}" />
+                <TextBox Text="{Binding TriggerValue}" Width="140" PlaceholderText="valor" IsVisible="{Binding IsValueTrigger}" />
+              </StackPanel>
+              <TextBlock Grid.Row="2" Text="Y después" VerticalAlignment="Center" />
+              <StackPanel Grid.Row="2" Grid.Column="1" Orientation="Horizontal" Spacing="8">
+                <NumericUpDown Value="{Binding TriggerHoldMs}" Minimum="0" Increment="1000" FormatString="0" Width="140" />
+                <TextBlock Text="ms más tras dejar de cumplirse" Classes="muted" VerticalAlignment="Center" />
+              </StackPanel>
+            </Grid>
+            <TextBlock Classes="muted" FontSize="11.5" TextWrapping="Wrap" IsVisible="{Binding TriggerEnabled}"
+                       Text="Al cumplirse se guarda el valor actual y, mientras dure, lo normal (frecuencia, banda muerta, tiempo máximo). Al terminar se guarda un último punto." />
+          </StackPanel>
           <TextBlock Classes="muted" FontSize="11.5" TextWrapping="Wrap"
                      Text="Los cambios de calidad (p.ej. pérdida de conexión) se guardan siempre. Si cambia más rápido que la frecuencia mínima, se guarda el último valor al cumplirse el intervalo." />
         </StackPanel>

@@ -171,14 +171,24 @@ public class MainWindowTests
         var tag = vm.Devices[0].Tags.Single(t => t.Name == "peso");
         var config = new DeviceConfig { Name = "casa1200", WritesEnabled = true };
         var group = new ScanGroupConfig { Name = "rapido", IntervalMs = 250 };
-        group.Tags.Add(new TagConfig { Name = "peso", Address = "Viruta_Datos.Viruta.Peso", Writable = true });
+        group.Tags.Add(new TagConfig
+        {
+            Name = "peso", Address = "Viruta_Datos.Viruta.Peso", Writable = true,
+            History = new HistoryConfig { Enabled = true, Trigger = new HistoryTrigger { Tag = "clock", Value = "true", HoldMs = 5000 } },
+        });
+        group.Tags.Add(new TagConfig { Name = "clock", Address = "Maquinas_Transfer_DB.Maquina_9.Clock_1s" });
         config.ScanGroups.Add(group);
         config.ScanGroups.Add(new ScanGroupConfig { Name = "lento", IntervalMs = 2000 });
-        var window = new TagDetailsWindow { DataContext = new TagDetailsViewModel(vm, tag, config) };
+        var details = new TagDetailsViewModel(vm, tag, config, isBoolean: name => vm.FindTag("casa1200", name)?.IsBoolean == true);
+        var window = new TagDetailsWindow { DataContext = details };
         window.Show();
 
         window.GetVisualDescendants().OfType<TextBlock>().Select(t => t.Text).ShouldContain("HISTÓRICO");
+        (details.TriggerEnabled, details.TriggerTag, details.IsBooleanTrigger).ShouldBe((true, "clock", true));
         Capture(window, "tag-details.png");
+        window.GetVisualDescendants().OfType<ScrollViewer>().First().ScrollToEnd();
+        window.UpdateLayout();
+        Capture(window, "tag-details-history.png");
         Avalonia.Application.Current.RequestedThemeVariant = Avalonia.Styling.ThemeVariant.Dark;
         Capture(window, "tag-details-dark.png");
         Avalonia.Application.Current.RequestedThemeVariant = Avalonia.Styling.ThemeVariant.Light;

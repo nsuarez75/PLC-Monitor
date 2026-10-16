@@ -350,7 +350,7 @@ public sealed partial class MainViewModel : ObservableObject, IAgentContext, IAs
         try
         {
             var config = await client.GetDeviceConfigAsync(new DeviceRequest { Device = tag.Device });
-            await Dialogs.ShowTagDetailsAsync(new TagDetailsViewModel(this, tag, config, HistorianEnabled));
+            await Dialogs.ShowTagDetailsAsync(new TagDetailsViewModel(this, tag, config, HistorianEnabled, name => FindTag(tag.Device, name)?.IsBoolean == true));
         }
         catch (RpcException ex)
         {

@@ -124,6 +124,9 @@ internal static class ProtoMapper
                         Deadband = h.Deadband,
                         DeadbandPercent = h.DeadbandMode == DeadbandMode.Percent,
                         MaxIntervalMs = h.MaxIntervalMs,
+                        Trigger = h.Trigger is { } trigger
+                            ? new Api.HistoryTrigger { Tag = trigger.Tag, Condition = ToProto(trigger.Condition), Value = trigger.Value, HoldMs = trigger.HoldMs }
+                            : null,
                     }
                     : null,
             }));
@@ -174,6 +177,9 @@ internal static class ProtoMapper
                         Deadband = h.Deadband,
                         DeadbandMode = h.DeadbandPercent ? DeadbandMode.Percent : DeadbandMode.Absolute,
                         MaxIntervalMs = h.MaxIntervalMs,
+                        Trigger = h.Trigger is { } trigger
+                            ? new HistoryTrigger { Tag = trigger.Tag.Trim(), Condition = FromProto(trigger.Condition), Value = trigger.Value.Trim(), HoldMs = trigger.HoldMs }
+                            : null,
                     }
                     : null,
             }));
@@ -181,6 +187,26 @@ internal static class ProtoMapper
         }
         return device;
     }
+
+    public static Api.TriggerCondition ToProto(TriggerCondition condition) => condition switch
+    {
+        TriggerCondition.NotEqual => Api.TriggerCondition.NotEqual,
+        TriggerCondition.Greater => Api.TriggerCondition.Greater,
+        TriggerCondition.GreaterOrEqual => Api.TriggerCondition.GreaterOrEqual,
+        TriggerCondition.Less => Api.TriggerCondition.Less,
+        TriggerCondition.LessOrEqual => Api.TriggerCondition.LessOrEqual,
+        _ => Api.TriggerCondition.Equal,
+    };
+
+    public static TriggerCondition FromProto(Api.TriggerCondition condition) => condition switch
+    {
+        Api.TriggerCondition.NotEqual => TriggerCondition.NotEqual,
+        Api.TriggerCondition.Greater => TriggerCondition.Greater,
+        Api.TriggerCondition.GreaterOrEqual => TriggerCondition.GreaterOrEqual,
+        Api.TriggerCondition.Less => TriggerCondition.Less,
+        Api.TriggerCondition.LessOrEqual => TriggerCondition.LessOrEqual,
+        _ => TriggerCondition.Equal,
+    };
 
     public static Api.HistorySeries ToProto(PlcMonitor.Historian.HistorySeries series)
     {

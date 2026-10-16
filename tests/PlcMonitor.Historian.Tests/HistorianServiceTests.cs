@@ -104,6 +104,36 @@ public sealed class HistorianServiceTests : IAsyncDisposable
     }
 
     [Fact]
+    public async Task Triggered_tag_is_stored_only_while_the_trigger_tag_is_on()
+    {
+        var valor = Historized("DB1.DBW0", "valor");
+        valor.History!.Trigger = new HistoryTrigger { Tag = "marcha", Value = "true" };
+        // El tag disparo no se historiza: se sigue igual.
+        var (h, historian) = await StartAsync(Device("plc1", intervalMs: 100, tags: [valor, Tag("DB1.DBX2.0", "marcha")]));
+        var plc = h.Driver.Plc("plc1");
+        plc.Values["DB1.DBX2.0"] = false;
+        plc.Values["DB1.DBW0"] = 1;
+        await h.AdvanceUntilAsync(() => Equals(h.Value("plc1", "valor").Value, 1));
+        plc.Values["DB1.DBW0"] = 2;
+        await h.AdvanceUntilAsync(() => Equals(h.Value("plc1", "valor").Value, 2));
+
+        plc.Values["DB1.DBX2.0"] = true;
+        await h.AdvanceUntilAsync(() => Equals(h.Value("plc1", "marcha").Value, true));
+        plc.Values["DB1.DBW0"] = 3;
+        await h.AdvanceUntilAsync(() => Equals(h.Value("plc1", "valor").Value, 3));
+
+        plc.Values["DB1.DBX2.0"] = false;
+        await h.AdvanceUntilAsync(() => Equals(h.Value("plc1", "marcha").Value, false));
+        plc.Values["DB1.DBW0"] = 4;
+        await h.AdvanceUntilAsync(() => Equals(h.Value("plc1", "valor").Value, 4));
+
+        var good = (await Query(historian, h, "valor")).Single().Points.Where(p => p.Quality == QualityCode.Good).Select(p => p.Number).ToArray();
+        // Al activarse (2), el cambio (3) y el cierre al caer (3); ni el 1 ni el 4.
+        good.ShouldBe([2.0, 3.0, 3.0]);
+        (await Query(historian, h, "marcha")).Single().Points.ShouldBeEmpty();
+    }
+
+    [Fact]
     public async Task Disabled_historian_refuses_queries()
     {
         var h = new EngineHarness(Device("plc1"));
