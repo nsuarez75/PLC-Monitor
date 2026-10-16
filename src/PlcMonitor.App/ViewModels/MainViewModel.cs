@@ -25,6 +25,7 @@ public sealed partial class MainViewModel : ObservableObject, IAgentContext, IAs
     private readonly string _settingsPath;
     private readonly string _profilesPath;
     private readonly Func<SshTarget, CancellationToken, Task<ISshSession>> _sshFactory;
+    private readonly Func<ISshSession> _localFactory;
     private readonly Dictionary<(string Device, string Tag), TagViewModel> _tagIndex = [];
     private IDisposable? _channel;
     private CancellationTokenSource? _subscriptionCts;
@@ -37,7 +38,8 @@ public sealed partial class MainViewModel : ObservableObject, IAgentContext, IAs
         AppSettings settings,
         string settingsPath,
         string? profilesPath = null,
-        Func<SshTarget, CancellationToken, Task<ISshSession>>? sshFactory = null)
+        Func<SshTarget, CancellationToken, Task<ISshSession>>? sshFactory = null,
+        Func<ISshSession>? localFactory = null)
     {
         _connector = connector;
         _ui = ui;
@@ -46,6 +48,7 @@ public sealed partial class MainViewModel : ObservableObject, IAgentContext, IAs
         _settingsPath = settingsPath;
         _profilesPath = profilesPath ?? Path.Combine(Path.GetDirectoryName(Path.GetFullPath(settingsPath))!, "agents.json");
         _sshFactory = sshFactory ?? (async (target, ct) => await SshNetSession.ConnectAsync(target, ct));
+        _localFactory = localFactory ?? (() => new LocalSession());
         Profiles = [.. AgentProfileStore.LoadOrCreate(_profilesPath, settings)];
         AgentUrl = settings.AgentUrl;
         SelectedProfile = Profiles.FirstOrDefault(p => string.Equals(p.Url, settings.AgentUrl, StringComparison.OrdinalIgnoreCase)) ?? Profiles.FirstOrDefault();
@@ -96,7 +99,7 @@ public sealed partial class MainViewModel : ObservableObject, IAgentContext, IAs
     public void SaveProfiles() => AgentProfileStore.Save(_profilesPath, Profiles);
 
     [RelayCommand]
-    private void OpenAgents() => Agents = new AgentsViewModel(this, _sshFactory);
+    private void OpenAgents() => Agents = new AgentsViewModel(this, _sshFactory, _localFactory);
 
     [RelayCommand]
     private void CloseAgents() => Agents = null;

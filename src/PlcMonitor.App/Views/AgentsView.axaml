@@ -23,7 +23,7 @@
               <StackPanel Spacing="2">
                 <TextBlock Text="{Binding Name}" FontWeight="SemiBold" TextTrimming="CharacterEllipsis" />
                 <TextBlock Text="{Binding Url}" Classes="muted" FontSize="11.5" TextTrimming="CharacterEllipsis" />
-                <TextBlock Text="{Binding SshHost, StringFormat='SSH: {0}'}" Classes="muted" FontSize="11.5" IsVisible="{Binding IsManaged}" />
+                <TextBlock Text="{Binding ManagedLabel}" Classes="muted" FontSize="11.5" IsVisible="{Binding IsManaged}" />
               </StackPanel>
             </DataTemplate>
           </ListBox.ItemTemplate>
@@ -65,15 +65,15 @@
           </StackPanel>
         </Border>
 
-        <!-- Equipo por SSH -->
+        <!-- Equipo: este equipo o por SSH -->
         <Border Classes="card" Padding="20">
           <StackPanel Spacing="12">
             <StackPanel Spacing="2">
-              <TextBlock Text="EQUIPO (SSH)" Classes="caption" />
-              <TextBlock Classes="muted" FontSize="12" TextWrapping="Wrap"
-                         Text="Para instalar, actualizar o desinstalar el agente. Linux (con sudo) o Windows con OpenSSH (usuario administrador)." />
+              <TextBlock Text="EQUIPO" Classes="caption" />
+              <TextBlock Classes="muted" FontSize="12" TextWrapping="Wrap" Text="{Binding MachineHelp}" />
             </StackPanel>
-            <Grid ColumnDefinitions="170,*" RowDefinitions="Auto,Auto,Auto,Auto" RowSpacing="10" ColumnSpacing="16">
+            <CheckBox Content="Este equipo (sin SSH)" IsChecked="{Binding LocalMachine}" />
+            <Grid ColumnDefinitions="170,*" RowDefinitions="Auto,Auto,Auto" RowSpacing="10" ColumnSpacing="16" IsVisible="{Binding IsSsh}">
               <TextBlock Text="Equipo" VerticalAlignment="Center" FontWeight="Medium" />
               <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="8">
                 <TextBox Text="{Binding SshHost}" Width="260" PlaceholderText="192.168.0.20 o pc-linea" />
@@ -84,18 +84,20 @@
               <TextBox Grid.Row="1" Grid.Column="1" Text="{Binding SshUser}" Width="260" HorizontalAlignment="Left" />
               <TextBlock Grid.Row="2" Text="Clave privada" VerticalAlignment="Center" FontWeight="Medium" />
               <TextBox Grid.Row="2" Grid.Column="1" Text="{Binding SshKeyFile}" Classes="mono" PlaceholderText="(opcional) por defecto ~/.ssh/id_ed25519, id_ecdsa o id_rsa" />
-              <TextBlock Grid.Row="3" Text="Puerto del agente" VerticalAlignment="Center" FontWeight="Medium" />
-              <NumericUpDown Grid.Row="3" Grid.Column="1" Value="{Binding AgentPort}" Minimum="1" Maximum="65535" FormatString="0" Width="140" HorizontalAlignment="Left" />
+            </Grid>
+            <Grid ColumnDefinitions="170,*" ColumnSpacing="16">
+              <TextBlock Text="Puerto del agente" VerticalAlignment="Center" FontWeight="Medium" />
+              <NumericUpDown Grid.Column="1" Value="{Binding AgentPort}" Minimum="1" Maximum="65535" FormatString="0" Width="140" HorizontalAlignment="Left" />
             </Grid>
 
             <Border Background="{DynamicResource App.SurfaceAlt}" CornerRadius="8" Padding="14" Margin="0,4,0,0">
               <StackPanel Spacing="10">
                 <TextBlock Text="Para esta operación (no se guarda)" FontWeight="SemiBold" />
                 <Grid ColumnDefinitions="170,*" RowDefinitions="Auto,Auto,Auto" RowSpacing="10" ColumnSpacing="16">
-                  <TextBlock Text="Contraseña SSH / sudo" VerticalAlignment="Center" />
-                  <TextBox Grid.Column="1" Text="{Binding SshPassword}" PasswordChar="•" Width="260" HorizontalAlignment="Left" PlaceholderText="vacía si entras con clave" />
-                  <TextBlock Grid.Row="1" Text="Contraseña de sudo" VerticalAlignment="Center" />
-                  <TextBox Grid.Row="1" Grid.Column="1" Text="{Binding SudoPassword}" PasswordChar="•" Width="260" HorizontalAlignment="Left" PlaceholderText="solo si es distinta" />
+                  <TextBlock Text="Contraseña SSH / sudo" VerticalAlignment="Center" IsVisible="{Binding IsSsh}" />
+                  <TextBox Grid.Column="1" Text="{Binding SshPassword}" PasswordChar="•" Width="260" HorizontalAlignment="Left" PlaceholderText="vacía si entras con clave" IsVisible="{Binding IsSsh}" />
+                  <TextBlock Grid.Row="1" Text="Contraseña de sudo" VerticalAlignment="Center" IsVisible="{Binding ShowSudoPassword}" />
+                  <TextBox Grid.Row="1" Grid.Column="1" Text="{Binding SudoPassword}" PasswordChar="•" Width="260" HorizontalAlignment="Left" PlaceholderText="{Binding SudoPlaceholder}" IsVisible="{Binding ShowSudoPassword}" />
                   <TextBlock Grid.Row="2" Text="Paquetes del agente" VerticalAlignment="Center" />
                   <TextBox Grid.Row="2" Grid.Column="1" Text="{Binding PackageFolder}" Classes="mono" PlaceholderText="(por defecto la carpeta agents/ de la release)" />
                 </Grid>

@@ -45,7 +45,8 @@ internal sealed class FakeSsh : ISshSession
     public Task<SshResult> RunElevatedPowerShellAsync(string script, CancellationToken cancellationToken = default)
     {
         ElevatedScripts.Add(script);
-        return RunAsync(AgentScripts.PowerShell(script), cancellationToken: cancellationToken);
+        // Mismo comando que AgentScripts.PowerShell (interno de Deploy; este fichero también se compila en App.Tests).
+        return RunAsync("powershell -NoProfile -NonInteractive -ExecutionPolicy Bypass -EncodedCommand " + Convert.ToBase64String(Encoding.Unicode.GetBytes(script)), cancellationToken: cancellationToken);
     }
 
     public async Task UploadAsync(Stream content, string remotePath, CancellationToken cancellationToken = default)

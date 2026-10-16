@@ -14,6 +14,7 @@ public sealed class AgentsViewModelTests : IDisposable
     private readonly string _dir = Directory.CreateTempSubdirectory("plcmon-agents-").FullName;
     private readonly FakeDialogs _dialogs = new();
     private readonly List<SshTarget> _targets = [];
+    private int _localSessions;
 
     public AgentsViewModelTests()
     {
@@ -30,6 +31,11 @@ public sealed class AgentsViewModelTests : IDisposable
             {
                 _targets.Add(target);
                 return Task.FromResult<ISshSession>(ssh);
+            },
+            () =>
+            {
+                _localSessions++;
+                return ssh;
             });
         main.OpenAgentsCommand.Execute(null);
         var agents = main.Agents.ShouldNotBeNull();
@@ -115,6 +121,46 @@ public sealed class AgentsViewModelTests : IDisposable
         _targets[1].ExpectedHostKey.ShouldBe("huella-ssh");
         agents.Log.ShouldContain("El agente está en marcha desde hoy.");
     }
+
+    [Fact]
+    public async Task This_machine_installs_without_ssh()
+    {
+        var (main, agents) = Create(LocalLinux());
+        agents.NewCommand.Execute(null);
+        agents.Name = "Este PC";
+        agents.LocalMachine = true;
+
+        agents.IsSsh.ShouldBeFalse();
+        agents.InstallCommand.CanExecute(null).ShouldBeTrue();
+        await agents.InstallCommand.ExecuteAsync(null);
+
+        _targets.ShouldBeEmpty();
+        _localSessions.ShouldBe(1);
+        var profile = agents.Selected!;
+        profile.LocalMachine.ShouldBeTrue();
+        profile.Url.ShouldBe("https://127.0.0.1:5311");
+        profile.Token.ShouldNotBeNullOrEmpty();
+        profile.SshHostKey.ShouldBeNull();
+        profile.ManagedLabel.ShouldBe("Este equipo (sin SSH)");
+        agents.Log[0].ShouldBe("Instalando: en este equipo (sin SSH)…");
+        agents.Log.ShouldContain("Pidiendo permiso de administrador (ventana del sistema)…");
+        agents.Log.Last().ShouldBe("✔ Hecho");
+        main.Message.ShouldContain("Agente instalado en este equipo");
+        agents.Info.ShouldStartWith("Este equipo");
+        AgentProfileStore.Load(ProfilesPath).Single(p => p.Id == profile.Id).LocalMachine.ShouldBeTrue();
+    }
+
+    /// <summary>Este equipo con Linux: sudo pide contraseña y hay pkexec.</summary>
+    private static FakeSsh LocalLinux() => new FakeSsh { IsLocal = true }
+        .On("uname -sm", Ok("Linux x86_64\n"))
+        .On("hostname", Ok("mi-pc\n"))
+        .On("id -u", Ok("1000\n"))
+        .On("sudo -n true", Fail("sudo: a password is required"))
+        .On("command -v pkexec", Ok("/usr/bin/pkexec\n"))
+        .On(c => c.EndsWith("bash -s", StringComparison.Ordinal), (_, input) =>
+            input!.Contains("agent.settings.json && echo yes", StringComparison.Ordinal) ? Ok("no\n")
+            : input.Contains("systemctl restart", StringComparison.Ordinal) ? Ok("active\n")
+            : Fail("script no previsto"));
 
     [Fact]
     public async Task Selection_and_activity_survive_an_operation()

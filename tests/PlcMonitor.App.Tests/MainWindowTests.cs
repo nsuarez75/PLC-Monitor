@@ -117,8 +117,17 @@ public class MainWindowTests
         agents.Log.Add("✔ Hecho");
         window.UpdateLayout();
 
-        window.GetVisualDescendants().OfType<TextBlock>().Select(t => t.Text).ShouldContain("EQUIPO (SSH)");
+        var texts = window.GetVisualDescendants().OfType<TextBlock>().Select(t => t.Text).ToList();
+        texts.ShouldContain("EQUIPO");
+        texts.ShouldContain("Este equipo (sin SSH)");
         Capture(window, "agents.png");
+
+        // Este equipo: sin campos de SSH.
+        agents.LocalMachine = true;
+        window.UpdateLayout();
+        window.GetVisualDescendants().OfType<TextBlock>().Where(t => t.IsEffectivelyVisible).Select(t => t.Text).ShouldNotContain("Usuario");
+        Capture(window, "agents-local.png");
+        agents.LocalMachine = false;
         Avalonia.Application.Current.RequestedThemeVariant = Avalonia.Styling.ThemeVariant.Dark;
         Capture(window, "agents-dark.png");
         Avalonia.Application.Current.RequestedThemeVariant = Avalonia.Styling.ThemeVariant.Light;
