@@ -30,6 +30,50 @@ public sealed class TrendView
     public double? YMin { get; set; }
 
     public double? YMax { get; set; }
+
+    /// <summary>Tendencia de disparo: solo se ven los valores mientras se cumple; null = siempre.</summary>
+    public TrendTrigger? Trigger { get; set; }
+}
+
+/// <summary>
+/// Disparo de una vista de tendencia (como el del histórico): los tags se ven mientras <see cref="Tag"/> cumple la
+/// condición con <see cref="Value"/>, y <see cref="HoldSeconds"/> más después.
+/// </summary>
+public sealed class TrendTrigger
+{
+    public string Device { get; set; } = "";
+
+    public string Tag { get; set; } = "";
+
+    [JsonConverter(typeof(JsonStringEnumConverter<PlcMonitor.Agent.Contracts.TriggerCondition>))]
+    public PlcMonitor.Agent.Contracts.TriggerCondition Condition { get; set; }
+
+    /// <summary>true/false para booleanos; un número para los demás.</summary>
+    public string Value { get; set; } = "true";
+
+    /// <summary>Segundos que se siguen mostrando después de que deje de cumplirse.</summary>
+    public double HoldSeconds { get; set; }
+
+    /// <summary>Segundos que se muestran de antes de cumplirse (pre-disparo).</summary>
+    public double BeforeSeconds { get; set; }
+
+    public TrendTagRef Ref => new(Device, Tag);
+
+    public override string ToString()
+    {
+        var condition = Condition switch
+        {
+            PlcMonitor.Agent.Contracts.TriggerCondition.NotEqual => "≠",
+            PlcMonitor.Agent.Contracts.TriggerCondition.Greater => ">",
+            PlcMonitor.Agent.Contracts.TriggerCondition.GreaterOrEqual => "≥",
+            PlcMonitor.Agent.Contracts.TriggerCondition.Less => "<",
+            PlcMonitor.Agent.Contracts.TriggerCondition.LessOrEqual => "≤",
+            _ => "=",
+        };
+        var culture = System.Globalization.CultureInfo.InvariantCulture;
+        var times = (BeforeSeconds > 0 ? $" −{BeforeSeconds.ToString("0.#", culture)} s" : "") + (HoldSeconds > 0 ? $" +{HoldSeconds.ToString("0.#", culture)} s" : "");
+        return $"{Device} / {Tag} {condition} {Value}{(times.Length > 0 ? $" ({times.Trim()})" : "")}";
+    }
 }
 
 /// <summary>Vistas de tendencia en <c>trends.json</c>, junto a las preferencias de la app.</summary>
