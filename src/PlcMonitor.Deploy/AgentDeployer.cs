@@ -55,7 +55,7 @@ public sealed class AgentDeployer(ISshSession session, IProgress<string>? progre
         var package = AgentPackages.Find(platform.Rid, options.PackageFolders)
             ?? throw new DeployException($"No se encuentra el paquete del agente para {platform.Rid} (plcmon-agent-*-{platform.Rid}{(platform.Os == RemoteOs.Windows ? ".zip" : ".tar.gz")}) en: {string.Join(", ", options.PackageFolders)}");
 
-        var hasSecurity = (await RunPlatformAsync(platform, platform.Os == RemoteOs.Linux ? AgentScripts.LinuxHasSecurity : AgentScripts.WindowsHasSecurity, password, options.SudoPassword, elevated: true, cancellationToken)).Output.Trim() == "yes";
+        var hasSecurity = (await RunPlatformAsync(platform, platform.Os == RemoteOs.Linux ? AgentScripts.LinuxHasSecurity : AgentScripts.WindowsHasSecurity, password, options.SudoPassword, elevated: !session.IsLocal, cancellationToken)).Output.Trim() == "yes";
         string? token = null;
         string? thumbprint = null;
         AgentSecurityFiles? security = null;
@@ -125,6 +125,13 @@ public sealed class AgentDeployer(ISshSession session, IProgress<string>? progre
         var platform = await DetectPlatformAsync(cancellationToken);
         if (platform.Os == RemoteOs.Windows)
             return "En Windows el agente escribe en el Visor de eventos (Registro de Windows → Aplicación, origen «plcmon-agent»).";
+        if (session.IsLocal)
+        {
+            // Si el usuario puede leer el diario del sistema (grupos wheel, adm o systemd-journal) no hace falta pedir permiso.
+            var own = await RunPlatformAsync(platform, AgentScripts.LinuxLogs(lines), password, sudoPassword, elevated: false, cancellationToken);
+            if (own.Success && own.Output.Trim() is { Length: > 0 } text && !text.Contains("-- No entries --", StringComparison.Ordinal))
+                return own.Output;
+        }
         var result = await RunPlatformAsync(platform, AgentScripts.LinuxLogs(lines), password, sudoPassword, elevated: true, cancellationToken);
         return result.Success ? result.Output : throw new DeployException($"No se pudo leer el log: {result.Detail}");
     }
@@ -149,14 +156,18 @@ public sealed class AgentDeployer(ISshSession session, IProgress<string>? progre
     }
 
     /// <summary>
-    /// Ejecuta un script con permisos de administrador. Linux: root directamente, <c>sudo -n</c> si no pide contraseña
-    /// o <c>sudo -S</c> con la contraseña por la entrada estándar. Windows: PowerShell (la sesión SSH de un
-    /// administrador ya está elevada).
+    /// Ejecuta un script con permisos de administrador. Linux: root directamente, <c>sudo -n</c> si no pide contraseña,
+    /// <c>sudo -S</c> con la contraseña por la entrada estándar o, en el propio equipo y sin contraseña, pkexec (ventana
+    /// de polkit). Windows: PowerShell elevado (por SSH la sesión de un administrador ya lo está; en el propio equipo, UAC).
     /// </summary>
     private async Task<SshResult> RunPlatformAsync(RemotePlatform platform, string script, string? password, string? sudoPassword, bool elevated, CancellationToken cancellationToken)
     {
         if (platform.Os == RemoteOs.Windows)
-            return await session.RunAsync(AgentScripts.PowerShell(script), cancellationToken: cancellationToken);
+        {
+            return elevated
+                ? await session.RunElevatedPowerShellAsync(script, cancellationToken)
+                : await session.RunAsync(AgentScripts.PowerShell(script), cancellationToken: cancellationToken);
+        }
         if (!elevated)
             return await session.RunAsync("bash -s", script, cancellationToken);
 
@@ -165,12 +176,31 @@ public sealed class AgentDeployer(ISshSession session, IProgress<string>? progre
             return await session.RunAsync("bash -s", script, cancellationToken);
         if ((await session.RunAsync("sudo -n true", cancellationToken: cancellationToken)).Success)
             return await session.RunAsync("sudo -n bash -s", script, cancellationToken);
-        var sudo = sudoPassword ?? password
-            ?? throw new DeployException("sudo pide contraseña: indícala (o configura sudo sin contraseña para este usuario).");
+        var sudo = sudoPassword ?? password;
+        if (sudo is null && session.IsLocal)
+            return await RunWithPkexecAsync(script, cancellationToken);
+        if (sudo is null)
+            throw new DeployException("sudo pide contraseña: indícala (o configura sudo sin contraseña para este usuario).");
         var result = await session.RunAsync("sudo -S -p '' bash -s", sudo + "\n" + script, cancellationToken);
         if (!result.Success && result.Error.Contains("incorrect password", StringComparison.OrdinalIgnoreCase))
             throw new DeployException("Contraseña de sudo incorrecta.");
         return result;
+    }
+
+    /// <summary>Pide permiso de administrador con la ventana de polkit del escritorio.</summary>
+    private async Task<SshResult> RunWithPkexecAsync(string script, CancellationToken cancellationToken)
+    {
+        if (!(await session.RunAsync("command -v pkexec", cancellationToken: cancellationToken)).Success)
+            throw new DeployException("sudo pide contraseña y no hay pkexec para pedirla con una ventana: indica la contraseña de sudo.");
+        Report("Pidiendo permiso de administrador (ventana del sistema)…");
+        var result = await session.RunAsync("pkexec bash -s", script, cancellationToken);
+        return result.ExitCode switch
+        {
+            126 => throw new DeployException("Permiso de administrador denegado o cancelado."),
+            127 when result.Error.Contains("authentication agent", StringComparison.OrdinalIgnoreCase) || result.Error.Contains("Not authorized", StringComparison.OrdinalIgnoreCase)
+                => throw new DeployException("No hay agente de polkit para pedir la contraseña: indica la contraseña de sudo."),
+            _ => result,
+        };
     }
 
     private void Report(string message) => progress?.Report(message);

@@ -165,6 +165,25 @@ internal static class AgentScripts
         if ($s -and $s.Status -eq 'Running') { 'active=active' } elseif ($s) { 'active=' + $s.Status.ToString().ToLowerInvariant() } else { 'active=inactive' }
         """;
 
+    /// <summary>
+    /// Envuelve un script para ejecutarlo elevado con UAC (sin tuberías): su salida, línea a línea según se produce, va
+    /// a <paramref name="outFile"/>, el error que lo corta a <paramref name="errFile"/> y el código de salida es 0 o 1.
+    /// </summary>
+    public static string ElevatedWrapper(string script, string outFile, string errFile) => $$"""
+        $__lines = [System.Collections.Generic.List[string]]::new()
+        $__code = 0
+        try {
+          & {
+        {{script}}
+          } *>&1 | ForEach-Object { $__lines.Add("$_") }
+        } catch {
+          [IO.File]::WriteAllText('{{errFile.Replace("'", "''", StringComparison.Ordinal)}}', ($_ | Out-String))
+          $__code = 1
+        }
+        [IO.File]::WriteAllLines('{{outFile.Replace("'", "''", StringComparison.Ordinal)}}', $__lines)
+        exit $__code
+        """;
+
     /// <summary>Comando para ejecutar un script de PowerShell sin problemas de comillas (-EncodedCommand).</summary>
     public static string PowerShell(string script) =>
         "powershell -NoProfile -NonInteractive -ExecutionPolicy Bypass -EncodedCommand " + Convert.ToBase64String(Encoding.Unicode.GetBytes(script));

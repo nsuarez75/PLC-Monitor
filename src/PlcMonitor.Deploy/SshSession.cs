@@ -29,11 +29,21 @@ public sealed record SshResult(int ExitCode, string Output, string Error)
     public string Detail => (string.IsNullOrWhiteSpace(Error) ? Output : Error).Trim();
 }
 
-/// <summary>Sesión SSH abierta (sustituible en los tests).</summary>
+/// <summary>Sesión con el equipo donde se gestiona el agente: por SSH o el propio equipo (<see cref="LocalSession"/>).</summary>
 public interface ISshSession : IDisposable
 {
-    /// <summary>Huella SHA-256 de la clave del servidor (formato de <c>ssh</c>, sin prefijo).</summary>
+    /// <summary>Huella SHA-256 de la clave del servidor (formato de <c>ssh</c>, sin prefijo). Vacía en el propio equipo.</summary>
     string HostKeyFingerprint { get; }
+
+    /// <summary>
+    /// El propio equipo, sin SSH. En Linux, si sudo pide contraseña y no se ha dado, se pide permiso con pkexec (ventana
+    /// de polkit); lo que no necesita administrador (comprobar si ya hay credenciales, leer el log) se intenta sin él.
+    /// </summary>
+    bool IsLocal => false;
+
+    /// <summary>Ejecuta un script de PowerShell como administrador. Por SSH, la sesión de un administrador ya lo es.</summary>
+    Task<SshResult> RunElevatedPowerShellAsync(string script, CancellationToken cancellationToken = default) =>
+        RunAsync(AgentScripts.PowerShell(script), cancellationToken: cancellationToken);
 
     /// <summary>Ejecuta un comando. Si se indica <paramref name="input"/>, se escribe en su entrada estándar.</summary>
     Task<SshResult> RunAsync(string command, string? input = null, CancellationToken cancellationToken = default);
