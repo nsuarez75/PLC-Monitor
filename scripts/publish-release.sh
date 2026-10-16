@@ -1,55 +1,39 @@
 #!/usr/bin/env bash
-# Genera los paquetes de la release (CLI plcmon + agente en agent/ + app de escritorio en app/) en artifacts/release/<version>/.
+# Genera la release en artifacts/release/<version>/: un único ejecutable de la app de escritorio por plataforma
+# (plcmon-app-<version>-<rid>, .exe en Windows). Cada app lleva dentro los agentes de todas las plataformas para
+# instalarlos en este equipo o por SSH sin más ficheros.
 # Uso: scripts/publish-release.sh [rid...]   (por defecto: win-x64 linux-x64 linux-arm64)
-# No se usa single-file para que S7CommPlusDriver.dll (LGPL-3) siga siendo un fichero reemplazable.
+# Los agentes incluidos son siempre los de todas las plataformas, aunque se pidan menos apps.
 set -euo pipefail
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 cd "$ROOT"
 VERSION=$(grep -oE '<Version>[^<]+' Directory.Build.props | sed 's/<Version>//')
-RIDS=("${@:-win-x64 linux-x64 linux-arm64}")
-[ $# -eq 0 ] && RIDS=(win-x64 linux-x64 linux-arm64)
+ALL_RIDS=(win-x64 linux-x64 linux-arm64)
+if [ $# -gt 0 ]; then RIDS=("$@"); else RIDS=("${ALL_RIDS[@]}"); fi
 OUT="$ROOT/artifacts/release/$VERSION"
-# bsdtar sabe crear zip (en Windows: tar.exe del sistema); el GNU tar de Git Bash no.
-ZIPTAR=$(command -v bsdtar || echo /c/Windows/System32/tar.exe)
-rm -rf "$OUT" && mkdir -p "$OUT"
+AGENTS="$OUT/.agents"
+# Ejecutable único, autocontenido; las librerías nativas (Skia, SQLite) se extraen solas al arrancar.
+SINGLE=(-c Release --self-contained true -p:PublishSingleFile=true -p:IncludeNativeLibrariesForSelfExtract=true
+        -p:EnableCompressionInSingleFile=true -p:DebugType=none -p:SatelliteResourceLanguages=es -v q -nologo)
+rm -rf "$OUT" && mkdir -p "$AGENTS"
+
+for RID in "${ALL_RIDS[@]}"; do
+  echo "== agente $RID"
+  dotnet publish src/PlcMonitor.Agent -r "$RID" "${SINGLE[@]}" -o "$AGENTS/$RID"
+  EXT=""; [[ "$RID" == win-* ]] && EXT=".exe"
+  # Sin extensión: el nombre del recurso dentro de la app es agents/plcmon-agent-<rid>.
+  mv "$AGENTS/$RID/plcmon-agent$EXT" "$AGENTS/plcmon-agent-$RID"
+  rm -rf "${AGENTS:?}/$RID"
+done
 
 for RID in "${RIDS[@]}"; do
-  DIR="$OUT/plcmon-$VERSION-$RID"
-  echo "== $RID"
-  dotnet publish src/PlcMonitor.Cli -c Release -r "$RID" --self-contained true -p:PublishSingleFile=false -o "$DIR" -v q -nologo
-  # El agente va en su propia carpeta: lleva el runtime de ASP.NET y no debe pisar ficheros de la CLI.
-  dotnet publish src/PlcMonitor.Agent -c Release -r "$RID" --self-contained true -p:PublishSingleFile=false -o "$DIR/agent" -v q -nologo
-  dotnet publish src/PlcMonitor.App -c Release -r "$RID" --self-contained true -p:PublishSingleFile=false -o "$DIR/app" -v q -nologo
-  rm -f "$DIR"/*.pdb "$DIR"/agent/*.pdb "$DIR"/app/*.pdb
-  mkdir -p "$DIR/deploy" && cp deploy/linux/plcmon-agent.service "$DIR/deploy/"
-  mkdir -p "$DIR/licenses" "$DIR/docs"
-  cp external/S7CommPlusDriver/LICENSE "$DIR/licenses/LGPL-3.0.txt"
-  cp external/S7CommPlusDriver/PLCMONITOR-NOTICE.md "$DIR/licenses/S7CommPlusDriver-NOTICE.md"
-  cp THIRD-PARTY-NOTICES.md CHANGELOG.md README.md "$DIR/"
-  cp -r docs/manual "$DIR/docs/"
-  if [[ "$RID" == win-* ]]; then
-    (cd "$OUT" && "$ZIPTAR" -a -c -f "plcmon-$VERSION-$RID.zip" "plcmon-$VERSION-$RID")
-  else
-    # Desde Windows se pierde el bit de ejecución: se fija dentro del tar (ejecutables 0755, resto 0644).
-    (cd "$OUT" && P="plcmon-$VERSION-$RID" \
-      && EXES=("$P/plcmon" "$P/agent/plcmon-agent" "$P/app/plcmon-app") \
-      && for f in "$P/createdump" "$P/agent/createdump" "$P/app/createdump"; do [ -f "$f" ] && EXES+=("$f"); done \
-      && tar -cf "$P.tar" --owner=0 --group=0 --mode=u+rw,go+r,a-x,a+X "${EXES[@]/#/--exclude=}" "$P" \
-      && tar -rf "$P.tar" --owner=0 --group=0 --mode=0755 "${EXES[@]}" \
-      && gzip -9f "$P.tar")
-  fi
-  # Paquete suelto del agente para este RID: es el que la app sube al instalar agentes remotos por SSH.
-  mkdir -p "$OUT/agents"
-  AP="plcmon-agent-$VERSION-$RID"
-  rm -rf "$OUT/$AP" && mkdir -p "$OUT/$AP" && cp -r "$DIR/agent" "$OUT/$AP/plcmon-agent"
-  if [[ "$RID" == win-* ]]; then
-    (cd "$OUT/$AP" && "$ZIPTAR" -a -c -f "$OUT/agents/$AP.zip" plcmon-agent)
-  else
-    (cd "$OUT/$AP" && tar -cf "$OUT/agents/$AP.tar" --owner=0 --group=0 --mode=u+rw,go+r,a-x,a+X --exclude=plcmon-agent/plcmon-agent --exclude=plcmon-agent/createdump plcmon-agent \
-      && tar -rf "$OUT/agents/$AP.tar" --owner=0 --group=0 --mode=0755 plcmon-agent/plcmon-agent $( [ -f plcmon-agent/createdump ] && echo plcmon-agent/createdump ) \
-      && gzip -9f "$OUT/agents/$AP.tar")
-  fi
-  rm -rf "$OUT/$AP"
+  echo "== app $RID"
+  EXT=""; [[ "$RID" == win-* ]] && EXT=".exe"
+  TMP="$OUT/.app-$RID"
+  dotnet publish src/PlcMonitor.App -r "$RID" "${SINGLE[@]}" -p:PlcMonAgentsDir="$AGENTS" -o "$TMP"
+  mv "$TMP/plcmon-app$EXT" "$OUT/plcmon-app-$VERSION-$RID$EXT"
+  chmod 0755 "$OUT/plcmon-app-$VERSION-$RID$EXT"
+  rm -rf "$TMP"
 done
-(cd "$OUT" && sha256sum plcmon-* agents/* 2>/dev/null | grep -E '\.(zip|tar\.gz)$' > SHA256SUMS.txt || true)
+rm -rf "$AGENTS"
 ls -la "$OUT"

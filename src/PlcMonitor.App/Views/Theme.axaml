@@ -194,6 +194,29 @@
     <Setter Property="Background" Value="{DynamicResource App.Accent}" />
     <Setter Property="Foreground" Value="White" />
   </Style>
+  <!-- Selector segmentado (true/false): el segmento encendido va con el color de acento -->
+  <Style Selector="Button.seg">
+    <Setter Property="Background" Value="{DynamicResource App.Surface}" />
+    <Setter Property="BorderBrush" Value="{DynamicResource App.Border}" />
+    <Setter Property="BorderThickness" Value="1" />
+    <Setter Property="Padding" Value="10,5" />
+    <Setter Property="MinWidth" Value="58" />
+    <Setter Property="HorizontalContentAlignment" Value="Center" />
+    <Setter Property="FontFamily" Value="JetBrains Mono, Cascadia Mono, Consolas, DejaVu Sans Mono, monospace" />
+    <Setter Property="FontSize" Value="12" />
+  </Style>
+  <Style Selector="Button.seg.left">
+    <Setter Property="CornerRadius" Value="7,0,0,7" />
+  </Style>
+  <Style Selector="Button.seg.right">
+    <Setter Property="CornerRadius" Value="0,7,7,0" />
+    <Setter Property="Margin" Value="-1,0,0,0" />
+  </Style>
+  <Style Selector="Button.seg.on /template/ ContentPresenter">
+    <Setter Property="Background" Value="{DynamicResource App.Accent}" />
+    <Setter Property="BorderBrush" Value="{DynamicResource App.Accent}" />
+    <Setter Property="Foreground" Value="White" />
+  </Style>
   <Style Selector="Button c|Icon">
     <Setter Property="VerticalAlignment" Value="Center" />
   </Style>

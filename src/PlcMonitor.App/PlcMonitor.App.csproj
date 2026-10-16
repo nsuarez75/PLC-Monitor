@@ -24,4 +24,9 @@
   <ItemGroup>
     <InternalsVisibleTo Include="PlcMonitor.App.Tests" />
   </ItemGroup>
+  <!-- Release: los agentes de todas las plataformas van dentro de la app (plcmon-agent-<rid> en PlcMonAgentsDir),
+       así la app instala el agente en cualquier equipo sin más ficheros. Ver scripts/publish-release.sh. -->
+  <ItemGroup Condition="'$(PlcMonAgentsDir)' != ''">
+    <EmbeddedResource Include="$(PlcMonAgentsDir)/plcmon-agent-*" LogicalName="agents/%(Filename)%(Extension)" />
+  </ItemGroup>
 </Project>

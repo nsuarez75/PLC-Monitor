@@ -227,10 +227,17 @@
                             </Border>
                             <TextBlock Grid.Column="5" Text="{Binding Time}" Classes="muted mono" FontSize="11.5" VerticalAlignment="Center" />
                             <StackPanel Grid.Column="6" Orientation="Horizontal" Spacing="4" VerticalAlignment="Center">
-                              <TextBox Text="{Binding NewValue}" Width="120" IsVisible="{Binding Writable}" PlaceholderText="nuevo valor" Classes="mono" />
-                              <Button Classes="accent" Padding="9,6" Command="{Binding WriteCommand}" IsVisible="{Binding Writable}" ToolTip.Tip="Escribir">
+                              <TextBox Text="{Binding NewValue}" Width="120" IsVisible="{Binding ShowTextWrite}" PlaceholderText="nuevo valor" Classes="mono" />
+                              <Button Classes="accent" Padding="9,6" Command="{Binding WriteCommand}" IsVisible="{Binding ShowTextWrite}" ToolTip.Tip="Escribir">
                                 <c:Icon Kind="send" Width="14" Height="14" />
                               </Button>
+                              <!-- Booleanos: el botón del valor actual va encendido; el otro escribe ese valor -->
+                              <StackPanel Orientation="Horizontal" IsVisible="{Binding ShowBoolWrite}">
+                                <Button Classes="seg left" Classes.on="{Binding IsFalse}" IsHitTestVisible="{Binding !IsFalse}"
+                                        Command="{Binding WriteBoolCommand}" CommandParameter="false" Content="false" ToolTip.Tip="Escribir false" />
+                                <Button Classes="seg right" Classes.on="{Binding IsTrue}" IsHitTestVisible="{Binding !IsTrue}"
+                                        Command="{Binding WriteBoolCommand}" CommandParameter="true" Content="true" ToolTip.Tip="Escribir true" />
+                              </StackPanel>
                               <Button Classes="ghost danger" Command="{Binding RemoveCommand}" ToolTip.Tip="Quitar tag">
                                 <c:Icon Kind="x" Width="14" Height="14" />
                               </Button>

@@ -9,18 +9,20 @@ using Renci.SshNet.Common;
 namespace PlcMonitor.App.ViewModels;
 
 /// <summary>
-/// Gestión de agentes: perfiles (cómo conectar) y, para los equipos accesibles por SSH, instalar, actualizar,
-/// consultar, ver el log y desinstalar el agente. Las contraseñas SSH solo viven mientras dura la operación.
+/// Gestión de agentes: perfiles (cómo conectar) y, para este equipo o los accesibles por SSH, instalar, actualizar,
+/// consultar, ver el log y desinstalar el agente. Las contraseñas solo viven mientras dura la operación.
 /// </summary>
 public sealed partial class AgentsViewModel : ObservableObject
 {
     private readonly MainViewModel _main;
     private readonly Func<SshTarget, CancellationToken, Task<ISshSession>> _sshFactory;
+    private readonly Func<ISshSession> _localFactory;
 
-    public AgentsViewModel(MainViewModel main, Func<SshTarget, CancellationToken, Task<ISshSession>> sshFactory)
+    public AgentsViewModel(MainViewModel main, Func<SshTarget, CancellationToken, Task<ISshSession>> sshFactory, Func<ISshSession> localFactory)
     {
         _main = main ?? throw new ArgumentNullException(nameof(main));
         _sshFactory = sshFactory;
+        _localFactory = localFactory;
         PackageFolder = main.AgentPackagesFolder;
         Selected = main.SelectedProfile ?? main.Profiles.FirstOrDefault();
     }
@@ -54,6 +56,12 @@ public sealed partial class AgentsViewModel : ObservableObject
 
     [ObservableProperty]
     public partial int SshPort { get; set; } = 22;
+
+    /// <summary>Gestionar el agente de este equipo sin SSH.</summary>
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(IsManaged), nameof(IsSsh), nameof(ShowSudoPassword), nameof(MachineHelp), nameof(SudoPlaceholder))]
+    [NotifyCanExecuteChangedFor(nameof(InstallCommand), nameof(UninstallCommand), nameof(StatusCommand), nameof(LogsCommand))]
+    public partial bool LocalMachine { get; set; }
 
     [ObservableProperty]
     [NotifyCanExecuteChangedFor(nameof(InstallCommand), nameof(UninstallCommand), nameof(StatusCommand), nameof(LogsCommand))]
@@ -90,7 +98,23 @@ public sealed partial class AgentsViewModel : ObservableObject
     [NotifyCanExecuteChangedFor(nameof(InstallCommand), nameof(UninstallCommand), nameof(StatusCommand), nameof(LogsCommand), nameof(SaveCommand))]
     public partial bool IsBusy { get; set; }
 
-    public bool IsManaged => !string.IsNullOrWhiteSpace(SshHost);
+    public bool IsManaged => LocalMachine || !string.IsNullOrWhiteSpace(SshHost);
+
+    public bool IsSsh => !LocalMachine;
+
+    /// <summary>En Windows, este equipo pide permiso con UAC: no hace falta contraseña.</summary>
+    public bool ShowSudoPassword => !LocalMachine || !OperatingSystem.IsWindows();
+
+    public string MachineHelp => !LocalMachine
+        ? "Para instalar, actualizar o desinstalar el agente. Linux (con sudo) o Windows con OpenSSH (usuario administrador)."
+        : OperatingSystem.IsWindows()
+            ? "El agente se instala en este equipo como servicio de Windows. Windows pedirá permiso de administrador (UAC)."
+            : "El agente se instala en este equipo como servicio systemd. Si no indicas la contraseña de sudo, se pedirá con la ventana del sistema.";
+
+    public string SudoPlaceholder => LocalMachine ? "vacía: la pide el sistema" : "solo si es distinta";
+
+    /// <summary>Equipo de la operación, para los mensajes.</summary>
+    private string TargetName => LocalMachine ? "este equipo" : SshHost.Trim();
 
     partial void OnPackageFolderChanged(string value) => _main.AgentPackagesFolder = value;
 
@@ -111,6 +135,7 @@ public sealed partial class AgentsViewModel : ObservableObject
         Token = value?.Token ?? "";
         Thumbprint = value?.CertificateThumbprint ?? "";
         SshHost = value?.SshHost ?? "";
+        LocalMachine = value?.LocalMachine ?? false;
         SshPort = value?.SshPort ?? 22;
         SshUser = value?.SshUser ?? "";
         SshKeyFile = value?.SshKeyFile ?? "";
@@ -153,7 +178,7 @@ public sealed partial class AgentsViewModel : ObservableObject
         Selected = Profiles.FirstOrDefault();
     }
 
-    private bool CanUseSsh() => !IsBusy && !string.IsNullOrWhiteSpace(SshHost) && !string.IsNullOrWhiteSpace(SshUser);
+    private bool CanUseSsh() => !IsBusy && (LocalMachine || (!string.IsNullOrWhiteSpace(SshHost) && !string.IsNullOrWhiteSpace(SshUser)));
 
     /// <summary>Instala o actualiza el agente en el equipo y guarda en el perfil la URL, el token y la huella.</summary>
     [RelayCommand(CanExecute = nameof(CanUseSsh))]
@@ -161,7 +186,7 @@ public sealed partial class AgentsViewModel : ObservableObject
     {
         var folders = string.IsNullOrWhiteSpace(PackageFolder) ? AgentPackages.DefaultFolders().ToArray() : [PackageFolder.Trim()];
         var result = await deployer.InstallAsync(
-            SshHost.Trim(),
+            LocalMachine ? "127.0.0.1" : SshHost.Trim(),
             new InstallOptions(folders, AgentPort, RegenerateCredentials, NullIfEmpty(SudoPassword)),
             NullIfEmpty(SshPassword),
             ct);
@@ -178,7 +203,7 @@ public sealed partial class AgentsViewModel : ObservableObject
         profile.Platform = result.Platform.Description;
         profile.InstalledAt = DateTimeOffset.Now;
         RegenerateCredentials = false;
-        _main.Report($"Agente instalado en {SshHost} ({result.Url})");
+        _main.Report($"Agente instalado en {TargetName} ({result.Url})");
     });
 
     [RelayCommand(CanExecute = nameof(CanUseSsh))]
@@ -203,7 +228,7 @@ public sealed partial class AgentsViewModel : ObservableObject
     private async Task UninstallAsync()
     {
         if (!await _main.Dialogs.ConfirmAsync("Desinstalar agente",
-                $"¿Desinstalar el agente de {SshHost}?\nSe para el servicio y se borran sus ficheros{(KeepConfiguration ? " (se guarda una copia de agent.json)" : "")}."))
+                $"¿Desinstalar el agente de {TargetName}?\nSe para el servicio y se borran sus ficheros{(KeepConfiguration ? " (se guarda una copia de agent.json)" : "")}."))
             return;
         await RunSshAsync("Desinstalando", async (deployer, profile, ct) =>
         {
@@ -211,11 +236,11 @@ public sealed partial class AgentsViewModel : ObservableObject
             profile.InstalledAt = null;
             profile.Token = null;
             profile.CertificateThumbprint = null;
-            _main.Report($"Agente desinstalado de {SshHost}");
+            _main.Report($"Agente desinstalado de {TargetName}");
         });
     }
 
-    /// <summary>Abre la sesión SSH, ejecuta la operación y guarda el perfil. Las contraseñas se borran al terminar.</summary>
+    /// <summary>Abre la sesión (SSH o este equipo), ejecuta la operación y guarda el perfil. Las contraseñas se borran al terminar.</summary>
     private async Task RunSshAsync(string action, Func<AgentDeployer, AgentProfile, CancellationToken, Task> operation)
     {
         if (Selected is not { } profile)
@@ -223,14 +248,10 @@ public sealed partial class AgentsViewModel : ObservableObject
         Apply(profile);
         IsBusy = true;
         Log.Clear();
-        AddLog($"{action}: conectando por SSH con {SshUser}@{SshHost}:{SshPort}…");
+        AddLog(LocalMachine ? $"{action}: en este equipo (sin SSH)…" : $"{action}: conectando por SSH con {SshUser}@{SshHost}:{SshPort}…");
         try
         {
-            var target = new SshTarget(SshHost.Trim(), SshPort, SshUser.Trim(), NullIfEmpty(SshPassword), NullIfEmpty(SshKeyFile), ExpectedHostKey: profile.SshHostKey);
-            using var session = await _sshFactory(target, CancellationToken.None);
-            if (profile.SshHostKey is null)
-                AddLog($"Huella SSH del equipo (queda fijada): SHA256:{session.HostKeyFingerprint}");
-            profile.SshHostKey = session.HostKeyFingerprint;
+            using var session = LocalMachine ? _localFactory() : await OpenSshAsync(profile);
             var deployer = new AgentDeployer(session, new InlineProgress(AddLog));
             await operation(deployer, profile, CancellationToken.None);
             AddLog("✔ Hecho");
@@ -251,6 +272,16 @@ public sealed partial class AgentsViewModel : ObservableObject
         }
     }
 
+    private async Task<ISshSession> OpenSshAsync(AgentProfile profile)
+    {
+        var target = new SshTarget(SshHost.Trim(), SshPort, SshUser.Trim(), NullIfEmpty(SshPassword), NullIfEmpty(SshKeyFile), ExpectedHostKey: profile.SshHostKey);
+        var session = await _sshFactory(target, CancellationToken.None);
+        if (profile.SshHostKey is null)
+            AddLog($"Huella SSH del equipo (queda fijada): SHA256:{session.HostKeyFingerprint}");
+        profile.SshHostKey = session.HostKeyFingerprint;
+        return session;
+    }
+
     private static string Explain(Exception ex) => ex switch
     {
         SshAuthenticationException => "El equipo rechaza el usuario, la clave o la contraseña SSH.",
@@ -266,6 +297,7 @@ public sealed partial class AgentsViewModel : ObservableObject
         profile.Token = NullIfEmpty(Token);
         profile.CertificateThumbprint = NullIfEmpty(Thumbprint);
         profile.SshHost = NullIfEmpty(SshHost);
+        profile.LocalMachine = LocalMachine;
         profile.SshPort = SshPort;
         profile.SshUser = NullIfEmpty(SshUser);
         profile.SshKeyFile = NullIfEmpty(SshKeyFile);
@@ -281,6 +313,8 @@ public sealed partial class AgentsViewModel : ObservableObject
     private static string Describe(AgentProfile p)
     {
         var parts = new List<string>();
+        if (p.LocalMachine)
+            parts.Add("Este equipo");
         parts.Add(p.CertificateThumbprint is null ? "Sin TLS" : "TLS con certificado fijado");
         parts.Add(string.IsNullOrEmpty(p.Token) ? "sin token" : "con token");
         if (p.Platform is not null)

@@ -30,8 +30,13 @@ public sealed partial class AgentProfile : ObservableObject
 
     /// <summary>Equipo SSH (vacío = no gestionado por SSH).</summary>
     [ObservableProperty]
-    [NotifyPropertyChangedFor(nameof(IsManaged))]
+    [NotifyPropertyChangedFor(nameof(IsManaged), nameof(ManagedLabel))]
     public partial string? SshHost { get; set; }
+
+    /// <summary>El agente está en este mismo equipo y se instala sin SSH (pkexec/sudo en Linux, UAC en Windows).</summary>
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(IsManaged), nameof(ManagedLabel))]
+    public partial bool LocalMachine { get; set; }
 
     public int SshPort { get; set; } = 22;
 
@@ -57,11 +62,15 @@ public sealed partial class AgentProfile : ObservableObject
     public AgentEndpoint Endpoint => new(Url, string.IsNullOrEmpty(Token) ? null : Token, string.IsNullOrEmpty(CertificateThumbprint) ? null : CertificateThumbprint);
 
     [JsonIgnore]
-    public bool IsManaged => !string.IsNullOrWhiteSpace(SshHost);
+    public bool IsManaged => LocalMachine || !string.IsNullOrWhiteSpace(SshHost);
+
+    /// <summary>Cómo se gestiona, para la lista: «Este equipo» o «SSH: equipo».</summary>
+    [JsonIgnore]
+    public string? ManagedLabel => LocalMachine ? "Este equipo (sin SSH)" : string.IsNullOrWhiteSpace(SshHost) ? null : $"SSH: {SshHost}";
 
     public AgentProfile Clone() => new()
     {
-        Id = Id, Name = Name, Url = Url, Token = Token, CertificateThumbprint = CertificateThumbprint, SshHost = SshHost, SshPort = SshPort,
+        Id = Id, Name = Name, Url = Url, Token = Token, CertificateThumbprint = CertificateThumbprint, SshHost = SshHost, LocalMachine = LocalMachine, SshPort = SshPort,
         SshUser = SshUser, SshKeyFile = SshKeyFile, SshHostKey = SshHostKey, Platform = Platform, AgentPort = AgentPort, InstalledAt = InstalledAt,
         StoredToken = StoredToken,
     };

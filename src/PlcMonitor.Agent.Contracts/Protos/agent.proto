@@ -46,7 +46,9 @@ service AgentService {
   rpc GetDeviceConfig(DeviceRequest) returns (DeviceConfig);
 
   // Alta o modificación de un dispositivo con sus grupos y tags. Se valida todo antes de aplicar; si hay errores
-  // devuelve INVALID_ARGUMENT con la lista y no cambia nada. El dispositivo se reinicia con la nueva configuración.
+  // devuelve INVALID_ARGUMENT con la lista y no cambia nada. Si solo cambian grupos, tags o la llave de escritura se
+  // aplica en caliente (sin reconectar; los tags que no cambian conservan su valor); si cambia la conexión, el
+  // dispositivo se reinicia.
   rpc PutDevice(PutDeviceRequest) returns (Device);
 
   // Baja de un dispositivo.

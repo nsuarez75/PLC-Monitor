@@ -114,6 +114,38 @@ public sealed class MainViewModelTests : IDisposable
     }
 
     [Fact]
+    public async Task Booleans_are_written_with_true_and_false_buttons()
+    {
+        await using var agent = new AgentFactory(Device("plc1", writesEnabled: true, tags: [T("DB1.DBX0.0", "marcha", writable: true)]));
+        var plc = agent.Driver.Plc("plc1");
+        plc.Values["DB1.DBX0.0"] = false;
+        await using var vm = await ConnectAsync(agent);
+        var tag = TagOf(vm, "plc1", "marcha");
+        await Wait.UntilAsync(() => _ui.Read(() => tag.IsGood));
+
+        _ui.Read(() => (tag.IsBoolean, tag.ShowBoolWrite, tag.ShowTextWrite, tag.IsFalse, tag.IsTrue)).ShouldBe((true, true, false, true, false));
+
+        await tag.WriteBoolCommand.ExecuteAsync("true");
+
+        _dialogs.Questions.ShouldHaveSingleItem().ShouldContain("«true» en plc1/marcha");
+        plc.Writes.ShouldHaveSingleItem().Value.ShouldBe(true);
+        await Wait.UntilAsync(() => _ui.Read(() => tag.IsTrue && !tag.IsFalse), "botón true encendido");
+    }
+
+    [Fact]
+    public async Task System_theme_has_its_own_icon()
+    {
+        await using var agent = new AgentFactory();
+        await using var vm = Create(agent);
+        vm.Theme = "system";
+        var system = vm.ThemeIcon;
+        vm.Theme = "light";
+        var light = vm.ThemeIcon;
+        vm.Theme = "dark";
+        (system, light, vm.ThemeIcon).ShouldBe(("monitor", "sun", "moon"));
+    }
+
+    [Fact]
     public async Task Write_is_only_possible_on_writable_tags()
     {
         await using var agent = new AgentFactory(Device("plc1", tags: [T("DB1.DBW0", "ro")]));

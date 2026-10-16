@@ -1,3 +1,5 @@
+using System.Reflection;
+
 namespace PlcMonitor.Deploy;
 
 public enum RemoteOs
@@ -38,15 +40,22 @@ public sealed record RemotePlatform(RemoteOs Os, string Rid, string Description)
     }
 }
 
-/// <summary>Busca el paquete del agente para un RID: <c>plcmon-agent-*-&lt;rid&gt;.tar.gz</c> (Linux) o <c>.zip</c> (Windows).</summary>
+/// <summary>
+/// Busca el ejecutable (único) del agente para un RID: <c>plcmon-agent-&lt;versión&gt;-&lt;rid&gt;</c>, con <c>.exe</c> en
+/// Windows. Primero en las carpetas indicadas; si no está, el que la app lleva dentro (la app de la release incluye los
+/// agentes de todas las plataformas como recursos <c>agents/plcmon-agent-&lt;rid&gt;</c>).
+/// </summary>
 public static class AgentPackages
 {
-    /// <summary>Carpetas por defecto: <c>agents/</c> junto a la app y en la carpeta superior (paquete de la release).</summary>
+    /// <summary>Prefijo de los recursos con los agentes incluidos en la app.</summary>
+    public const string ResourcePrefix = "agents/plcmon-agent-";
+
+    /// <summary>Carpetas por defecto: <c>agents/</c> junto a la app y en la carpeta superior.</summary>
     public static IEnumerable<string> DefaultFolders() => DefaultFolders(AppContext.BaseDirectory);
 
     /// <summary>
-    /// <c>agents/</c> junto a la app y en la carpeta superior (paquete de la release) y, si la app corre desde el código,
-    /// la release más reciente en <c>artifacts/release/&lt;versión&gt;/agents</c> del repositorio.
+    /// <c>agents/</c> junto a la app y en la carpeta superior y, si la app corre desde el código, la release más
+    /// reciente en <c>artifacts/release/&lt;versión&gt;/agents</c> del repositorio.
     /// </summary>
     public static IEnumerable<string> DefaultFolders(string baseDir)
     {
@@ -63,14 +72,51 @@ public static class AgentPackages
         }
     }
 
-    public static string? Find(string rid, IEnumerable<string> folders)
+    /// <summary>Nombre del ejecutable del agente para un RID (sin versión), p.ej. <c>plcmon-agent-*-win-x64.exe</c>.</summary>
+    public static string FileName(string rid) => $"plcmon-agent-*-{rid}{Extension(rid)}";
+
+    public static string? Find(string rid, IEnumerable<string> folders) => Find(rid, folders, Assembly.GetEntryAssembly());
+
+    /// <summary>Busca en las carpetas y, si no está, en los recursos de <paramref name="bundle"/> (se extrae a un temporal).</summary>
+    public static string? Find(string rid, IEnumerable<string> folders, Assembly? bundle)
     {
         ArgumentNullException.ThrowIfNull(folders);
-        var extension = rid.StartsWith("win-", StringComparison.Ordinal) ? ".zip" : ".tar.gz";
-        return folders
+        var file = folders
             .Where(Directory.Exists)
-            .SelectMany(f => Directory.EnumerateFiles(f, $"plcmon-agent-*-{rid}{extension}"))
+            .SelectMany(f => Directory.EnumerateFiles(f, FileName(rid)))
             .OrderByDescending(File.GetLastWriteTimeUtc)
             .FirstOrDefault();
+        return file ?? ExtractEmbedded(rid, bundle);
     }
+
+    /// <summary>RIDs de los agentes que lleva dentro la app.</summary>
+    public static IReadOnlyList<string> Embedded(Assembly? bundle) =>
+        bundle?.GetManifestResourceNames()
+            .Where(n => n.StartsWith(ResourcePrefix, StringComparison.Ordinal))
+            .Select(n => n[ResourcePrefix.Length..])
+            .Order(StringComparer.Ordinal)
+            .ToArray() ?? [];
+
+    /// <summary>
+    /// Copia el agente incluido a <c>%TEMP%/plcmon-agents/&lt;versión&gt;/</c> (se reutiliza entre instalaciones) y
+    /// devuelve su ruta, o null si la app no lo lleva.
+    /// </summary>
+    private static string? ExtractEmbedded(string rid, Assembly? bundle)
+    {
+        using var resource = bundle?.GetManifestResourceStream(ResourcePrefix + rid);
+        if (resource is null)
+            return null;
+        var version = bundle!.GetName().Version?.ToString(3) ?? "0.0.0";
+        var dir = Directory.CreateDirectory(Path.Combine(Path.GetTempPath(), "plcmon-agents", version)).FullName;
+        var path = Path.Combine(dir, $"plcmon-agent-{version}-{rid}{Extension(rid)}");
+        if (File.Exists(path) && new FileInfo(path).Length == resource.Length)
+            return path;
+        var temp = path + $".{Guid.NewGuid():N}.tmp";
+        using (var file = File.Create(temp))
+            resource.CopyTo(file);
+        File.Move(temp, path, overwrite: true);
+        return path;
+    }
+
+    private static string Extension(string rid) => rid.StartsWith("win-", StringComparison.Ordinal) ? ".exe" : "";
 }

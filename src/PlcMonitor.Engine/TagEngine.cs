@@ -128,8 +128,9 @@ public sealed class TagEngine : IAsyncDisposable, IEngineSink
 
     /// <summary>
     /// Da de alta o sustituye un dispositivo (con sus grupos y tags). Se valida la configuración completa resultante;
-    /// si hay errores lanza <see cref="EngineConfigurationException"/> y no cambia nada. Un dispositivo existente se
-    /// detiene y se vuelve a crear con la nueva configuración.
+    /// si hay errores lanza <see cref="EngineConfigurationException"/> y no cambia nada. Si solo cambian los grupos, los
+    /// tags o la llave de escritura, se aplica en caliente sin cortar la conexión y los tags que no cambian conservan su
+    /// valor; si cambia la conexión (driver, ajustes, reconexión, activación o nombre), se detiene y se vuelve a crear.
     /// </summary>
     /// <param name="device">Nueva configuración del dispositivo (se copia).</param>
     /// <param name="originalName">Nombre actual si se renombra; null para alta o mismo nombre.</param>
@@ -152,6 +153,9 @@ public sealed class TagEngine : IAsyncDisposable, IEngineSink
             var errors = ConfigurationValidator.Validate(candidate, _registry);
             if (errors.Count > 0)
                 throw new EngineConfigurationException(errors);
+
+            if (index >= 0 && CanReconfigureInPlace(Configuration.Devices[index], copy))
+                return ReconfigureInPlace(index, copy);
 
             DeviceSupervisor? old = null;
             if (index >= 0)
@@ -187,6 +191,49 @@ public sealed class TagEngine : IAsyncDisposable, IEngineSink
         {
             _changes.Release();
         }
+    }
+
+    /// <summary>Mismo dispositivo y misma conexión: solo cambian grupos, tags o la llave de escritura.</summary>
+    private static bool CanReconfigureInPlace(DeviceConfiguration current, DeviceConfiguration next)
+    {
+        if (!string.Equals(current.Name, next.Name, StringComparison.Ordinal))
+            return false;
+        static string ConnectionPart(DeviceConfiguration device)
+        {
+            var copy = Clone(device);
+            copy.ScanGroups.Clear();
+            copy.WritesEnabled = false;
+            return ConfigurationFile.Serialize(new AgentConfiguration { Devices = [copy] });
+        }
+        return ConnectionPart(current) == ConnectionPart(next);
+    }
+
+    private DeviceStatus ReconfigureInPlace(int index, DeviceConfiguration copy)
+    {
+        DeviceSupervisor supervisor;
+        lock (_sync)
+        {
+            supervisor = _devices[copy.Name];
+            Configuration.Devices[index] = copy;
+            // Primero los valores: lo que publiquen los grupos nuevos debe encontrar ya sus tags.
+            var previous = supervisor.Tags.ToDictionary(t => t.Key);
+            var next = DeviceSupervisor.BuildTags(copy);
+            foreach (var key in previous.Keys.Except(next.Select(t => t.Key)))
+                _values.Remove(key);
+            var pending = TagValue.Bad(QualityCode.BadNotConnected, _time.GetUtcNow(),
+                supervisor.Status.State == ConnectionState.Connected ? "Esperando la primera lectura" : supervisor.Status.Detail ?? DeviceSupervisor.DisabledDetail);
+            foreach (var tag in next)
+            {
+                // Un tag que sigue leyendo la misma dirección conserva su valor; si no, espera a la próxima lectura.
+                _values[tag.Key] = previous.TryGetValue(tag.Key, out var old) && old.Address == tag.Address && old.DataType == tag.DataType
+                    ? _values[tag.Key] with { Definition = tag }
+                    : new TagSnapshot(tag, pending);
+            }
+            supervisor.Reconfigure(copy);
+            Broadcast(new DeviceConfigured(_statuses[copy.Name], next.Select(t => _values[t.Key]).ToArray()));
+        }
+        _logger.LogInformation("{Device}: reconfigurado en caliente ({Tags} tags)", copy.Name, supervisor.Tags.Count);
+        return GetDevice(copy.Name);
     }
 
     /// <summary>Da de baja un dispositivo: lo detiene y lo quita de la configuración.</summary>

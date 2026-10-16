@@ -39,13 +39,12 @@ internal static class AgentScripts
         id plcmon >/dev/null 2>&1 || useradd --system --no-create-home --shell /usr/sbin/nologin plcmon
         systemctl stop {{LinuxService}} 2>/dev/null || true
         mkdir -p "$D"
-        T=$(mktemp -d)
-        tar -xzf "$A" -C "$T"
-        SRC=$(dirname "$(find "$T" -maxdepth 3 -type f -name plcmon-agent | head -n1)")
-        [ -x "$SRC/plcmon-agent" ] || { echo "El paquete no contiene plcmon-agent" >&2; exit 3; }
-        # La configuración del equipo (agent.json y la seguridad) se conserva en las actualizaciones.
-        cp -a "$SRC/." "$D/"
-        rm -rf "$T" "$A"
+        [ -s "$A" ] || { echo "No llegó el ejecutable del agente" >&2; exit 3; }
+        # Se conserva la configuración del equipo (agent.json y la seguridad) y el histórico; lo demás (incluidos los
+        # ficheros de las versiones en varios ficheros) se sustituye por el ejecutable único.
+        find "$D" -mindepth 1 -maxdepth 1 ! -name agent.json ! -name agent.settings.json ! -name agent.pfx ! -name history -exec rm -rf {} +
+        install -m 0755 "$A" "$D/plcmon-agent"
+        rm -f "$A"
         {{(security is null ? "" : $"""
         echo '{Convert.ToBase64String(Encoding.UTF8.GetBytes(security.SettingsJson))}' | base64 -d > "$D/agent.settings.json"
         echo '{Convert.ToBase64String(security.Pfx)}' | base64 -d > "$D/agent.pfx"
@@ -64,6 +63,8 @@ internal static class AgentScripts
         Group=plcmon
         WorkingDirectory={{LinuxDir}}
         ExecStart={{LinuxDir}}/plcmon-agent
+        # El ejecutable único extrae aquí sus librerías nativas (SQLite): el servicio no tiene carpeta personal.
+        Environment=DOTNET_BUNDLE_EXTRACT_BASE_DIR={{LinuxDir}}/.bundle
         Restart=on-failure
         RestartSec=5
         NoNewPrivileges=true
@@ -119,12 +120,10 @@ internal static class AgentScripts
         $svc = Get-Service -Name {{WindowsService}} -ErrorAction SilentlyContinue
         if ($svc -and $svc.Status -ne 'Stopped') { Stop-Service -Name {{WindowsService}} -Force; $svc.WaitForStatus('Stopped', '00:00:30') }
         New-Item -ItemType Directory -Force -Path $D | Out-Null
-        $T = Join-Path ([IO.Path]::GetTempPath()) ([Guid]::NewGuid())
-        Expand-Archive -Path $A -DestinationPath $T -Force
-        $exe = Get-ChildItem -Path $T -Recurse -Filter plcmon-agent.exe | Select-Object -First 1
-        if (-not $exe) { throw 'El paquete no contiene plcmon-agent.exe' }
-        Copy-Item -Path (Join-Path $exe.DirectoryName '*') -Destination $D -Recurse -Force
-        Remove-Item -Recurse -Force $T, $A
+        if (-not (Test-Path $A)) { throw 'No llegó el ejecutable del agente' }
+        # Se conserva la configuración del equipo y el histórico; lo demás se sustituye por el ejecutable único.
+        Get-ChildItem -Path $D -Force | Where-Object { $_.Name -notin 'agent.json', 'agent.settings.json', 'agent.pfx', 'history' } | Remove-Item -Recurse -Force
+        Move-Item -Path $A -Destination (Join-Path $D 'plcmon-agent.exe') -Force
         {{(security is null ? "" : $"""
         [IO.File]::WriteAllBytes((Join-Path $D 'agent.settings.json'), [Convert]::FromBase64String('{Convert.ToBase64String(Encoding.UTF8.GetBytes(security.SettingsJson))}'))
         [IO.File]::WriteAllBytes((Join-Path $D 'agent.pfx'), [Convert]::FromBase64String('{Convert.ToBase64String(security.Pfx)}'))
@@ -163,6 +162,25 @@ internal static class AgentScripts
         if (Test-Path (Join-Path $D 'plcmon-agent.exe')) { 'installed=yes' } else { 'installed=no' }
         $s = Get-Service -Name {{WindowsService}} -ErrorAction SilentlyContinue
         if ($s -and $s.Status -eq 'Running') { 'active=active' } elseif ($s) { 'active=' + $s.Status.ToString().ToLowerInvariant() } else { 'active=inactive' }
+        """;
+
+    /// <summary>
+    /// Envuelve un script para ejecutarlo elevado con UAC (sin tuberías): su salida, línea a línea según se produce, va
+    /// a <paramref name="outFile"/>, el error que lo corta a <paramref name="errFile"/> y el código de salida es 0 o 1.
+    /// </summary>
+    public static string ElevatedWrapper(string script, string outFile, string errFile) => $$"""
+        $__lines = [System.Collections.Generic.List[string]]::new()
+        $__code = 0
+        try {
+          & {
+        {{script}}
+          } *>&1 | ForEach-Object { $__lines.Add("$_") }
+        } catch {
+          [IO.File]::WriteAllText('{{errFile.Replace("'", "''", StringComparison.Ordinal)}}', ($_ | Out-String))
+          $__code = 1
+        }
+        [IO.File]::WriteAllLines('{{outFile.Replace("'", "''", StringComparison.Ordinal)}}', $__lines)
+        exit $__code
         """;
 
     /// <summary>Comando para ejecutar un script de PowerShell sin problemas de comillas (-EncodedCommand).</summary>

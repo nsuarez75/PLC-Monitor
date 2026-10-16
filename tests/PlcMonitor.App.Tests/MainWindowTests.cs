@@ -20,7 +20,7 @@ public class MainWindowTests
         snapshot.Devices.Add(new Device { Name = "casa1200", Driver = "s7-symbolic", Enabled = true, WritesEnabled = true, State = ConnectionState.Connected, Since = now, TagCount = 3 });
         snapshot.Devices.Add(new Device { Name = "prensa2", Driver = "s7-absolute", Enabled = true, State = ConnectionState.Faulted, Detail = "TCP : Unreachable peer", Since = now, NextRetry = now });
         snapshot.Devices.Add(new Device { Name = "linea3", Driver = "s7-symbolic", Enabled = false, State = ConnectionState.Disconnected, Detail = "Dispositivo deshabilitado", Since = now });
-        snapshot.Tags.Add(Tag("clock", "Maquinas_Transfer_DB.Maquina_9.Clock_1s", "true", DataType.Boolean, Quality.Good, now, false));
+        snapshot.Tags.Add(Tag("clock", "Maquinas_Transfer_DB.Maquina_9.Clock_1s", "true", DataType.Boolean, Quality.Good, now, true));
         snapshot.Tags.Add(Tag("peso", "Viruta_Datos.Viruta.Peso", "12.5", DataType.Float, Quality.Good, now, true));
         snapshot.Tags.Add(Tag("malo", "NoExiste_DB.x", "", DataType.Unknown, Quality.BadAddressInvalid, now, false, "El símbolo 'NoExiste_DB.x' no existe en la CPU."));
         vm.Apply(new SubscribeEvent { Snapshot = snapshot });
@@ -112,13 +112,22 @@ public class MainWindowTests
         agents.SshUser = "tecnico";
         agents.Log.Add("Instalando: conectando por SSH con tecnico@192.168.0.20:22…");
         agents.Log.Add("Equipo: Linux x86_64 (paquete linux-x64)");
-        agents.Log.Add("Subiendo plcmon-agent-1.0.0-linux-x64.tar.gz (49 MB)…");
+        agents.Log.Add("Subiendo plcmon-agent-1.0.0-linux-x64 (49 MB)…");
         agents.Log.Add("Agente en marcha: https://192.168.0.20:5311");
         agents.Log.Add("✔ Hecho");
         window.UpdateLayout();
 
-        window.GetVisualDescendants().OfType<TextBlock>().Select(t => t.Text).ShouldContain("EQUIPO (SSH)");
+        var texts = window.GetVisualDescendants().OfType<TextBlock>().Select(t => t.Text).ToList();
+        texts.ShouldContain("EQUIPO");
+        texts.ShouldContain("Este equipo (sin SSH)");
         Capture(window, "agents.png");
+
+        // Este equipo: sin campos de SSH.
+        agents.LocalMachine = true;
+        window.UpdateLayout();
+        window.GetVisualDescendants().OfType<TextBlock>().Where(t => t.IsEffectivelyVisible).Select(t => t.Text).ShouldNotContain("Usuario");
+        Capture(window, "agents-local.png");
+        agents.LocalMachine = false;
         Avalonia.Application.Current.RequestedThemeVariant = Avalonia.Styling.ThemeVariant.Dark;
         Capture(window, "agents-dark.png");
         Avalonia.Application.Current.RequestedThemeVariant = Avalonia.Styling.ThemeVariant.Light;

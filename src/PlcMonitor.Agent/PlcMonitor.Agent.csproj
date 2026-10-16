@@ -2,6 +2,9 @@
   <PropertyGroup>
     <AssemblyName>plcmon-agent</AssemblyName>
     <Description>Agente de PLC-Monitor: servicio que vigila los dispositivos y los expone por gRPC.</Description>
+    <!-- Solo gRPC: sin ficheros estáticos (así el publicado es un único ejecutable). -->
+    <StaticWebAssetsEnabled>false</StaticWebAssetsEnabled>
+    <IsTransformWebConfigDisabled>true</IsTransformWebConfigDisabled>
   </PropertyGroup>
   <ItemGroup>
     <PackageReference Include="Grpc.AspNetCore.Server" />
@@ -19,6 +22,6 @@
     <InternalsVisibleTo Include="PlcMonitor.Agent.Tests" />
   </ItemGroup>
   <ItemGroup>
-    <None Update="agent.sample.json" CopyToOutputDirectory="PreserveNewest" />
+    <Content Update="agent.sample.json" CopyToOutputDirectory="PreserveNewest" CopyToPublishDirectory="Never" />
   </ItemGroup>
 </Project>

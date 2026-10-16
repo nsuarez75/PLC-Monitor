@@ -4,8 +4,10 @@
   </PropertyGroup>
   <ItemGroup>
     <ProjectReference Include="..\PlcMonitor.Abstractions\PlcMonitor.Abstractions.csproj" />
-    <!-- Fork propio de DotNetProjects.S7CommPlusDriver (LGPL-3): external/S7CommPlusDriver, rama plcmonitor -->
-    <ProjectReference Include="..\..\external\S7CommPlusDriver\src\S7CommPlusDriver\S7CommPlusDriver.csproj" SetTargetFramework="TargetFramework=net9.0" />
+    <!-- Fork propio de DotNetProjects.S7CommPlusDriver (LGPL-3): external/S7CommPlusDriver, rama plcmonitor.
+         Sin los binarios de OpenSSL: el TLS usa BouncyCastle (código gestionado) y así todo cabe en un único ejecutable. -->
+    <ProjectReference Include="..\..\external\S7CommPlusDriver\src\S7CommPlusDriver\S7CommPlusDriver.csproj" SetTargetFramework="TargetFramework=net9.0"
+                      AdditionalProperties="S7CommPlusIncludeOpenSslRuntimes=false" />
   </ItemGroup>
   <ItemGroup>
     <InternalsVisibleTo Include="PlcMonitor.Drivers.S7Symbolic.Tests" />

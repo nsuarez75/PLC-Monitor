@@ -1,4 +1,5 @@
 using Microsoft.AspNetCore.Server.Kestrel.Core;
+using Microsoft.Extensions.Configuration.Memory;
 using PlcMonitor.Agent;
 using PlcMonitor.Core;
 using PlcMonitor.Drivers.S7Absolute;
@@ -9,6 +10,18 @@ var builder = WebApplication.CreateBuilder(new WebApplicationOptions
     Args = args,
     // Como servicio, el directorio de trabajo es System32 o /: la configuración se busca junto al ejecutable.
     ContentRootPath = AppContext.BaseDirectory,
+});
+// Valores por defecto (el agente se publica como un único ejecutable, sin appsettings.json al lado): por debajo de
+// cualquier otra fuente. Solo local; para aceptar conexiones remotas, agent.settings.json o --Kestrel:Endpoints:Grpc:Url.
+builder.Configuration.Sources.Insert(0, new MemoryConfigurationSource
+{
+    InitialData = new Dictionary<string, string?>
+    {
+        ["Kestrel:Endpoints:Grpc:Url"] = "http://127.0.0.1:5310",
+        ["Logging:LogLevel:Default"] = "Information",
+        ["Logging:LogLevel:Microsoft.AspNetCore"] = "Warning",
+        ["Logging:LogLevel:PlcMonitor.Audit"] = "Information",
+    },
 });
 // agent.settings.json: lo escribe el instalador (puerto, certificado TLS, hash del token) y no lo pisan las actualizaciones.
 builder.Configuration.AddJsonFile(Path.Combine(AppContext.BaseDirectory, "agent.settings.json"), optional: true, reloadOnChange: false);
