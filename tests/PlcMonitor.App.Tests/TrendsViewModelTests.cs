@@ -1,6 +1,7 @@
 using Google.Protobuf.WellKnownTypes;
 using PlcMonitor.Agent.Contracts;
 using PlcMonitor.App.Services;
+using PlcMonitor.App.Charts;
 using PlcMonitor.App.ViewModels;
 
 namespace PlcMonitor.App.Tests;
@@ -130,6 +131,61 @@ public sealed class TrendsViewModelTests : IDisposable
         trends.EditCommand.Execute(null);
         trends.Live.ShouldBeNull();
         trends.IsEditing.ShouldBeTrue();
+    }
+
+    [Fact]
+    public void A_trigger_view_is_saved_and_shows_only_the_triggered_spans()
+    {
+        var main = MainWindowTests.ViewModelWithData(SettingsPath);
+        using var trends = new TrendsViewModel(main, TrendsPath);
+        trends.NewCommand.Execute(null);
+        trends.AddTagCommand.Execute(trends.Available.Single(c => c.Tag == "peso"));
+        trends.TriggerEnabled = true;
+        trends.SaveCommand.Execute(null);
+        trends.TriggerError.ShouldBe("Elige el tag de disparo.");
+
+        trends.TriggerTag = trends.TriggerChoices.Single(c => c.Tag == "clock");
+        trends.IsBooleanTrigger.ShouldBeTrue();
+        trends.TriggerBeforeSeconds = 2;
+        trends.TriggerHoldSeconds = 3;
+        trends.SaveCommand.Execute(null);
+        trends.TriggerError.ShouldBeEmpty();
+        var saved = TrendViewStore.Load(TrendsPath).Single().Trigger.ShouldNotBeNull();
+        (saved.Device, saved.Tag, saved.Condition, saved.Value, saved.BeforeSeconds, saved.HoldSeconds)
+            .ShouldBe(("casa1200", "clock", TriggerCondition.Equal, "true", 2, 3));
+        File.ReadAllText(TrendsPath).ShouldContain("\"Equal\"");
+        trends.Selected!.Description.ShouldEndWith("· disparo");
+
+        // Un tag numérico pide un número.
+        trends.TriggerTag = trends.TriggerChoices.Single(c => c.Tag == "peso");
+        trends.IsValueTrigger.ShouldBeTrue();
+        trends.TriggerValue = "mucho";
+        trends.OpenCommand.Execute(null);
+        trends.Live.ShouldBeNull();
+        trends.TriggerError.ShouldContain("número");
+        trends.TriggerTag = trends.TriggerChoices.Single(c => c.Tag == "clock");
+
+        // clock: true de 0 a 10 s y de nuevo desde 40 s; peso cambia cada 5 s.
+        var start = DateTimeOffset.UtcNow.AddSeconds(5);
+        var updates = new TagUpdates();
+        foreach (var (at, on) in new[] { (0, true), (10, false), (40, true) })
+            updates.Updates.Add(new TagUpdate { Device = "casa1200", Tag = "clock", Value = new TagValue { Quality = Quality.Good, DataType = DataType.Boolean, BoolValue = on, Timestamp = Timestamp.FromDateTimeOffset(start.AddSeconds(at)) } });
+        for (var at = 0; at <= 50; at += 5)
+            updates.Updates.Add(new TagUpdate { Device = "casa1200", Tag = "peso", Value = new TagValue { Quality = Quality.Good, DataType = DataType.Float, DoubleValue = at, Timestamp = Timestamp.FromDateTimeOffset(start.AddSeconds(at)) } });
+        main.Apply(new SubscribeEvent { TagUpdates = updates });
+
+        trends.OpenCommand.Execute(null);
+        var live = trends.Live.ShouldNotBeNull();
+        live.IsTriggered.ShouldBeTrue();
+        live.TriggerText.ShouldBe("Disparo: casa1200 / clock = true (−2 s +3 s)");
+        live.Refresh(start.AddSeconds(50));
+        live.TriggerActive.ShouldBeTrue();
+        var shown = live.Chart.Options.Single().Points;
+        // Tramo 1: de −2 s a 13 s (hueco al final); tramo 2: desde 38 s, abierto.
+        shown[0].Time.ShouldBe(start.AddSeconds(-2));
+        // (El valor de la foto inicial de la prueba no trae número: el tramo empieza con hueco hasta el primer valor.)
+        shown.Where(p => p.Value is null).Select(p => p.Time).ShouldBe([start.AddSeconds(-2), start.AddSeconds(13)]);
+        shown.Where(p => p.Value is not null).Select(p => p.Value).ShouldBe([0, 5, 10, 35, 40, 45, 50]);
     }
 
     [Fact]

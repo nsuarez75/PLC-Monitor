@@ -83,6 +83,45 @@
               </StackPanel>
             </Border>
 
+            <!-- Disparo: solo se ven los valores mientras se cumple, con tiempo antes y después -->
+            <Border Classes="card" Padding="20">
+              <StackPanel Spacing="12">
+                <TextBlock Text="DISPARO" Classes="caption" />
+                <CheckBox Content="Mostrar solo mientras un tag cumpla una condición" IsChecked="{Binding TriggerEnabled}" />
+                <Grid ColumnDefinitions="170,*" RowDefinitions="Auto,Auto,Auto,Auto" RowSpacing="10" ColumnSpacing="16" IsVisible="{Binding TriggerEnabled}">
+                  <TextBlock Text="Tag de disparo" VerticalAlignment="Center" FontWeight="Medium" />
+                  <ComboBox Grid.Column="1" ItemsSource="{Binding TriggerChoices}" SelectedItem="{Binding TriggerTag}" MinWidth="280" PlaceholderText="Elige un tag del agente">
+                    <ComboBox.ItemTemplate>
+                      <DataTemplate x:DataType="vm:TrendTagChoice">
+                        <TextBlock Text="{Binding Text}" TextTrimming="CharacterEllipsis" />
+                      </DataTemplate>
+                    </ComboBox.ItemTemplate>
+                  </ComboBox>
+                  <TextBlock Grid.Row="1" Text="Mostrar mientras" VerticalAlignment="Center" FontWeight="Medium" />
+                  <StackPanel Grid.Row="1" Grid.Column="1" Orientation="Horizontal" Spacing="8">
+                    <TextBlock Text="valga" Classes="muted" VerticalAlignment="Center" IsVisible="{Binding IsBooleanTrigger}" />
+                    <ComboBox ItemsSource="{x:Static vm:TagDetailsViewModel.BoolChoices}" SelectedItem="{Binding TriggerBool}" MinWidth="100" IsVisible="{Binding IsBooleanTrigger}" />
+                    <ComboBox ItemsSource="{x:Static vm:TagDetailsViewModel.Conditions}" SelectedItem="{Binding TriggerCondition}" MinWidth="70" IsVisible="{Binding IsValueTrigger}" />
+                    <TextBox Text="{Binding TriggerValue}" Width="140" PlaceholderText="valor" IsVisible="{Binding IsValueTrigger}" />
+                  </StackPanel>
+                  <TextBlock Grid.Row="2" Text="Antes del disparo" VerticalAlignment="Center" FontWeight="Medium" />
+                  <StackPanel Grid.Row="2" Grid.Column="1" Orientation="Horizontal" Spacing="8">
+                    <NumericUpDown Value="{Binding TriggerBeforeSeconds}" Minimum="0" Maximum="3600" Increment="5" FormatString="0.#" Width="140" />
+                    <TextBlock Text="s que se muestran de antes de cumplirse" Classes="muted" VerticalAlignment="Center" />
+                  </StackPanel>
+                  <TextBlock Grid.Row="3" Text="Después" VerticalAlignment="Center" FontWeight="Medium" />
+                  <StackPanel Grid.Row="3" Grid.Column="1" Orientation="Horizontal" Spacing="8">
+                    <NumericUpDown Value="{Binding TriggerHoldSeconds}" Minimum="0" Maximum="3600" Increment="5" FormatString="0.#" Width="140" />
+                    <TextBlock Text="s más tras dejar de cumplirse" Classes="muted" VerticalAlignment="Center" />
+                  </StackPanel>
+                </Grid>
+                <TextBlock Classes="muted" FontSize="11.5" TextWrapping="Wrap" IsVisible="{Binding TriggerEnabled}"
+                           Text="Fuera de esos tramos la gráfica queda en blanco. Se calcula con lo recibido en vivo (la última hora), como el histórico por disparo del agente." />
+                <TextBlock Text="{Binding TriggerError}" Classes="error" TextWrapping="Wrap"
+                           IsVisible="{Binding TriggerError, Converter={x:Static StringConverters.IsNotNullOrEmpty}}" />
+              </StackPanel>
+            </Border>
+
             <Border Classes="card" Padding="20">
               <Grid ColumnDefinitions="*,*" ColumnSpacing="20">
                 <StackPanel Spacing="10">
@@ -177,7 +216,15 @@
               <Border Classes="pill warn" IsVisible="{Binding Paused}" VerticalAlignment="Center">
                 <TextBlock Text="En pausa" />
               </Border>
+              <Border Classes="pill" Classes.good="{Binding TriggerActive}" IsVisible="{Binding IsTriggered}" VerticalAlignment="Center"
+                      ToolTip.Tip="{Binding TriggerText}">
+                <StackPanel Orientation="Horizontal" Spacing="6">
+                  <Ellipse Classes="dot" Classes.good="{Binding TriggerActive}" />
+                  <TextBlock Text="{Binding TriggerState}" />
+                </StackPanel>
+              </Border>
             </StackPanel>
+            <TextBlock DockPanel.Dock="Top" Text="{Binding TriggerText}" Classes="muted" Margin="0,0,0,10" IsVisible="{Binding IsTriggered}" TextTrimming="CharacterEllipsis" />
             <Border DockPanel.Dock="Top" Classes="pill warn" CornerRadius="8" Padding="12,8" Margin="0,0,0,12" HorizontalAlignment="Stretch"
                     IsVisible="{Binding Missing, Converter={x:Static StringConverters.IsNotNullOrEmpty}}">
               <TextBlock Text="{Binding Missing}" TextWrapping="Wrap" />

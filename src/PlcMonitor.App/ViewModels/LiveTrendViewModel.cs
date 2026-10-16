@@ -1,6 +1,7 @@
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using PlcMonitor.App.Charts;
+using PlcMonitor.App.Services;
 
 namespace PlcMonitor.App.ViewModels;
 
@@ -11,13 +12,33 @@ namespace PlcMonitor.App.ViewModels;
 public sealed partial class LiveTrendViewModel : ObservableObject
 {
     private readonly Func<IReadOnlyList<(string Name, TagViewModel? Tag)>> _tags;
+    private readonly TrendTrigger? _trigger;
+    private readonly Func<TagViewModel?>? _triggerTag;
+    private readonly List<(TagViewModel Source, List<ChartPoint> Shown)> _filtered = [];
+    private TagViewModel? _triggerSource;
 
     /// <param name="tags">Tags a dibujar con su nombre en la leyenda; null si el tag ya no existe en el agente.</param>
-    public LiveTrendViewModel(Func<IReadOnlyList<(string Name, TagViewModel? Tag)>> tags)
+    /// <param name="trigger">Tendencia de disparo: solo se ven los tramos en que se cumple (más el tiempo extra).</param>
+    /// <param name="triggerTag">El tag disparo en el agente conectado (null si no existe).</param>
+    public LiveTrendViewModel(Func<IReadOnlyList<(string Name, TagViewModel? Tag)>> tags, TrendTrigger? trigger = null, Func<TagViewModel?>? triggerTag = null)
     {
         _tags = tags;
+        _trigger = trigger;
+        _triggerTag = triggerTag;
         Chart.ZoomChanged += (_, _) => Paused = Chart.IsZoomed;
     }
+
+    /// <summary>Es una tendencia de disparo.</summary>
+    public bool IsTriggered => _trigger is not null;
+
+    public string TriggerText => _trigger is null ? "" : $"Disparo: {_trigger}";
+
+    /// <summary>El disparo se cumple ahora (o sigue en su tiempo extra).</summary>
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(TriggerState))]
+    public partial bool TriggerActive { get; private set; }
+
+    public string TriggerState => TriggerActive ? "Activo" : "Esperando";
 
     public static IReadOnlyList<Choice<TimeSpan>> Windows { get; } =
     [
@@ -47,20 +68,48 @@ public sealed partial class LiveTrendViewModel : ObservableObject
     {
         var tags = _tags();
         var now = DateTimeOffset.UtcNow;
+        _filtered.Clear();
+        _triggerSource = _triggerTag?.Invoke();
         Chart.SetData(
-            tags.Where(t => t.Tag is not null).Select(t => new ChartSeriesData(t.Name, t.Tag!.TrendPoints, Step: true, t.Tag.IsBoolean)),
+            tags.Where(t => t.Tag is not null).Select(t => new ChartSeriesData(t.Name, Shown(t.Tag!), Step: true, t.Tag!.IsBoolean)),
             now - Window.Value, now);
-        var missing = tags.Where(t => t.Tag is null).Select(t => t.Name).ToArray();
-        Missing = missing.Length == 0 ? "" : $"No disponibles en el agente: {string.Join(", ", missing)}";
+        var missing = tags.Where(t => t.Tag is null).Select(t => t.Name).ToList();
+        if (_trigger is not null && _triggerSource is null)
+            missing.Add($"{_trigger.Ref} (disparo)");
+        Missing = missing.Count == 0 ? "" : $"No disponibles en el agente: {string.Join(", ", missing)}";
         Refresh(now);
     }
 
     /// <summary>Avanza la ventana hasta <paramref name="now"/> y redibuja (lo llama un temporizador de la vista).</summary>
     public void Refresh(DateTimeOffset now)
     {
+        Refilter(now);
         if (!Paused)
             Chart.SetWindow(now - Window.Value, now);
         Chart.Touch();
+    }
+
+    /// <summary>Puntos que dibuja la gráfica: los del tag o, con disparo, una copia con solo los tramos activos.</summary>
+    private List<ChartPoint> Shown(TagViewModel tag)
+    {
+        if (_trigger is null)
+            return tag.TrendPoints;
+        var shown = new List<ChartPoint>();
+        _filtered.Add((tag, shown));
+        return shown;
+    }
+
+    private void Refilter(DateTimeOffset now)
+    {
+        if (_trigger is null)
+            return;
+        var spans = _triggerSource is { } source && TriggerFilter.TryParseTarget(_trigger.Value, out var target)
+            ? TriggerFilter.Spans(source.TrendPoints, v => TriggerFilter.IsMet(v, _trigger.Condition, target),
+                TimeSpan.FromSeconds(Math.Max(0, _trigger.HoldSeconds)), TimeSpan.FromSeconds(Math.Max(0, _trigger.BeforeSeconds)))
+            : [];
+        TriggerActive = spans.Count > 0 && (spans[^1].To is not { } end || end > now);
+        foreach (var (tag, shown) in _filtered)
+            TriggerFilter.Apply(tag.TrendPoints, spans, now, shown);
     }
 
     partial void OnWindowChanged(Choice<TimeSpan> value) => Refresh(DateTimeOffset.UtcNow);

@@ -1,6 +1,7 @@
 using System.Collections.ObjectModel;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
+using PlcMonitor.App.Charts;
 using PlcMonitor.App.Services;
 
 namespace PlcMonitor.App.ViewModels;
@@ -25,8 +26,8 @@ public sealed partial class TrendViewItem(TrendView view) : ObservableObject
     private static string Describe(TrendView view) => view.Tags.Count switch
     {
         0 => "sin tags",
-        1 => $"1 tag · {view.WindowMinutes} min",
-        var n => $"{n} tags · {view.WindowMinutes} min",
+        1 => $"1 tag · {view.WindowMinutes} min{(view.Trigger is null ? "" : " · disparo")}",
+        var n => $"{n} tags · {view.WindowMinutes} min{(view.Trigger is null ? "" : " · disparo")}",
     };
 }
 
@@ -108,6 +109,51 @@ public sealed partial class TrendsViewModel : ObservableObject, IDisposable
     [ObservableProperty]
     public partial string Note { get; private set; } = "";
 
+    // ---- Disparo: la vista solo muestra los valores mientras se cumple (más un tiempo después) ----
+
+    [ObservableProperty]
+    public partial bool TriggerEnabled { get; set; }
+
+    /// <summary>Tags del agente que pueden disparar (los dibujables, estén o no en la vista).</summary>
+    public ObservableCollection<TrendTagChoice> TriggerChoices { get; } = [];
+
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(IsBooleanTrigger), nameof(IsValueTrigger))]
+    public partial TrendTagChoice? TriggerTag { get; set; }
+
+    /// <summary>El disparo es booleano: se elige true o false; si no, condición y valor.</summary>
+    public bool IsBooleanTrigger => TriggerTag is { } t && (t.DataType == "Boolean" || _main.FindTag(t.Device, t.Tag)?.IsBoolean == true);
+
+    public bool IsValueTrigger => !IsBooleanTrigger;
+
+    [ObservableProperty]
+    public partial Choice<PlcMonitor.Agent.Contracts.TriggerCondition> TriggerCondition { get; set; } = TagDetailsViewModel.Conditions[0];
+
+    [ObservableProperty]
+    public partial string TriggerValue { get; set; } = "";
+
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(TriggerBool))]
+    public partial bool TriggerOnTrue { get; set; } = true;
+
+    public Choice<bool> TriggerBool
+    {
+        get => TagDetailsViewModel.BoolChoices[TriggerOnTrue ? 0 : 1];
+        set
+        {
+            if (value is not null)
+                TriggerOnTrue = value.Value;
+        }
+    }
+
+    /// <summary>Segundos que se siguen mostrando después de que la condición deje de cumplirse.</summary>
+    [ObservableProperty]
+    public partial decimal TriggerHoldSeconds { get; set; }
+
+    /// <summary>Segundos de antes de que se cumpla que también se muestran (pre-disparo).</summary>
+    [ObservableProperty]
+    public partial decimal TriggerBeforeSeconds { get; set; }
+
     partial void OnSelectedChanged(TrendViewItem? value)
     {
         Live = null;
@@ -129,11 +175,48 @@ public sealed partial class TrendsViewModel : ObservableObject, IDisposable
             Tags.Add(tag);
         Search = "";
         RefreshAvailable();
+        var trigger = view?.Trigger;
+        TriggerEnabled = trigger is not null;
+        TriggerTag = trigger is null ? null : TriggerChoices.FirstOrDefault(c => c.Ref == trigger.Ref) ?? AddMissingTrigger(trigger.Ref);
+        TriggerCondition = TagDetailsViewModel.Conditions.FirstOrDefault(c => c.Value == trigger?.Condition) ?? TagDetailsViewModel.Conditions[0];
+        TriggerValue = trigger?.Value ?? "";
+        TriggerOnTrue = !string.Equals(trigger?.Value?.Trim(), "false", StringComparison.OrdinalIgnoreCase);
+        TriggerHoldSeconds = (decimal)(trigger?.HoldSeconds ?? 0);
+        TriggerBeforeSeconds = (decimal)(trigger?.BeforeSeconds ?? 0);
     }
+
+    // El tag disparo guardado aunque el agente no lo tenga (desconectado o borrado): se sigue viendo en el desplegable.
+    private TrendTagChoice AddMissingTrigger(TrendTagRef tag)
+    {
+        var choice = new TrendTagChoice(tag.Device, tag.Tag, "");
+        TriggerChoices.Add(choice);
+        return choice;
+    }
+
+    private TrendTrigger? BuildTrigger() => TriggerEnabled && TriggerTag is { } tag
+        ? new TrendTrigger
+        {
+            Device = tag.Device,
+            Tag = tag.Tag,
+            Condition = IsBooleanTrigger ? PlcMonitor.Agent.Contracts.TriggerCondition.Equal : TriggerCondition.Value,
+            Value = IsBooleanTrigger ? (TriggerOnTrue ? "true" : "false") : TriggerValue.Trim(),
+            HoldSeconds = (double)TriggerHoldSeconds,
+            BeforeSeconds = (double)TriggerBeforeSeconds,
+        }
+        : null;
 
     /// <summary>Tags que se pueden añadir: los del agente conectado (dibujables) que no estén ya.</summary>
     private void RefreshAvailable()
     {
+        var trigger = TriggerTag?.Ref;
+        TriggerChoices.Clear();
+        foreach (var device in _main.Devices)
+        {
+            foreach (var tag in device.Tags.Where(t => t.IsChartable))
+                TriggerChoices.Add(new TrendTagChoice(device.Name, tag.Name, tag.DataType));
+        }
+        if (trigger is not null)
+            TriggerTag = TriggerChoices.FirstOrDefault(c => c.Ref == trigger) ?? AddMissingTrigger(trigger);
         Available.Clear();
         var search = Search.Trim();
         foreach (var device in _main.Devices)
@@ -183,10 +266,23 @@ public sealed partial class TrendsViewModel : ObservableObject, IDisposable
 
     private bool CanSave() => Selected is not null && !string.IsNullOrWhiteSpace(Name);
 
+    /// <summary>El disparo está completo (tag y, si no es booleano, un número); si no, se explica en <see cref="TriggerError"/>.</summary>
+    private bool CheckTrigger()
+    {
+        TriggerError = !TriggerEnabled ? ""
+            : TriggerTag is null ? "Elige el tag de disparo."
+            : IsValueTrigger && !TriggerFilter.TryParseTarget(TriggerValue, out _) ? "El valor del disparo debe ser un número."
+            : "";
+        return TriggerError.Length == 0;
+    }
+
+    [ObservableProperty]
+    public partial string TriggerError { get; private set; } = "";
+
     [RelayCommand(CanExecute = nameof(CanSave))]
     private void Save()
     {
-        if (Selected is not { } item)
+        if (Selected is not { } item || !CheckTrigger())
             return;
         Apply(item);
         _main.Report($"Tendencia «{item.Name}» guardada");
@@ -196,15 +292,21 @@ public sealed partial class TrendsViewModel : ObservableObject, IDisposable
     [RelayCommand(CanExecute = nameof(CanSave))]
     private void Open()
     {
-        if (Selected is not { } item)
+        if (Selected is not { } item || !CheckTrigger())
             return;
         Apply(item);
         var view = item.View;
-        var live = new LiveTrendViewModel(() => view.Tags.Select(t => (t.ToString(), _main.FindTag(t.Device, t.Tag))).ToArray())
+        var trigger = view.Trigger;
+        var live = new LiveTrendViewModel(
+            () => view.Tags.Select(t => (t.ToString(), _main.FindTag(t.Device, t.Tag))).ToArray(),
+            trigger,
+            trigger is null ? null : () => _main.FindTag(trigger.Device, trigger.Tag))
         {
             Window = Window,
         };
-        live.Chart.EmptyText = view.Tags.Count == 0 ? "Esta vista no tiene tags: edítala y añade alguno" : "Aún no hay valores de estos tags";
+        live.Chart.EmptyText = view.Tags.Count == 0 ? "Esta vista no tiene tags: edítala y añade alguno"
+            : trigger is not null ? "Esperando el disparo"
+            : "Aún no hay valores de estos tags";
         live.Chart.AutoY = view.AutoY;
         live.Chart.YMinInput = YMin;
         live.Chart.YMaxInput = YMax;
@@ -246,6 +348,7 @@ public sealed partial class TrendsViewModel : ObservableObject, IDisposable
         view.YMin = YMin is { } min ? (double)min : null;
         view.YMax = YMax is { } max ? (double)max : null;
         view.Tags = [.. Tags];
+        view.Trigger = BuildTrigger();
         item.Refresh();
         Persist();
     }

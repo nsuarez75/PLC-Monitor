@@ -265,6 +265,21 @@ public class MainWindowTests
         Avalonia.Application.Current.RequestedThemeVariant = Avalonia.Styling.ThemeVariant.Dark;
         Capture(window, "trend-dark.png");
         Avalonia.Application.Current.RequestedThemeVariant = Avalonia.Styling.ThemeVariant.Light;
+
+        // Tendencia de disparo: solo mientras clock = true, con 3 s antes y 2 s después.
+        trends.EditCommand.Execute(null);
+        trends.RemoveTagCommand.Execute(new TrendTagRef("casa1200", "clock"));
+        trends.TriggerEnabled = true;
+        trends.TriggerTag = trends.TriggerChoices.Single(c => c.Tag == "clock");
+        trends.TriggerBeforeSeconds = 3;
+        trends.TriggerHoldSeconds = 2;
+        window.UpdateLayout();
+        Capture(window, "trends-trigger-edit.png");
+        trends.OpenCommand.Execute(null);
+        trends.Refresh(now);
+        trends.Live!.TriggerActive.ShouldBeTrue();
+        trends.Live.Chart.Series.ShouldHaveSingleItem().Points.Count(p => p.Value is null).ShouldBeGreaterThan(3);
+        Capture(window, "trend-trigger.png");
         vm.CloseTrendsCommand.Execute(null);
         Directory.Delete(dir, recursive: true);
     });
