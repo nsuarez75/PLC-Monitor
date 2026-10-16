@@ -12,9 +12,9 @@ namespace PlcMonitor.App.Tests;
 /// <summary>La ventana principal se construye y enlaza con el ViewModel (sin agente: eventos sintéticos).</summary>
 public class MainWindowTests
 {
-    private static MainViewModel ViewModelWithData()
+    internal static MainViewModel ViewModelWithData(string? settingsPath = null)
     {
-        var vm = new MainViewModel(new GrpcAgentConnector(), new ImmediateDispatcher(), new FakeDialogs(), new AppSettings(), Path.GetTempFileName(), Path.Combine(Path.GetTempPath(), $"plcmon-agents-{Guid.NewGuid():N}.json"));
+        var vm = new MainViewModel(new GrpcAgentConnector(), new ImmediateDispatcher(), new FakeDialogs(), new AppSettings(), settingsPath ?? Path.GetTempFileName(), Path.Combine(Path.GetTempPath(), $"plcmon-agents-{Guid.NewGuid():N}.json"));
         var now = Timestamp.FromDateTime(DateTime.UtcNow);
         var snapshot = new Snapshot();
         snapshot.Devices.Add(new Device { Name = "casa1200", Driver = "s7-symbolic", Enabled = true, WritesEnabled = true, State = ConnectionState.Connected, Since = now, TagCount = 3 });
@@ -180,10 +180,11 @@ public class MainWindowTests
     });
 
     [Fact]
-    public Task Trend_tab_draws_live_values() => HeadlessApp.RunAsync(() =>
+    public Task Trend_views_draw_live_values() => HeadlessApp.RunAsync(() =>
     {
         Avalonia.Application.Current!.RequestedThemeVariant = Avalonia.Styling.ThemeVariant.Light;
-        var vm = ViewModelWithData();
+        var dir = Directory.CreateTempSubdirectory("plcmon-trends-").FullName;
+        var vm = ViewModelWithData(Path.Combine(dir, "app.json"));
         var window = new MainWindow { DataContext = vm };
         window.Show();
         // Después del valor inicial de la foto (las horas del búfer no van hacia atrás).
@@ -201,19 +202,31 @@ public class MainWindowTests
                 updates.Updates.Add(new TagUpdate { Device = "casa1200", Tag = "clock", Value = new TagValue { Quality = Quality.Good, DataType = DataType.Boolean, BoolValue = i % 30 == 0, Timestamp = t } });
             vm.Apply(new SubscribeEvent { TagUpdates = updates });
         }
-        vm.Trend.Chart.Options[0].Name.ShouldBe("clock");
-        vm.Trend.Chart.Options[0].IsSelected.ShouldBeTrue(); // el primero va marcado
-        foreach (var option in vm.Trend.Chart.Options)
-            option.IsSelected = option.Name == "peso";
-        vm.Trend.Refresh(now);
-        SelectTab(window, "Tendencia");
 
-        vm.Trend.Chart.Series.ShouldHaveSingleItem().Points.Count.ShouldBeGreaterThan(200);
+        vm.OpenTrendsCommand.Execute(null);
+        var trends = vm.Trends.ShouldNotBeNull();
+        trends.NewCommand.Execute(null);
+        trends.Name = "Báscula";
+        trends.AddTagCommand.Execute(trends.Available.Single(c => c.Tag == "peso"));
+        window.UpdateLayout();
+        window.GetVisualDescendants().OfType<TextBlock>().Select(t => t.Text).ShouldContain("TAGS DE LA VISTA");
+        Capture(window, "trends-edit.png");
+
+        trends.OpenCommand.Execute(null);
+        var live = trends.Live.ShouldNotBeNull();
+        trends.Refresh(now);
+        live.Chart.Series.ShouldHaveSingleItem().Points.Count.ShouldBeGreaterThan(200);
         Capture(window, "trend.png");
-        vm.Trend.Chart.Options.Single(o => o.Name == "clock").IsSelected = true;
+        trends.EditCommand.Execute(null);
+        trends.AddTagCommand.Execute(trends.Available.Single(c => c.Tag == "clock"));
+        trends.OpenCommand.Execute(null);
+        trends.Refresh(now);
+        trends.Live!.Chart.Series.Count.ShouldBe(2);
         Avalonia.Application.Current.RequestedThemeVariant = Avalonia.Styling.ThemeVariant.Dark;
         Capture(window, "trend-dark.png");
         Avalonia.Application.Current.RequestedThemeVariant = Avalonia.Styling.ThemeVariant.Light;
+        vm.CloseTrendsCommand.Execute(null);
+        Directory.Delete(dir, recursive: true);
     });
 
     [Fact]

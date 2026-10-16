@@ -1,0 +1,191 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:vm="using:PlcMonitor.App.ViewModels"
+             xmlns:svc="using:PlcMonitor.App.Services"
+             xmlns:c="using:PlcMonitor.App.Controls"
+             xmlns:v="using:PlcMonitor.App.Views"
+             x:Class="PlcMonitor.App.Views.TrendsView"
+             x:DataType="vm:TrendsViewModel"
+             Background="{DynamicResource App.Background}">
+  <Grid ColumnDefinitions="270,*" Margin="20,16" ColumnSpacing="16">
+
+    <!-- Vistas guardadas -->
+    <Border Classes="card" Padding="12">
+      <DockPanel>
+        <Grid DockPanel.Dock="Top" ColumnDefinitions="*,Auto" Margin="4,0,0,10">
+          <TextBlock Text="TENDENCIAS" Classes="caption" VerticalAlignment="Center" />
+          <Button Grid.Column="1" Classes="ghost" Command="{Binding NewCommand}" ToolTip.Tip="Nueva vista de tendencia">
+            <c:Icon Kind="plus" />
+          </Button>
+        </Grid>
+        <ListBox Classes="devices" ItemsSource="{Binding Views}" SelectedItem="{Binding Selected}">
+          <ListBox.ItemTemplate>
+            <DataTemplate x:DataType="vm:TrendViewItem">
+              <StackPanel Spacing="2">
+                <TextBlock Text="{Binding Name}" FontWeight="SemiBold" TextTrimming="CharacterEllipsis" />
+                <TextBlock Text="{Binding Description}" Classes="muted" FontSize="11.5" TextTrimming="CharacterEllipsis" />
+              </StackPanel>
+            </DataTemplate>
+          </ListBox.ItemTemplate>
+        </ListBox>
+      </DockPanel>
+    </Border>
+
+    <DockPanel Grid.Column="1">
+      <Grid DockPanel.Dock="Top" ColumnDefinitions="*,Auto" Margin="0,0,0,14">
+        <StackPanel Spacing="2">
+          <TextBlock Text="{Binding Selected.Name, FallbackValue='Tendencias'}" Classes="title" />
+          <TextBlock Classes="muted" Text="Elige los tags de cualquier dispositivo del agente y ábrelos juntos en una gráfica en vivo." />
+        </StackPanel>
+        <Button Grid.Column="1" Classes="secondary" VerticalAlignment="Top"
+                Command="{Binding $parent[Window].((vm:MainViewModel)DataContext).CloseTrendsCommand}">
+          <StackPanel Orientation="Horizontal" Spacing="6">
+            <c:Icon Kind="x" />
+            <TextBlock Text="Cerrar" />
+          </StackPanel>
+        </Button>
+      </Grid>
+
+      <Panel>
+        <!-- Sin vistas -->
+        <Border Classes="card" Padding="24" VerticalAlignment="Top" IsVisible="{Binding !HasViews}">
+          <StackPanel Spacing="12">
+            <TextBlock Text="Aún no hay vistas de tendencia para este agente." />
+            <Button Classes="accent" Command="{Binding NewCommand}" HorizontalAlignment="Left">
+              <StackPanel Orientation="Horizontal" Spacing="6">
+                <c:Icon Kind="plus" />
+                <TextBlock Text="Nueva tendencia" />
+              </StackPanel>
+            </Button>
+          </StackPanel>
+        </Border>
+
+        <!-- Configuración de la vista -->
+        <ScrollViewer IsVisible="{Binding IsEditing}">
+          <StackPanel Spacing="14">
+            <Border Classes="card" Padding="20">
+              <StackPanel Spacing="12">
+                <TextBlock Text="VISTA" Classes="caption" />
+                <Grid ColumnDefinitions="170,*" RowDefinitions="Auto,Auto,Auto" RowSpacing="10" ColumnSpacing="16">
+                  <TextBlock Text="Nombre" VerticalAlignment="Center" FontWeight="Medium" />
+                  <TextBox Grid.Column="1" Text="{Binding Name}" PlaceholderText="Presión línea 3" />
+                  <TextBlock Grid.Row="1" Text="Ventana" VerticalAlignment="Center" FontWeight="Medium" />
+                  <ComboBox Grid.Row="1" Grid.Column="1" ItemsSource="{x:Static vm:LiveTrendViewModel.Windows}" SelectedItem="{Binding Window}" MinWidth="110" />
+                  <TextBlock Grid.Row="2" Text="Eje Y" VerticalAlignment="Center" FontWeight="Medium" />
+                  <StackPanel Grid.Row="2" Grid.Column="1" Orientation="Horizontal" Spacing="8">
+                    <CheckBox Content="Automático" IsChecked="{Binding AutoY}" />
+                    <TextBlock Text="mín" Classes="muted" VerticalAlignment="Center" IsVisible="{Binding IsManualY}" Margin="8,0,0,0" />
+                    <NumericUpDown Value="{Binding YMin}" Width="130" IsVisible="{Binding IsManualY}" />
+                    <TextBlock Text="máx" Classes="muted" VerticalAlignment="Center" IsVisible="{Binding IsManualY}" />
+                    <NumericUpDown Value="{Binding YMax}" Width="130" IsVisible="{Binding IsManualY}" />
+                  </StackPanel>
+                </Grid>
+              </StackPanel>
+            </Border>
+
+            <Border Classes="card" Padding="20">
+              <Grid ColumnDefinitions="*,*" ColumnSpacing="20">
+                <StackPanel Spacing="10">
+                  <TextBlock Text="TAGS DE LA VISTA" Classes="caption" />
+                  <TextBlock Classes="muted" Text="Ninguno todavía: añádelos de la lista de la derecha."
+                             IsVisible="{Binding !Tags.Count}" TextWrapping="Wrap" />
+                  <ItemsControl ItemsSource="{Binding Tags}">
+                    <ItemsControl.ItemTemplate>
+                      <DataTemplate x:DataType="svc:TrendTagRef">
+                        <Grid ColumnDefinitions="*,Auto" Margin="0,0,0,4">
+                          <TextBlock Text="{Binding}" VerticalAlignment="Center" TextTrimming="CharacterEllipsis" />
+                          <Button Grid.Column="1" Classes="ghost danger" ToolTip.Tip="Quitar de la vista"
+                                  Command="{Binding $parent[UserControl].((vm:TrendsViewModel)DataContext).RemoveTagCommand}" CommandParameter="{Binding}">
+                            <c:Icon Kind="x" Width="14" Height="14" />
+                          </Button>
+                        </Grid>
+                      </DataTemplate>
+                    </ItemsControl.ItemTemplate>
+                  </ItemsControl>
+                </StackPanel>
+                <StackPanel Grid.Column="1" Spacing="10">
+                  <TextBlock Text="TAGS DEL AGENTE" Classes="caption" />
+                  <TextBox Text="{Binding Search}" PlaceholderText="Buscar dispositivo o tag">
+                    <TextBox.InnerLeftContent>
+                      <c:Icon Kind="search" Width="14" Height="14" Margin="8,0,0,0" Foreground="{DynamicResource App.TextMuted}" />
+                    </TextBox.InnerLeftContent>
+                  </TextBox>
+                  <TextBlock Classes="muted" Text="{Binding Note}" TextWrapping="Wrap"
+                             IsVisible="{Binding Note, Converter={x:Static StringConverters.IsNotNullOrEmpty}}" />
+                  <ScrollViewer MaxHeight="360">
+                    <ItemsControl ItemsSource="{Binding Available}">
+                      <ItemsControl.ItemTemplate>
+                        <DataTemplate x:DataType="vm:TrendTagChoice">
+                          <Grid ColumnDefinitions="*,Auto,Auto" ColumnSpacing="8" Margin="0,0,0,4">
+                            <TextBlock Text="{Binding Text}" VerticalAlignment="Center" TextTrimming="CharacterEllipsis" />
+                            <TextBlock Grid.Column="1" Text="{Binding DataType}" Classes="muted" FontSize="11.5" VerticalAlignment="Center" />
+                            <Button Grid.Column="2" Classes="ghost" ToolTip.Tip="Añadir a la vista"
+                                    Command="{Binding $parent[UserControl].((vm:TrendsViewModel)DataContext).AddTagCommand}" CommandParameter="{Binding}">
+                              <c:Icon Kind="plus" Width="14" Height="14" />
+                            </Button>
+                          </Grid>
+                        </DataTemplate>
+                      </ItemsControl.ItemTemplate>
+                    </ItemsControl>
+                  </ScrollViewer>
+                </StackPanel>
+              </Grid>
+            </Border>
+
+            <StackPanel Orientation="Horizontal" Spacing="8">
+              <Button Classes="accent" Command="{Binding OpenCommand}">
+                <StackPanel Orientation="Horizontal" Spacing="6">
+                  <c:Icon Kind="play" />
+                  <TextBlock Text="Abrir" />
+                </StackPanel>
+              </Button>
+              <Button Classes="secondary" Command="{Binding SaveCommand}">
+                <StackPanel Orientation="Horizontal" Spacing="6">
+                  <c:Icon Kind="save" />
+                  <TextBlock Text="Guardar" />
+                </StackPanel>
+              </Button>
+              <Button Classes="ghost danger" Command="{Binding DeleteCommand}">
+                <StackPanel Orientation="Horizontal" Spacing="6">
+                  <c:Icon Kind="trash" />
+                  <TextBlock Text="Borrar" />
+                </StackPanel>
+              </Button>
+            </StackPanel>
+          </StackPanel>
+        </ScrollViewer>
+
+        <!-- Gráfica en vivo de la vista abierta -->
+        <Border Classes="card" Padding="16" IsVisible="{Binding IsViewing}">
+          <DockPanel DataContext="{Binding Live}" x:DataType="vm:LiveTrendViewModel">
+            <StackPanel DockPanel.Dock="Top" Orientation="Horizontal" Spacing="10" Margin="0,0,0,12">
+              <Button Classes="secondary" Command="{Binding $parent[UserControl].((vm:TrendsViewModel)DataContext).EditCommand}">
+                <StackPanel Orientation="Horizontal" Spacing="6">
+                  <c:Icon Kind="pencil" />
+                  <TextBlock Text="Editar vista" />
+                </StackPanel>
+              </Button>
+              <TextBlock Text="Ventana" Classes="muted" VerticalAlignment="Center" Margin="8,0,0,0" />
+              <ComboBox ItemsSource="{x:Static vm:LiveTrendViewModel.Windows}" SelectedItem="{Binding Window}" MinWidth="110" />
+              <Button Classes="secondary" Command="{Binding TogglePauseCommand}">
+                <StackPanel Orientation="Horizontal" Spacing="6">
+                  <c:Icon Kind="pause" IsVisible="{Binding !Paused}" />
+                  <c:Icon Kind="play" IsVisible="{Binding Paused}" />
+                  <TextBlock Text="{Binding PauseText}" />
+                </StackPanel>
+              </Button>
+              <Border Classes="pill warn" IsVisible="{Binding Paused}" VerticalAlignment="Center">
+                <TextBlock Text="En pausa" />
+              </Border>
+            </StackPanel>
+            <Border DockPanel.Dock="Top" Classes="pill warn" CornerRadius="8" Padding="12,8" Margin="0,0,0,12" HorizontalAlignment="Stretch"
+                    IsVisible="{Binding Missing, Converter={x:Static StringConverters.IsNotNullOrEmpty}}">
+              <TextBlock Text="{Binding Missing}" TextWrapping="Wrap" />
+            </Border>
+            <v:ChartPanel DataContext="{Binding Chart}" />
+          </DockPanel>
+        </Border>
+      </Panel>
+    </DockPanel>
+  </Grid>
+</UserControl>

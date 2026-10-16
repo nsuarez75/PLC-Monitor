@@ -5,16 +5,17 @@ using PlcMonitor.App.Charts;
 namespace PlcMonitor.App.ViewModels;
 
 /// <summary>
-/// Tendencia en vivo del dispositivo seleccionado: los tags que se marquen, con los valores que llegan del agente,
-/// en una ventana que avanza con el reloj. Se pausa al hacer zoom o con el botón; «Ajustar» quita el zoom y sigue.
+/// Tendencia en vivo de unos tags (los de una vista de tendencia), con los valores que llegan del agente, en una
+/// ventana que avanza con el reloj. Se pausa al hacer zoom o con el botón; «Seguir» quita el zoom y continúa.
 /// </summary>
 public sealed partial class LiveTrendViewModel : ObservableObject
 {
-    private readonly Func<DeviceViewModel?> _device;
+    private readonly Func<IReadOnlyList<(string Name, TagViewModel? Tag)>> _tags;
 
-    public LiveTrendViewModel(Func<DeviceViewModel?> device)
+    /// <param name="tags">Tags a dibujar con su nombre en la leyenda; null si el tag ya no existe en el agente.</param>
+    public LiveTrendViewModel(Func<IReadOnlyList<(string Name, TagViewModel? Tag)>> tags)
     {
-        _device = device;
+        _tags = tags;
         Chart.ZoomChanged += (_, _) => Paused = Chart.IsZoomed;
     }
 
@@ -26,7 +27,7 @@ public sealed partial class LiveTrendViewModel : ObservableObject
         new("1 h", TimeSpan.FromHours(1)),
     ];
 
-    public ChartViewModel Chart { get; } = new() { EmptyText = "Marca uno o más tags para ver su tendencia" };
+    public ChartViewModel Chart { get; } = new() { EmptyText = "Aún no hay valores de estos tags" };
 
     [ObservableProperty]
     public partial Choice<TimeSpan> Window { get; set; } = Windows[1];
@@ -37,17 +38,21 @@ public sealed partial class LiveTrendViewModel : ObservableObject
 
     public string PauseText => Paused ? "Seguir" : "Pausa";
 
-    /// <summary>Nuevo dispositivo seleccionado.</summary>
-    public void Reset() => RefreshTags(selectFirst: 1);
+    /// <summary>Tags de la vista que el agente ya no tiene (se han borrado o renombrado).</summary>
+    [ObservableProperty]
+    public partial string Missing { get; private set; } = "";
 
-    /// <summary>Rehace la lista de tags (conserva lo marcado) a partir del dispositivo seleccionado.</summary>
-    public void RefreshTags() => RefreshTags(selectFirst: 1);
-
-    private void RefreshTags(int selectFirst)
+    /// <summary>Vuelve a enlazar las series con los tags (al abrir y cuando el agente reconfigura o se reconecta).</summary>
+    public void RefreshTags()
     {
-        var tags = _device()?.Tags.Where(t => t.IsChartable).ToArray() ?? [];
+        var tags = _tags();
         var now = DateTimeOffset.UtcNow;
-        Chart.SetData(tags.Select(t => new ChartSeriesData(t.Name, t.TrendPoints, Step: true, t.IsBoolean)), now - Window.Value, now, selectFirst);
+        Chart.SetData(
+            tags.Where(t => t.Tag is not null).Select(t => new ChartSeriesData(t.Name, t.Tag!.TrendPoints, Step: true, t.Tag.IsBoolean)),
+            now - Window.Value, now);
+        var missing = tags.Where(t => t.Tag is null).Select(t => t.Name).ToArray();
+        Missing = missing.Length == 0 ? "" : $"No disponibles en el agente: {string.Join(", ", missing)}";
+        Refresh(now);
     }
 
     /// <summary>Avanza la ventana hasta <paramref name="now"/> y redibuja (lo llama un temporizador de la vista).</summary>

@@ -59,6 +59,12 @@
         </Border>
 
         <StackPanel Grid.Column="3" Orientation="Horizontal" Spacing="2">
+        <Button Classes="ghost" Command="{Binding OpenTrendsCommand}" ToolTip.Tip="Vistas de tendencia en vivo con tags de cualquier dispositivo">
+          <StackPanel Orientation="Horizontal" Spacing="6">
+            <c:Icon Kind="pulse" Width="16" Height="16" />
+            <TextBlock Text="Tendencias" />
+          </StackPanel>
+        </Button>
         <Button Classes="ghost" Command="{Binding OpenCsvCommand}" ToolTip.Tip="Ver un CSV exportado del histórico (sin conexión)">
           <StackPanel Orientation="Horizontal" Spacing="6">
             <c:Icon Kind="chart" Width="16" Height="16" />
@@ -257,29 +263,6 @@
               </DockPanel>
             </TabItem>
 
-            <!-- Tendencia en vivo -->
-            <TabItem Header="Tendencia">
-              <Border Classes="card" Padding="16" Margin="0,12,0,0" DataContext="{Binding Trend}" x:DataType="vm:LiveTrendViewModel">
-                <DockPanel>
-                  <StackPanel DockPanel.Dock="Top" Orientation="Horizontal" Spacing="10" Margin="0,0,0,12">
-                    <TextBlock Text="Ventana" Classes="muted" VerticalAlignment="Center" />
-                    <ComboBox ItemsSource="{x:Static vm:LiveTrendViewModel.Windows}" SelectedItem="{Binding Window}" MinWidth="110" />
-                    <Button Classes="secondary" Command="{Binding TogglePauseCommand}">
-                      <StackPanel Orientation="Horizontal" Spacing="6">
-                        <c:Icon Kind="pause" IsVisible="{Binding !Paused}" />
-                        <c:Icon Kind="play" IsVisible="{Binding Paused}" />
-                        <TextBlock Text="{Binding PauseText}" />
-                      </StackPanel>
-                    </Button>
-                    <Border Classes="pill warn" IsVisible="{Binding Paused}" VerticalAlignment="Center">
-                      <TextBlock Text="En pausa" />
-                    </Border>
-                  </StackPanel>
-                  <v:ChartPanel DataContext="{Binding Chart}" />
-                </DockPanel>
-              </Border>
-            </TabItem>
-
             <!-- Histórico -->
             <TabItem Header="Histórico">
               <DockPanel Margin="0,12,0,0" DataContext="{Binding History}" x:DataType="vm:HistoryViewModel">
@@ -433,6 +416,9 @@
             </TabItem>
           </TabControl>
         </DockPanel>
+
+        <!-- Vistas de tendencia (por encima del contenido) -->
+        <v:TrendsView DataContext="{Binding Trends}" IsVisible="{Binding $parent[Window].((vm:MainViewModel)DataContext).Trends, Converter={x:Static ObjectConverters.IsNotNull}}" />
 
         <!-- Gestión de agentes (por encima del contenido) -->
         <v:AgentsView DataContext="{Binding Agents}" IsVisible="{Binding $parent[Window].((vm:MainViewModel)DataContext).Agents, Converter={x:Static ObjectConverters.IsNotNull}}" />

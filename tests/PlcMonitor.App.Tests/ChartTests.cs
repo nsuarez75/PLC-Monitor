@@ -173,7 +173,7 @@ public sealed class ChartTests
     [Fact]
     public void Live_trend_follows_the_clock_and_pauses_on_zoom()
     {
-        var trend = new LiveTrendViewModel(() => null);
+        var trend = new LiveTrendViewModel(() => []);
         var now = T0.AddMinutes(30);
         trend.Refresh(now);
         (trend.Chart.From, trend.Chart.To).ShouldBe((now - TimeSpan.FromMinutes(5), now));

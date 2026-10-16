@@ -56,7 +56,6 @@ public sealed partial class MainViewModel : ObservableObject, IAgentContext, IAs
         RecentAgents = [.. settings.RecentAgents];
         Browse = new BrowseViewModel(this, () => SelectedDevice);
         History = new HistoryViewModel(this, () => SelectedDevice);
-        Trend = new LiveTrendViewModel(() => SelectedDevice);
     }
 
     public AgentService.AgentServiceClient? Client { get; private set; }
@@ -123,8 +122,32 @@ public sealed partial class MainViewModel : ObservableObject, IAgentContext, IAs
     /// <summary>Consulta del histórico del dispositivo seleccionado.</summary>
     public HistoryViewModel History { get; }
 
-    /// <summary>Tendencia en vivo del dispositivo seleccionado.</summary>
-    public LiveTrendViewModel Trend { get; }
+    /// <summary>Panel de vistas de tendencia abierto; null si no.</summary>
+    [ObservableProperty]
+    public partial TrendsViewModel? Trends { get; set; }
+
+    /// <summary>Agente al que pertenecen las vistas de tendencia: el id de su perfil o, sin perfil, su URL.</summary>
+    public string AgentKey => SelectedProfile?.Id ?? AgentUrl.Trim();
+
+    /// <summary>Han cambiado los tags del agente (foto nueva, dispositivo reconfigurado o quitado).</summary>
+    public event EventHandler? TagsChanged;
+
+    /// <summary>Tag del agente conectado; null si no existe.</summary>
+    public TagViewModel? FindTag(string device, string tag) => _tagIndex.GetValueOrDefault((device, tag));
+
+    [RelayCommand]
+    private void OpenTrends()
+    {
+        Trends?.Dispose();
+        Trends = new TrendsViewModel(this, TrendViewStore.PathNextTo(_settingsPath));
+    }
+
+    [RelayCommand]
+    private void CloseTrends()
+    {
+        Trends?.Dispose();
+        Trends = null;
+    }
 
     /// <summary>Abre un CSV exportado del histórico en un visor aparte (no hace falta estar conectado).</summary>
     [RelayCommand]
@@ -202,7 +225,6 @@ public sealed partial class MainViewModel : ObservableObject, IAgentContext, IAs
     {
         Browse.Clear();
         History.Reset();
-        Trend.Reset();
     }
 
     public void Report(string message, bool isError = false) => _ui.Post(() =>
@@ -291,6 +313,7 @@ public sealed partial class MainViewModel : ObservableObject, IAgentContext, IAs
         _tagIndex.Clear();
         SelectedDevice = null;
         AgentDescription = "";
+        TagsChanged?.Invoke(this, EventArgs.Empty);
         Report("Desconectado");
     }
 
@@ -453,6 +476,7 @@ public sealed partial class MainViewModel : ObservableObject, IAgentContext, IAs
         }
         SelectedDevice = Find(selected) ?? Devices.FirstOrDefault();
         IsLive = true;
+        TagsChanged?.Invoke(this, EventArgs.Empty);
     }
 
     private void ApplyConfigured(DeviceConfigured configured)
@@ -482,10 +506,8 @@ public sealed partial class MainViewModel : ObservableObject, IAgentContext, IAs
                 tag.AdoptTrend(old);
         }
         if (device == SelectedDevice)
-        {
             History.RefreshTags();
-            Trend.RefreshTags();
-        }
+        TagsChanged?.Invoke(this, EventArgs.Empty);
         if (_pendingSelection == device.Name)
         {
             SelectedDevice = device;
@@ -503,6 +525,7 @@ public sealed partial class MainViewModel : ObservableObject, IAgentContext, IAs
         Devices.Remove(device);
         if (wasSelected)
             SelectedDevice = Devices.FirstOrDefault();
+        TagsChanged?.Invoke(this, EventArgs.Empty);
     }
 
     private void AddTags(DeviceViewModel device, IEnumerable<Tag> tags)

@@ -16,7 +16,7 @@ public sealed partial class MainWindow : Window
         this.FindControl<ListBox>("TagsList")!.DoubleTapped += OnTagDoubleTapped;
         // La tendencia en vivo avanza con el reloj aunque no lleguen valores nuevos.
         var trend = new DispatcherTimer { Interval = TimeSpan.FromMilliseconds(500) };
-        trend.Tick += (_, _) => (DataContext as MainViewModel)?.Trend.Refresh(DateTimeOffset.UtcNow);
+        trend.Tick += (_, _) => (DataContext as MainViewModel)?.Trends?.Refresh(DateTimeOffset.UtcNow);
         Opened += (_, _) => trend.Start();
         Closed += (_, _) => trend.Stop();
     }
