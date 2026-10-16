@@ -78,10 +78,23 @@ public sealed partial class MainViewModel : ObservableObject, IAgentContext, IAs
     [ObservableProperty]
     public partial AgentsViewModel? Agents { get; set; }
 
-    partial void OnSelectedProfileChanged(AgentProfile? value)
+    partial void OnSelectedProfileChanged(AgentProfile? oldValue, AgentProfile? newValue)
     {
-        if (value is not null)
-            AgentUrl = value.Url;
+        if (oldValue is not null)
+            oldValue.PropertyChanged -= OnSelectedProfilePropertyChanged;
+        if (newValue is not null)
+        {
+            newValue.PropertyChanged += OnSelectedProfilePropertyChanged;
+            AgentUrl = newValue.Url;
+        }
+    }
+
+    // Instalar cambia la URL del perfil ya seleccionado (p.ej. de http://…:5310 a https://…:5311): la caja de URL la sigue,
+    // si no Conectar iría a la antigua sin token ni certificado.
+    private void OnSelectedProfilePropertyChanged(object? sender, System.ComponentModel.PropertyChangedEventArgs e)
+    {
+        if (e.PropertyName == nameof(AgentProfile.Url) && sender is AgentProfile profile && profile == SelectedProfile)
+            AgentUrl = profile.Url;
     }
 
     /// <summary>Carpeta de paquetes del agente recordada entre sesiones.</summary>

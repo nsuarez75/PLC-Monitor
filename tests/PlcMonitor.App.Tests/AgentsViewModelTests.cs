@@ -184,6 +184,24 @@ public sealed class AgentsViewModelTests : IDisposable
     }
 
     [Fact]
+    public async Task Installing_the_selected_profile_updates_the_url_to_connect_to()
+    {
+        // Caso real en Windows: perfil «Local» (http://127.0.0.1:5310) seleccionado, se instala y Conectar seguía yendo a 5310.
+        var (main, agents) = Create(LocalLinux());
+        var profile = main.SelectedProfile.ShouldNotBeNull();
+        agents.Selected.ShouldBeSameAs(profile);
+        main.AgentUrl.ShouldBe(AppSettings.DefaultAgentUrl);
+        agents.LocalMachine = true;
+
+        await agents.InstallCommand.ExecuteAsync(null);
+
+        main.SelectedProfile.ShouldBeSameAs(profile);
+        main.AgentUrl.ShouldBe("https://127.0.0.1:5311");
+        main.CloseAgentsCommand.Execute(null);
+        main.AgentUrl.ShouldBe(profile.Url);
+    }
+
+    [Fact]
     public void Package_folder_is_remembered()
     {
         var (main, agents) = Create(new FakeSsh());
