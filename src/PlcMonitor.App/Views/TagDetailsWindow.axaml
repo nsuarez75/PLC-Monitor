@@ -40,6 +40,15 @@
         </Grid>
       </Border>
 
+      <!-- Mini tendencia -->
+      <Border Classes="card" Padding="16,12" IsVisible="{Binding Tag.IsChartable}">
+        <StackPanel Spacing="6">
+          <TextBlock Text="ÚLTIMOS 5 MINUTOS" Classes="caption" />
+          <c:TrendChart Height="140" ShowLegend="False" Series="{Binding Trend}" From="{Binding TrendFrom}" To="{Binding TrendTo}"
+                        Revision="{Binding TrendRevision}" EmptyText="Aún no hay valores" />
+        </StackPanel>
+      </Border>
+
       <!-- Configuración -->
       <Border Classes="card" Padding="20">
         <StackPanel Spacing="12">

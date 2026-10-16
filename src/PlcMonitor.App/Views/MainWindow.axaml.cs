@@ -2,6 +2,7 @@ using Avalonia;
 using Avalonia.Controls;
 using Avalonia.Input;
 using Avalonia.Markup.Xaml;
+using Avalonia.Threading;
 using Avalonia.VisualTree;
 using PlcMonitor.App.ViewModels;
 
@@ -13,6 +14,11 @@ public sealed partial class MainWindow : Window
     {
         AvaloniaXamlLoader.Load(this);
         this.FindControl<ListBox>("TagsList")!.DoubleTapped += OnTagDoubleTapped;
+        // La tendencia en vivo avanza con el reloj aunque no lleguen valores nuevos.
+        var trend = new DispatcherTimer { Interval = TimeSpan.FromMilliseconds(500) };
+        trend.Tick += (_, _) => (DataContext as MainViewModel)?.Trend.Refresh(DateTimeOffset.UtcNow);
+        Opened += (_, _) => trend.Start();
+        Closed += (_, _) => trend.Stop();
     }
 
     /// <summary>Doble clic en una fila de tags (fuera del campo y los botones de escritura): abre su detalle.</summary>

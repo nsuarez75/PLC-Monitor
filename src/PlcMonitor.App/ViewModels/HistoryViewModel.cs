@@ -6,6 +6,7 @@ using CommunityToolkit.Mvvm.Input;
 using Google.Protobuf.WellKnownTypes;
 using Grpc.Core;
 using PlcMonitor.Agent.Contracts;
+using PlcMonitor.App.Charts;
 
 namespace PlcMonitor.App.ViewModels;
 
@@ -73,6 +74,13 @@ public sealed partial class HistoryViewModel(IAgentContext context, Func<DeviceV
 
     public ObservableCollection<HistoryRowViewModel> Rows { get; } = [];
 
+    /// <summary>Gráfica del resultado (los tags consultados, todos marcados).</summary>
+    public ChartViewModel Chart { get; } = new() { EmptyText = "Consulta el histórico para ver la gráfica" };
+
+    /// <summary>Muestra la tabla de puntos además de la gráfica.</summary>
+    [ObservableProperty]
+    public partial bool ShowTable { get; set; }
+
     [ObservableProperty]
     public partial Choice<TimeSpan> Range { get; set; } = Ranges[1];
 
@@ -99,6 +107,7 @@ public sealed partial class HistoryViewModel(IAgentContext context, Func<DeviceV
     {
         Rows.Clear();
         Summary = "";
+        Chart.SetData([]);
         RefreshTags();
     }
 
@@ -146,6 +155,15 @@ public sealed partial class HistoryViewModel(IAgentContext context, Func<DeviceV
                          .SelectMany(s => s.Points.Select(p => new HistoryRowViewModel(p.Timestamp.ToDateTimeOffset(), s.Tag, Text(p), p.Quality)))
                          .OrderByDescending(r => r.Timestamp))
                 Rows.Add(row);
+            var types = target.Tags.ToDictionary(t => t.Name, t => t.IsBoolean, StringComparer.Ordinal);
+            Chart.SetData(
+                reply.Series.Select(s => new ChartSeriesData(
+                    s.Tag,
+                    s.Points.Select(p => new ChartPoint(p.Timestamp.ToDateTimeOffset(),
+                        p.HasNumber && p.Quality is Quality.Good or Quality.Uncertain ? p.Number : null)).ToArray(),
+                    Step: Aggregate.Value is null,
+                    IsBoolean: types.GetValueOrDefault(s.Tag))),
+                request.From.ToDateTimeOffset(), request.To.ToDateTimeOffset());
             var truncated = reply.Series.Any(s => s.Truncated);
             Summary = $"{Rows.Count} puntos de {tags.Length} tags · {Range.Text.ToLowerInvariant()}" +
                       (Aggregate.Value is null ? "" : $" · {Aggregate.Text.ToLowerInvariant()} cada {Interval.Text}") +

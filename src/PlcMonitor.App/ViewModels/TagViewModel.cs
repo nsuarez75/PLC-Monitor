@@ -3,6 +3,7 @@ using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using Grpc.Core;
 using PlcMonitor.Agent.Contracts;
+using PlcMonitor.App.Charts;
 
 namespace PlcMonitor.App.ViewModels;
 
@@ -47,7 +48,7 @@ public sealed partial class TagViewModel : ObservableObject
     public partial Quality Quality { get; set; } = Quality.BadNotConnected;
 
     [ObservableProperty]
-    [NotifyPropertyChangedFor(nameof(IsBoolean), nameof(ShowTextWrite), nameof(ShowBoolWrite))]
+    [NotifyPropertyChangedFor(nameof(IsBoolean), nameof(ShowTextWrite), nameof(ShowBoolWrite), nameof(IsChartable))]
     public partial string DataType { get; set; } = "";
 
     [ObservableProperty]
@@ -65,6 +66,25 @@ public sealed partial class TagViewModel : ObservableObject
     public bool IsBad => !IsGood && !IsUncertain;
 
     public bool IsBoolean => DataType == nameof(Agent.Contracts.DataType.Boolean);
+
+    /// <summary>Se puede dibujar (números y booleanos; si aún no se conoce el tipo, también).</summary>
+    public bool IsChartable => DataType is not (nameof(Agent.Contracts.DataType.String) or nameof(Agent.Contracts.DataType.DateTime)
+        or nameof(Agent.Contracts.DataType.TimeSpan) or nameof(Agent.Contracts.DataType.ByteArray));
+
+    /// <summary>Ventana que se guarda de cada tag para la tendencia en vivo.</summary>
+    public static readonly TimeSpan TrendWindow = TimeSpan.FromHours(1);
+
+    public const int MaxTrendPoints = 20_000;
+
+    /// <summary>Valores recientes (desde que la app recibe el tag, como mucho <see cref="TrendWindow"/>) para la tendencia.</summary>
+    public List<ChartPoint> TrendPoints { get; } = [];
+
+    /// <summary>Hereda los puntos de la tendencia de la versión anterior del tag (tras reconfigurar el dispositivo).</summary>
+    internal void AdoptTrend(TagViewModel previous)
+    {
+        var first = TrendPoints.Count > 0 ? TrendPoints[0].Time : DateTimeOffset.MaxValue;
+        TrendPoints.InsertRange(0, previous.TrendPoints.Where(p => p.Time <= first));
+    }
 
     /// <summary>Los booleanos se escriben con dos botones (true/false); el resto, con un campo de texto.</summary>
     public bool ShowTextWrite => Writable && !IsBoolean;
@@ -85,6 +105,32 @@ public sealed partial class TagViewModel : ObservableObject
         ValueText = value.Quality is Quality.Good or Quality.Uncertain ? value.Text : value.Error;
         DataType = value.DataType == Agent.Contracts.DataType.Unknown ? "" : value.DataType.ToString();
         Time = value.Timestamp?.ToDateTime().ToLocalTime().ToString("HH:mm:ss.fff", CultureInfo.InvariantCulture) ?? "";
+        AddTrendPoint(value);
+    }
+
+    private void AddTrendPoint(TagValue value)
+    {
+        var time = value.Timestamp?.ToDateTimeOffset() ?? DateTimeOffset.UtcNow;
+        double? number = value.Quality is not (Quality.Good or Quality.Uncertain) ? null : value.TypedCase switch
+        {
+            TagValue.TypedOneofCase.BoolValue => value.BoolValue ? 1 : 0,
+            TagValue.TypedOneofCase.IntValue => value.IntValue,
+            TagValue.TypedOneofCase.UintValue => value.UintValue,
+            TagValue.TypedOneofCase.DoubleValue => value.DoubleValue,
+            _ => null,
+        };
+        if (TrendPoints.Count > 0 && time < TrendPoints[^1].Time)
+            time = TrendPoints[^1].Time;
+        TrendPoints.Add(new ChartPoint(time, number));
+
+        // Fuera lo anterior a la ventana (menos un punto: el valor que había al empezar) y el exceso de puntos.
+        var cutoff = time - TrendWindow;
+        var old = 0;
+        while (old + 1 < TrendPoints.Count && TrendPoints[old + 1].Time < cutoff)
+            old++;
+        old = Math.Max(old, TrendPoints.Count - MaxTrendPoints);
+        if (old > 0)
+            TrendPoints.RemoveRange(0, old);
     }
 
     private bool CanWrite() => Writable && !string.IsNullOrEmpty(NewValue);

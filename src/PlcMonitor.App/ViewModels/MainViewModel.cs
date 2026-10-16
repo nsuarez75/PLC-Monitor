@@ -56,6 +56,7 @@ public sealed partial class MainViewModel : ObservableObject, IAgentContext, IAs
         RecentAgents = [.. settings.RecentAgents];
         Browse = new BrowseViewModel(this, () => SelectedDevice);
         History = new HistoryViewModel(this, () => SelectedDevice);
+        Trend = new LiveTrendViewModel(() => SelectedDevice);
     }
 
     public AgentService.AgentServiceClient? Client { get; private set; }
@@ -122,6 +123,24 @@ public sealed partial class MainViewModel : ObservableObject, IAgentContext, IAs
     /// <summary>Consulta del histórico del dispositivo seleccionado.</summary>
     public HistoryViewModel History { get; }
 
+    /// <summary>Tendencia en vivo del dispositivo seleccionado.</summary>
+    public LiveTrendViewModel Trend { get; }
+
+    /// <summary>Abre un CSV exportado del histórico en un visor aparte (no hace falta estar conectado).</summary>
+    [RelayCommand]
+    private async Task OpenCsvAsync()
+    {
+        if (await Dialogs.OpenFileAsync("Abrir histórico (CSV)", "csv") is not { } path)
+            return;
+        var viewer = new CsvViewerViewModel(Dialogs);
+        if (!viewer.Load(path))
+        {
+            Report($"No se pudo abrir {Path.GetFileName(path)}: {viewer.Error}", isError: true);
+            return;
+        }
+        Dialogs.ShowCsvViewer(viewer);
+    }
+
     /// <summary>El agente conectado tiene el historiador activado.</summary>
     [ObservableProperty]
     public partial bool HistorianEnabled { get; set; }
@@ -183,6 +202,7 @@ public sealed partial class MainViewModel : ObservableObject, IAgentContext, IAs
     {
         Browse.Clear();
         History.Reset();
+        Trend.Reset();
     }
 
     public void Report(string message, bool isError = false) => _ui.Post(() =>
@@ -438,6 +458,7 @@ public sealed partial class MainViewModel : ObservableObject, IAgentContext, IAs
     private void ApplyConfigured(DeviceConfigured configured)
     {
         var device = Find(configured.Device.Name);
+        Dictionary<string, TagViewModel> previous = new(StringComparer.Ordinal);
         if (device is null)
         {
             device = new DeviceViewModel(this, configured.Device);
@@ -447,12 +468,24 @@ public sealed partial class MainViewModel : ObservableObject, IAgentContext, IAs
         {
             device.Apply(configured.Device);
             foreach (var tag in device.Tags)
+            {
                 _tagIndex.Remove((tag.Device, tag.Name));
+                previous[tag.Name] = tag;
+            }
             device.Tags.Clear();
         }
         AddTags(device, configured.Tags);
+        // La tendencia en vivo sigue con lo recibido antes del cambio (si el tag lee la misma dirección).
+        foreach (var tag in device.Tags)
+        {
+            if (previous.TryGetValue(tag.Name, out var old) && old.Address == tag.Address)
+                tag.AdoptTrend(old);
+        }
         if (device == SelectedDevice)
+        {
             History.RefreshTags();
+            Trend.RefreshTags();
+        }
         if (_pendingSelection == device.Name)
         {
             SelectedDevice = device;

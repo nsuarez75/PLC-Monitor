@@ -3,6 +3,7 @@ using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using Grpc.Core;
 using PlcMonitor.Agent.Contracts;
+using PlcMonitor.App.Charts;
 
 namespace PlcMonitor.App.ViewModels;
 
@@ -71,6 +72,31 @@ public sealed partial class TagDetailsViewModel : ObservableObject
 
     /// <summary>Tag en vivo (valor, calidad, hora).</summary>
     public TagViewModel Tag { get; }
+
+    /// <summary>Ventana de la mini tendencia.</summary>
+    public static readonly TimeSpan TrendWindow = TimeSpan.FromMinutes(5);
+
+    /// <summary>Mini tendencia de los últimos minutos (los valores que ha recibido la app).</summary>
+    public IReadOnlyList<ChartSeries> Trend => _trend ??= [new ChartSeries(Tag.Name, Tag.TrendPoints) { IsBoolean = Tag.IsBoolean }];
+
+    private IReadOnlyList<ChartSeries>? _trend;
+
+    [ObservableProperty]
+    public partial DateTimeOffset TrendFrom { get; private set; }
+
+    [ObservableProperty]
+    public partial DateTimeOffset TrendTo { get; private set; }
+
+    [ObservableProperty]
+    public partial int TrendRevision { get; private set; }
+
+    /// <summary>Avanza la mini tendencia hasta <paramref name="now"/> (lo llama un temporizador de la ventana).</summary>
+    public void RefreshTrend(DateTimeOffset now)
+    {
+        TrendFrom = now - TrendWindow;
+        TrendTo = now;
+        TrendRevision++;
+    }
 
     public string Device { get; }
 

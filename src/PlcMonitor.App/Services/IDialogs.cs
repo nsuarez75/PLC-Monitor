@@ -11,4 +11,10 @@ public interface IDialogs
 
     /// <summary>Muestra la ventana de detalle de un tag hasta que se cierra.</summary>
     Task ShowTagDetailsAsync(ViewModels.TagDetailsViewModel details);
+
+    /// <summary>Pide un fichero que abrir. Devuelve la ruta o null si se cancela.</summary>
+    Task<string?> OpenFileAsync(string title, string extension);
+
+    /// <summary>Abre (sin bloquear) la ventana del visor de CSV.</summary>
+    void ShowCsvViewer(ViewModels.CsvViewerViewModel viewer);
 }

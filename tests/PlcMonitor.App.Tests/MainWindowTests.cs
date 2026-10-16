@@ -168,10 +168,84 @@ public class MainWindowTests
             vm.History.Rows.Add(new HistoryRowViewModel(now.AddSeconds(-10 * i), "peso", (12.5 - i * 0.5).ToString(System.Globalization.CultureInfo.InvariantCulture), Quality.Good));
         vm.History.Rows.Add(new HistoryRowViewModel(now.AddMinutes(-2), "peso", "", Quality.BadNotConnected));
         vm.History.Summary = "7 puntos de 1 tags · última hora";
+        vm.History.Chart.SetData([new PlcMonitor.App.Charts.ChartSeriesData("peso",
+            vm.History.Rows.Where(r => r.IsGood).Select(r => new PlcMonitor.App.Charts.ChartPoint(r.Timestamp, double.Parse(r.Value, System.Globalization.CultureInfo.InvariantCulture))).OrderBy(p => p.Time).ToArray())],
+            now.AddMinutes(-1), now);
         SelectTab(window, "Histórico");
 
         window.GetVisualDescendants().OfType<TextBlock>().Select(t => t.Text).ShouldContain("7 puntos de 1 tags · última hora");
         Capture(window, "history.png");
+        vm.History.ShowTable = true;
+        Capture(window, "history-table.png");
+    });
+
+    [Fact]
+    public Task Trend_tab_draws_live_values() => HeadlessApp.RunAsync(() =>
+    {
+        Avalonia.Application.Current!.RequestedThemeVariant = Avalonia.Styling.ThemeVariant.Light;
+        var vm = ViewModelWithData();
+        var window = new MainWindow { DataContext = vm };
+        window.Show();
+        // Después del valor inicial de la foto (las horas del búfer no van hacia atrás).
+        var now = DateTimeOffset.UtcNow.AddSeconds(241);
+        for (var i = 240; i >= 0; i--)
+        {
+            var t = Timestamp.FromDateTimeOffset(now.AddSeconds(-i));
+            var updates = new TagUpdates();
+            updates.Updates.Add(new TagUpdate { Device = "casa1200", Tag = "peso", Value = new TagValue
+            {
+                Quality = i is > 100 and < 115 ? Quality.BadNotConnected : Quality.Good, DataType = DataType.Float,
+                DoubleValue = 12 + (3 * Math.Sin(i / 20.0)), Timestamp = t,
+            } });
+            if (i % 15 == 0)
+                updates.Updates.Add(new TagUpdate { Device = "casa1200", Tag = "clock", Value = new TagValue { Quality = Quality.Good, DataType = DataType.Boolean, BoolValue = i % 30 == 0, Timestamp = t } });
+            vm.Apply(new SubscribeEvent { TagUpdates = updates });
+        }
+        vm.Trend.Chart.Options[0].Name.ShouldBe("clock");
+        vm.Trend.Chart.Options[0].IsSelected.ShouldBeTrue(); // el primero va marcado
+        foreach (var option in vm.Trend.Chart.Options)
+            option.IsSelected = option.Name == "peso";
+        vm.Trend.Refresh(now);
+        SelectTab(window, "Tendencia");
+
+        vm.Trend.Chart.Series.ShouldHaveSingleItem().Points.Count.ShouldBeGreaterThan(200);
+        Capture(window, "trend.png");
+        vm.Trend.Chart.Options.Single(o => o.Name == "clock").IsSelected = true;
+        Avalonia.Application.Current.RequestedThemeVariant = Avalonia.Styling.ThemeVariant.Dark;
+        Capture(window, "trend-dark.png");
+        Avalonia.Application.Current.RequestedThemeVariant = Avalonia.Styling.ThemeVariant.Light;
+    });
+
+    [Fact]
+    public Task Csv_viewer_shows_an_exported_history() => HeadlessApp.RunAsync(() =>
+    {
+        Avalonia.Application.Current!.RequestedThemeVariant = Avalonia.Styling.ThemeVariant.Light;
+        var path = Path.Combine(Path.GetTempPath(), $"plcmon-{Guid.NewGuid():N}.csv");
+        var start = new DateTimeOffset(2026, 10, 17, 8, 0, 0, TimeSpan.Zero);
+        var csv = new System.Text.StringBuilder("device,tag,timestamp,value,quality\n");
+        for (var i = 0; i < 600; i++)
+        {
+            var t = start.AddSeconds(i * 6).UtcDateTime.ToString("yyyy-MM-ddTHH:mm:ss.fffZ", System.Globalization.CultureInfo.InvariantCulture);
+            csv.Append(System.Globalization.CultureInfo.InvariantCulture, $"casa1200,temperatura,{t},{20 + (5 * Math.Sin(i / 40.0)):0.##},Good\n");
+            csv.Append(System.Globalization.CultureInfo.InvariantCulture, $"casa1200,presion,{t},{3 + Math.Cos(i / 25.0):0.###},Good\n");
+        }
+        File.WriteAllText(path, csv.ToString());
+        var viewer = new CsvViewerViewModel(new FakeDialogs());
+        viewer.Load(path).ShouldBeTrue(viewer.Error);
+        var window = new CsvViewerWindow { DataContext = viewer };
+        window.Show();
+
+        viewer.Chart.Series.Select(s => s.Name).ShouldBe(["presion", "temperatura"]);
+        viewer.Summary.ShouldContain("2 tags · 1200 puntos");
+        Capture(window, "csv-viewer.png");
+        viewer.Chart.AutoY = false;
+        viewer.Chart.YMinInput = 0;
+        viewer.Chart.YMaxInput = 40;
+        viewer.Chart.Zoom(start.AddMinutes(10), start.AddMinutes(30));
+        Avalonia.Application.Current.RequestedThemeVariant = Avalonia.Styling.ThemeVariant.Dark;
+        Capture(window, "csv-viewer-dark.png");
+        Avalonia.Application.Current.RequestedThemeVariant = Avalonia.Styling.ThemeVariant.Light;
+        File.Delete(path);
     });
 
     /// <summary>
