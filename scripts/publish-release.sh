@@ -22,11 +22,9 @@ for RID in "${RIDS[@]}"; do
   dotnet publish src/PlcMonitor.App -c Release -r "$RID" --self-contained true -p:PublishSingleFile=false -o "$DIR/app" -v q -nologo
   rm -f "$DIR"/*.pdb "$DIR"/agent/*.pdb "$DIR"/app/*.pdb
   mkdir -p "$DIR/deploy" && cp deploy/linux/plcmon-agent.service "$DIR/deploy/"
-  mkdir -p "$DIR/licenses" "$DIR/docs"
+  mkdir -p "$DIR/licenses"
   cp external/S7CommPlusDriver/LICENSE "$DIR/licenses/LGPL-3.0.txt"
   cp external/S7CommPlusDriver/PLCMONITOR-NOTICE.md "$DIR/licenses/S7CommPlusDriver-NOTICE.md"
-  cp THIRD-PARTY-NOTICES.md CHANGELOG.md README.md "$DIR/"
-  cp -r docs/manual "$DIR/docs/"
   if [[ "$RID" == win-* ]]; then
     (cd "$OUT" && "$ZIPTAR" -a -c -f "plcmon-$VERSION-$RID.zip" "plcmon-$VERSION-$RID")
   else

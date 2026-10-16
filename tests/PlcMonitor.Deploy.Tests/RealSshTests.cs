@@ -6,7 +6,7 @@ using PlcMonitor.Agent.Contracts.Client;
 namespace PlcMonitor.Deploy.Tests;
 
 /// <summary>
-/// Instalación real por SSH en un equipo Linux con systemd (p.ej. el contenedor de docs/manual: «Probar el despliegue»).
+/// Instalación real por SSH en un equipo Linux con systemd.
 /// Variables: PLCMON_IT_SSH_HOST, PLCMON_IT_SSH_PORT, PLCMON_IT_SSH_USER, PLCMON_IT_SSH_PASSWORD y
 /// PLCMON_IT_AGENT_PACKAGES (carpeta con plcmon-agent-*-&lt;rid&gt;). Se omite si faltan.
 /// </summary>
