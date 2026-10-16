@@ -39,13 +39,15 @@ public sealed partial class TagViewModel : ObservableObject
     public bool Historized { get; }
 
     [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(IsTrue), nameof(IsFalse))]
     public partial string ValueText { get; set; } = "";
 
     [ObservableProperty]
-    [NotifyPropertyChangedFor(nameof(IsGood), nameof(IsUncertain), nameof(IsBad))]
+    [NotifyPropertyChangedFor(nameof(IsGood), nameof(IsUncertain), nameof(IsBad), nameof(IsTrue), nameof(IsFalse))]
     public partial Quality Quality { get; set; } = Quality.BadNotConnected;
 
     [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(IsBoolean), nameof(ShowTextWrite), nameof(ShowBoolWrite))]
     public partial string DataType { get; set; } = "";
 
     [ObservableProperty]
@@ -62,6 +64,20 @@ public sealed partial class TagViewModel : ObservableObject
 
     public bool IsBad => !IsGood && !IsUncertain;
 
+    public bool IsBoolean => DataType == nameof(Agent.Contracts.DataType.Boolean);
+
+    /// <summary>Los booleanos se escriben con dos botones (true/false); el resto, con un campo de texto.</summary>
+    public bool ShowTextWrite => Writable && !IsBoolean;
+
+    public bool ShowBoolWrite => Writable && IsBoolean;
+
+    /// <summary>El valor actual es true (se marca su botón).</summary>
+    public bool IsTrue => HasValue && string.Equals(ValueText, "true", StringComparison.OrdinalIgnoreCase);
+
+    public bool IsFalse => HasValue && string.Equals(ValueText, "false", StringComparison.OrdinalIgnoreCase);
+
+    private bool HasValue => Quality is Quality.Good or Quality.Uncertain;
+
     public void Apply(TagValue value)
     {
         ArgumentNullException.ThrowIfNull(value);
@@ -74,11 +90,16 @@ public sealed partial class TagViewModel : ObservableObject
     private bool CanWrite() => Writable && !string.IsNullOrEmpty(NewValue);
 
     [RelayCommand(CanExecute = nameof(CanWrite))]
-    private async Task WriteAsync()
+    private Task WriteAsync() => WriteValueAsync(NewValue, clearInput: true);
+
+    /// <summary>Escribe true o false (botones de los booleanos).</summary>
+    [RelayCommand]
+    private Task WriteBoolAsync(string value) => Writable ? WriteValueAsync(value, clearInput: false) : Task.CompletedTask;
+
+    private async Task WriteValueAsync(string value, bool clearInput)
     {
         if (_context.Client is not { } client)
             return;
-        var value = NewValue;
         if (!await _context.Dialogs.ConfirmAsync("Escribir en el PLC", $"¿Escribir «{value}» en {Device}/{Name} ({Address})?\nActual: {ValueText}"))
             return;
         try
@@ -86,7 +107,8 @@ public sealed partial class TagViewModel : ObservableObject
             var reply = await client.WriteAsync(new WriteRequest { Device = Device, Tag = Name, Value = value, User = Environment.UserName });
             if (reply.Success)
             {
-                NewValue = "";
+                if (clearInput)
+                    NewValue = "";
                 _context.Report($"{Device}/{Name} = {value}");
             }
             else

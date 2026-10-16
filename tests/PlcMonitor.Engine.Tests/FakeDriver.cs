@@ -80,7 +80,10 @@ internal sealed class FakeConnection(string name, FakePlc plc) : DeviceConnectio
     public override AddressValidation ValidateAddress(string address) =>
         address.StartsWith("BAD", StringComparison.Ordinal)
             ? AddressValidation.Invalid("dirección mala")
-            : AddressValidation.Valid(address.StartsWith("REAL", StringComparison.Ordinal) ? TagDataType.Float : TagDataType.Int32);
+            : AddressValidation.Valid(
+                address.StartsWith("REAL", StringComparison.Ordinal) ? TagDataType.Float
+                : address.Contains(".DBX", StringComparison.Ordinal) ? TagDataType.Boolean
+                : TagDataType.Int32);
 
     protected override Task OpenCoreAsync(CancellationToken cancellationToken)
     {

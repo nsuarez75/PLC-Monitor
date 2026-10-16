@@ -140,7 +140,7 @@ public sealed partial class MainViewModel : ObservableObject, IAgentContext, IAs
 
     public string ThemeText => Theme switch { "light" => "Claro", "dark" => "Oscuro", _ => "Sistema" };
 
-    public string ThemeIcon => Theme == "dark" ? "moon" : "sun";
+    public string ThemeIcon => Theme switch { "light" => "sun", "dark" => "moon", _ => "monitor" };
 
     public bool IsReconnecting => IsConnected && !IsLive;
 
