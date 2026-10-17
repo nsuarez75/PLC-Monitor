@@ -241,6 +241,7 @@ public sealed class AgentDeployerTests : IDisposable
         await Deployer(ssh).UninstallAsync(keepConfiguration: true, "secreto", cancellationToken: Ct);
         var script = ssh.Commands.Single(c => c.Input?.Contains("disable --now", StringComparison.Ordinal) == true).Input!;
         script.ShouldContain("agent.json.backup");
+        script.ShouldContain("agent.key.backup");
         script.ShouldContain("rm -rf \"$D\"");
         _progress.ShouldContain("Agente desinstalado");
     }
@@ -293,7 +294,7 @@ public sealed class AgentDeployerTests : IDisposable
     public void Linux_install_replaces_everything_but_configuration_and_history()
     {
         var script = AgentScripts.LinuxInstall("/tmp/plcmon-agent-x", null, 5311);
-        script.ShouldContain("! -name agent.json ! -name agent.settings.json ! -name agent.pfx ! -name history -exec rm -rf {} +");
+        script.ShouldContain("! -name agent.json ! -name agent.key ! -name agent.settings.json ! -name agent.pfx ! -name history -exec rm -rf {} +");
         script.ShouldContain("install -m 0755 \"$A\" \"$D/plcmon-agent\"");
         script.ShouldContain("Environment=DOTNET_BUNDLE_EXTRACT_BASE_DIR=/opt/plc-monitor/agent/.bundle");
         script.ShouldNotContain("tar ");

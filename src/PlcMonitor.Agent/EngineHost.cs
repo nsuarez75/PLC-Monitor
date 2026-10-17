@@ -24,6 +24,9 @@ public sealed class EngineHost(IOptions<AgentOptions> options, DriverRegistry re
 
     public string ConfigPath { get; } = Path.GetFullPath(options.Value.ConfigPath, AppContext.BaseDirectory);
 
+    /// <summary>Cifrado de las contraseñas de los dispositivos (clave en agent.key junto a la configuración).</summary>
+    public ConfigSecrets Secrets { get; } = new(Path.Combine(Path.GetDirectoryName(Path.GetFullPath(options.Value.ConfigPath, AppContext.BaseDirectory))!, "agent.key"));
+
     public DateTimeOffset Started { get; private set; }
 
     public TagEngine Engine => _engine ?? throw new InvalidOperationException("El motor no está arrancado.");
@@ -38,6 +41,11 @@ public sealed class EngineHost(IOptions<AgentOptions> options, DriverRegistry re
         {
             configuration = await ConfigurationFile.LoadAsync(ConfigPath, cancellationToken);
             logger.LogInformation("Configuración cargada de {Path}: {Count} dispositivos", ConfigPath, configuration.Devices.Count);
+            var (plain, undecryptable) = Secrets.Unprotect(configuration);
+            foreach (var device in undecryptable)
+                logger.LogError("No se pudo descifrar la contraseña de {Device} con {Key}: vuelve a introducirla", device, Secrets.KeyPath);
+            if (plain.Count > 0)
+                await MigrateAsync(configuration, plain, cancellationToken);
         }
         else
         {
@@ -68,13 +76,35 @@ public sealed class EngineHost(IOptions<AgentOptions> options, DriverRegistry re
         await _saveLock.WaitAsync(cancellationToken);
         try
         {
-            await ConfigurationFile.SaveAsync(ConfigPath, Engine.SnapshotConfiguration(), cancellationToken);
+            await WriteAsync(Engine.SnapshotConfiguration(), cancellationToken);
             logger.LogInformation("Configuración guardada en {Path}", ConfigPath);
         }
         finally
         {
             _saveLock.Release();
         }
+    }
+
+    /// <summary>Contraseñas en claro (agent.json editado a mano o de una versión anterior): se guardan ya cifradas.</summary>
+    private async Task MigrateAsync(AgentConfiguration configuration, List<string> devices, CancellationToken cancellationToken)
+    {
+        try
+        {
+            await WriteAsync(ConfigurationFile.Parse(ConfigurationFile.Serialize(configuration)), cancellationToken);
+            logger.LogInformation("Contraseñas de {Devices} cifradas en {Path}", string.Join(", ", devices), ConfigPath);
+        }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
+        {
+            logger.LogWarning(ex, "No se pudieron cifrar las contraseñas de {Path}: siguen en claro", ConfigPath);
+        }
+    }
+
+    /// <summary>Escribe una copia de la configuración con las contraseñas cifradas y el fichero solo legible por el servicio.</summary>
+    private async Task WriteAsync(AgentConfiguration copy, CancellationToken cancellationToken)
+    {
+        Secrets.Protect(copy);
+        await ConfigurationFile.SaveAsync(ConfigPath, copy, cancellationToken);
+        ConfigSecrets.RestrictToOwner(ConfigPath);
     }
 
     public async ValueTask DisposeAsync()

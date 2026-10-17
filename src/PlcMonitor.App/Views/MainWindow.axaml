@@ -441,6 +441,7 @@
                   <StackPanel Grid.Row="2" Spacing="2" Margin="0,6,0,0">
                     <TextBlock Text="Ajustes" FontWeight="Medium" />
                     <TextBlock Text="JSON del driver" Classes="muted" FontSize="11.5" />
+                    <TextBlock Text="La contraseña guardada se ve como ********; déjala así para conservarla" Classes="muted" FontSize="11.5" TextWrapping="Wrap" Margin="0,6,0,0" />
                   </StackPanel>
                   <TextBox Grid.Row="2" Grid.Column="1" Text="{Binding SettingsJson}" AcceptsReturn="True" Classes="mono" MinHeight="150" FontSize="12.5" />
                   <TextBlock Grid.Row="3" Text="Opciones" VerticalAlignment="Center" FontWeight="Medium" />
