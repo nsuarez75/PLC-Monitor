@@ -110,7 +110,7 @@ public sealed class ChartKindsTests : IDisposable
         using var trends = new TrendsViewModel(main, path);
         trends.NewCommand.Execute(null);
         trends.Kind.Value.ShouldBe(ChartKind.Trend);
-        ChartKindChoice.All.Select(k => k.Value).ShouldBe([ChartKind.Trend, ChartKind.Cycles, ChartKind.XY, ChartKind.States]);
+        ChartKindChoice.All.Select(k => k.Value).ShouldBe([ChartKind.Trend, ChartKind.Cycles, ChartKind.XY, ChartKind.States, ChartKind.Histogram, ChartKind.Gauges, ChartKind.Bars]);
         ChartKindChoice.All.ShouldAllBe(k => k.Description.Length > 40);
 
         // Ciclos sin disparo: no se abre.
@@ -182,6 +182,141 @@ public sealed class ChartKindsTests : IDisposable
     }
 
     [Fact]
+    public void Histogram_stats_and_capability()
+    {
+        double[] values = [9, 10, 10, 11, 10, 9, 11, 10];
+        var stats = Histogram.Stats(values, 7, 13).ShouldNotBeNull();
+        (stats.Count, stats.Mean, stats.Min, stats.Max).ShouldBe((8, 10, 9, 11));
+        stats.StdDev.ShouldBe(Math.Sqrt(4.0 / 7), 1e-12);
+        stats.Cp!.Value.ShouldBe(6 / (6 * stats.StdDev), 1e-12);
+        stats.Cpk!.Value.ShouldBe(3 / (3 * stats.StdDev), 1e-12);
+
+        // Media descentrada: Cpk es el lado más cercano; con una sola tolerancia, solo Cpk.
+        Histogram.Stats(values, 8, 16)!.Cpk!.Value.ShouldBe(2 / (3 * stats.StdDev), 1e-12);
+        var oneSided = Histogram.Stats(values, null, 13)!;
+        oneSided.Cp.ShouldBeNull();
+        oneSided.Cpk.ShouldNotBeNull();
+        Histogram.Stats([5], 0, 10)!.Cpk.ShouldBeNull(); // sin desviación
+        Histogram.Stats([], 0, 10).ShouldBeNull();
+    }
+
+    [Fact]
+    public void Histogram_bins_cover_all_values_with_round_widths()
+    {
+        var values = Enumerable.Range(0, 100).Select(i => 10 + (i * 0.05)).ToList(); // 10 … 14.95
+        var bins = Histogram.Bins(values);
+        bins.Sum(b => b.Count).ShouldBe(100);
+        (bins[1].To - bins[1].From).ShouldBe(0.5, 1e-9);
+        bins[0].From.ShouldBe(10, 1e-9);
+        bins[^1].To.ShouldBeGreaterThan(14.95);
+
+        Histogram.Bins([3, 3, 3]).ShouldHaveSingleItem().Count.ShouldBe(3);
+
+        // Solo los valores dentro de la ventana y con calidad buena.
+        Histogram.Values(new ChartSeries("v", [P(0, 1), P(5, null), P(10, 2), P(20, 3)]), At(5), At(15)).ShouldBe([2]);
+    }
+
+    [Fact]
+    public void Periods_start_on_local_boundaries_and_have_labels()
+    {
+        var local = new DateTimeOffset(new DateTime(2026, 10, 16, 23, 30, 0, DateTimeKind.Local));
+        PeriodBars.Start(local, BarPeriod.Hour, 6).ShouldBe(local.AddMinutes(-30));
+        PeriodBars.Start(local, BarPeriod.Day, 6).ShouldBe(local.AddHours(-23).AddMinutes(-30));
+        // Turnos desde las 6: T3 empieza a las 22.
+        var shift = PeriodBars.Start(local, BarPeriod.Shift, 6);
+        shift.ShouldBe(local.AddHours(-1).AddMinutes(-30));
+        PeriodBars.Label(shift, BarPeriod.Shift, 6).ShouldBe("16/10 T3");
+        // A las 3 de la madrugada sigue el T3 del día anterior.
+        var night = PeriodBars.Start(local.AddHours(4), BarPeriod.Shift, 6);
+        night.ShouldBe(shift);
+        PeriodBars.Label(PeriodBars.Start(local.AddHours(8), BarPeriod.Shift, 6), BarPeriod.Shift, 6).ShouldBe("17/10 T1");
+        PeriodBars.Label(local.AddMinutes(-30), BarPeriod.Hour, 6).ShouldBe("16/10 23:00");
+        PeriodBars.Label(local.Date, BarPeriod.Day, 6).ShouldBe("vie 16/10");
+        PeriodBars.Length(BarPeriod.Shift).ShouldBe(TimeSpan.FromHours(8));
+        PeriodBars.Aggregate(BarMetric.Increase).ShouldBe(HistoryAggregate.Last);
+    }
+
+    [Fact]
+    public void Counter_increase_per_period_handles_resets()
+    {
+        // Último valor de cada periodo: 100 (referencia), 130, 180, reinicio a 20, 50.
+        PeriodBars.Increase([P(0, 100), P(3600, 130), P(7200, 180), P(10800, 20), P(14400, null), P(18000, 50)])
+            .ShouldBe([P(3600, 30), P(7200, 50), P(10800, 20), P(18000, 30)]);
+    }
+
+    [Fact]
+    public void Gauges_flag_values_out_of_limits()
+    {
+        GaugePanel.OutOfLimits(5, 0, 10).ShouldBeFalse();
+        GaugePanel.OutOfLimits(-1, 0, 10).ShouldBeTrue();
+        GaugePanel.OutOfLimits(11, null, 10).ShouldBeTrue();
+        GaugePanel.OutOfLimits(1e9, null, null).ShouldBeFalse();
+    }
+
+    [Fact]
+    public void The_options_of_each_kind_are_saved()
+    {
+        var path = Path.Combine(_dir, "trends.json");
+        var main = MainWindowTests.ViewModelWithData(Path.Combine(_dir, "app.json"));
+        using var trends = new TrendsViewModel(main, path);
+        trends.NewCommand.Execute(null);
+        trends.AddTagCommand.Execute(trends.Available.Single(c => c.Tag == "peso"));
+
+        trends.Kind = ChartKindChoice.For(ChartKind.Histogram);
+        (trends.HasLimits, trends.LimitsText, trends.CanTrigger, trends.UsesLiveWindow).ShouldBe((true, "Tolerancias", true, true));
+        trends.LowLimit = 12;
+        trends.HighLimit = 10;
+        trends.SaveCommand.Execute(null);
+        trends.KindError.ShouldContain("menor que la superior");
+        trends.HighLimit = 14;
+        trends.SaveCommand.Execute(null);
+        trends.KindError.ShouldBeEmpty();
+
+        trends.Kind = ChartKindChoice.For(ChartKind.Gauges);
+        (trends.LimitsText, trends.CanTrigger, trends.AxisCaption).ShouldBe(("Límites", false, "Escala"));
+        trends.GaugeStyle = TrendsViewModel.GaugeStyles.Single(g => g.Value == GaugeStyle.Level);
+        trends.TriggerEnabled = true; // el disparo no aplica a los indicadores: no se guarda
+        trends.SaveCommand.Execute(null);
+        var saved = TrendViewStore.Load(path).Single();
+        (saved.Kind, saved.LowLimit, saved.HighLimit, saved.GaugeStyle, saved.Trigger).ShouldBe((ChartKind.Gauges, 12, 14, GaugeStyle.Level, null));
+
+        trends.OpenCommand.Execute(null);
+        var live = trends.Live.ShouldNotBeNull();
+        (live.Chart.Kind, live.Chart.LowLimit, live.Chart.HighLimit, live.Chart.GaugeStyle).ShouldBe((ChartKind.Gauges, 12, 14, GaugeStyle.Level));
+        trends.EditCommand.Execute(null);
+
+        trends.Kind = ChartKindChoice.For(ChartKind.Bars);
+        (trends.UsesLiveWindow, trends.CanTrigger, trends.IsShiftPeriod).ShouldBe((false, false, false));
+        trends.BarPeriod = PeriodBarsViewModel.Periods.Single(p => p.Value == BarPeriod.Shift);
+        trends.IsShiftPeriod.ShouldBeTrue();
+        trends.ShiftStartHour = 7;
+        trends.BarMetric = PeriodBarsViewModel.Metrics.Single(m => m.Value == BarMetric.Increase);
+        trends.BarRange = PeriodBarsViewModel.Ranges.Single(r => r.Value == 7);
+        trends.SaveCommand.Execute(null);
+        saved = TrendViewStore.Load(path).Single();
+        (saved.BarPeriod, saved.BarMetric, saved.BarDays, saved.ShiftStartHour).ShouldBe((BarPeriod.Shift, BarMetric.Increase, 7, 7));
+        trends.Selected!.Description.ShouldBe("Barras · 1 tag · por turno (8 h)");
+
+        // Sin conexión con el agente, las barras lo dicen.
+        trends.OpenCommand.Execute(null);
+        trends.Live.ShouldBeNull();
+        var bars = trends.Bars.ShouldNotBeNull();
+        (trends.IsViewing, trends.IsViewingBars, trends.IsEditing).ShouldBe((true, true, false));
+        bars.Description.ShouldBe("Incremento (contador) por turno (8 h) · últimos 7 días");
+        trends.EditCommand.Execute(null);
+        trends.Bars.ShouldBeNull();
+
+        // En la tendencia el disparo sí cuenta: marcado y sin tag, no se guarda.
+        trends.Kind = ChartKindChoice.For(ChartKind.Trend);
+        trends.SeparateAxes = true;
+        trends.SaveCommand.Execute(null);
+        trends.TriggerError.ShouldBe("Elige el tag de disparo.");
+        trends.TriggerEnabled = false;
+        trends.SaveCommand.Execute(null);
+        TrendViewStore.Load(path).Single().SeparateAxes.ShouldBeTrue();
+    }
+
+    [Fact]
     public Task The_new_charts_are_drawn() => HeadlessApp.RunAsync(() =>
     {
         Avalonia.Application.Current!.RequestedThemeVariant = Avalonia.Styling.ThemeVariant.Light;
@@ -209,6 +344,47 @@ public sealed class ChartKindsTests : IDisposable
         xy.SetData([new ChartSeriesData("fuerza", [])]);
         xy.Curves = [new XYCurve("fuerza", Enumerable.Range(0, 100).Select(k => new XYPoint(k * 0.5, (k * k * 0.01) - (k * 0.2))).ToList(), 0)];
         Show(new ChartPanel { DataContext = xy }, "chart-xy.png");
+
+        var random = new Random(7);
+        double Normal() => Math.Sqrt(-2 * Math.Log(1 - random.NextDouble())) * Math.Cos(2 * Math.PI * random.NextDouble());
+        var histogram = new ChartViewModel { Kind = ChartKind.Histogram, LowLimit = 9.2, HighLimit = 10.8 };
+        histogram.SetData(
+        [
+            new ChartSeriesData("Diámetro", Enumerable.Range(0, 400).Select(i => P(i, 10.1 + (0.2 * Normal()))).ToList()),
+        ], At(0), At(400));
+        Show(new ChartPanel { DataContext = histogram }, "chart-histogram.png").OfType<HistogramChart>().Single().IsVisible.ShouldBeTrue();
+
+        foreach (var style in new[] { GaugeStyle.Needle, GaugeStyle.Level, GaugeStyle.Value })
+        {
+            var gauges = new ChartViewModel { Kind = ChartKind.Gauges, GaugeStyle = style, LowLimit = 20, HighLimit = 80 };
+            gauges.SetData(
+            [
+                new ChartSeriesData("Presión", [P(0, 30), P(10, 55)]),
+                new ChartSeriesData("Temperatura", [P(0, 70), P(10, 91.5)]),
+                new ChartSeriesData("Marcha", [P(0, 1)], IsBoolean: true),
+            ], At(0), At(10));
+            Show(new ChartPanel { DataContext = gauges }, $"chart-gauges-{style.ToString().ToLowerInvariant()}.png");
+        }
+
+        var day = new DateTimeOffset(new DateTime(2026, 10, 16, 6, 0, 0, DateTimeKind.Local));
+        var bars = new ChartViewModel { Kind = ChartKind.Bars, BarPeriod = BarPeriod.Shift };
+        bars.SetData(
+        [
+            new ChartSeriesData("Piezas L1", Enumerable.Range(0, 9).Select(i => new ChartPoint(day.AddHours(8 * i), 400 + (i % 3 * 60) + (i * 5))).ToList(), Step: false),
+            new ChartSeriesData("Piezas L2", Enumerable.Range(0, 9).Select(i => new ChartPoint(day.AddHours(8 * i), 350 + (i % 3 * 40))).ToList(), Step: false),
+        ]);
+        Show(new ChartPanel { DataContext = bars }, "chart-bars.png");
+
+        var axes = new ChartViewModel { SeparateAxes = true };
+        axes.SetData(
+        [
+            new ChartSeriesData("Presión bar", Enumerable.Range(0, 60).Select(i => P(i * 3, 4 + Math.Sin(i / 6.0))).ToList()),
+            new ChartSeriesData("Caudal l/min", Enumerable.Range(0, 60).Select(i => P(i * 3, 1200 + (300 * Math.Cos(i / 9.0)))).ToList()),
+            new ChartSeriesData("Bomba", Enumerable.Range(0, 60).Select(i => P(i * 3, i % 20 < 12 ? 1 : 0)).ToList(), IsBoolean: true),
+        ], At(0), At(180));
+        axes.CanSeparateAxes.ShouldBeTrue();
+        axes.HasYAxis.ShouldBeFalse();
+        Show(new ChartPanel { DataContext = axes }, "chart-separate-axes.png");
     });
 
     private static IEnumerable<Avalonia.Visual> Show(ChartPanel panel, string file)

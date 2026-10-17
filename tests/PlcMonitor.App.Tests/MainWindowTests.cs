@@ -252,6 +252,24 @@ public class MainWindowTests
         window.GetVisualDescendants().OfType<TextBlock>().Select(t => t.Text).ShouldContain("TAGS DE LA VISTA");
         Capture(window, "trends-edit.png");
 
+        // Opciones según el tipo de gráfica.
+        trends.Kind = ChartKindChoice.For(PlcMonitor.App.Charts.ChartKind.Bars);
+        trends.BarPeriod = PeriodBarsViewModel.Periods[1];
+        window.UpdateLayout();
+        Capture(window, "trends-edit-bars.png");
+        trends.Kind = ChartKindChoice.For(PlcMonitor.App.Charts.ChartKind.Histogram);
+        trends.LowLimit = 9;
+        trends.HighLimit = 15;
+        window.UpdateLayout();
+        Capture(window, "trends-edit-histogram.png");
+        trends.OpenCommand.Execute(null);
+        trends.Refresh(now);
+        window.UpdateLayout();
+        Capture(window, "trend-histogram.png");
+        trends.EditCommand.Execute(null);
+        trends.Kind = ChartKindChoice.For(PlcMonitor.App.Charts.ChartKind.Trend);
+        trends.LowLimit = trends.HighLimit = null;
+
         trends.OpenCommand.Execute(null);
         var live = trends.Live.ShouldNotBeNull();
         trends.Refresh(now);

@@ -66,7 +66,7 @@
             <Border Classes="card" Padding="20">
               <StackPanel Spacing="12">
                 <TextBlock Text="VISTA" Classes="caption" />
-                <Grid ColumnDefinitions="170,*" RowDefinitions="Auto,Auto,Auto,Auto,Auto" RowSpacing="10" ColumnSpacing="16">
+                <Grid ColumnDefinitions="170,*" RowDefinitions="Auto,Auto,Auto" RowSpacing="10" ColumnSpacing="16">
                   <TextBlock Text="Nombre" VerticalAlignment="Center" FontWeight="Medium" />
                   <TextBox Grid.Column="1" Text="{Binding Name}" PlaceholderText="Presión línea 3" />
                   <TextBlock Grid.Row="1" Text="Tipo de gráfica" VerticalAlignment="Center" FontWeight="Medium" />
@@ -87,10 +87,53 @@
                     </ComboBox.SelectionBoxItemTemplate>
                   </ComboBox>
                   <TextBlock Grid.Row="2" Grid.Column="1" Text="{Binding Kind.Description}" Classes="muted" FontSize="11.5" TextWrapping="Wrap" />
-                  <TextBlock Grid.Row="3" Text="Ventana" VerticalAlignment="Center" FontWeight="Medium" />
-                  <ComboBox Grid.Row="3" Grid.Column="1" ItemsSource="{x:Static vm:LiveTrendViewModel.Windows}" SelectedItem="{Binding Window}" MinWidth="110" />
-                  <TextBlock Grid.Row="4" Text="Eje Y" VerticalAlignment="Center" FontWeight="Medium" />
-                  <StackPanel Grid.Row="4" Grid.Column="1" Orientation="Horizontal" Spacing="8">
+                </Grid>
+                <!-- Opciones según el tipo: una fila por opción, las que no aplican se ocultan. -->
+                <Grid ColumnDefinitions="170,*" ColumnSpacing="16" IsVisible="{Binding UsesLiveWindow}">
+                  <TextBlock Text="Ventana" VerticalAlignment="Center" FontWeight="Medium" />
+                  <ComboBox Grid.Column="1" ItemsSource="{x:Static vm:LiveTrendViewModel.Windows}" SelectedItem="{Binding Window}" MinWidth="110" />
+                </Grid>
+                <Grid ColumnDefinitions="170,*" ColumnSpacing="16" IsVisible="{Binding IsBarsKind}">
+                  <TextBlock Text="Barras" VerticalAlignment="Center" FontWeight="Medium" />
+                  <WrapPanel Grid.Column="1">
+                    <ComboBox ItemsSource="{x:Static vm:PeriodBarsViewModel.Metrics}" SelectedItem="{Binding BarMetric}" MinWidth="190" Margin="0,0,8,6" ToolTip.Tip="Qué se calcula en cada periodo" />
+                    <TextBlock Text="por" Classes="muted" VerticalAlignment="Center" Margin="0,0,8,6" />
+                    <ComboBox ItemsSource="{x:Static vm:PeriodBarsViewModel.Periods}" SelectedItem="{Binding BarPeriod}" MinWidth="120" Margin="0,0,8,6" />
+                    <ComboBox ItemsSource="{x:Static vm:PeriodBarsViewModel.Ranges}" SelectedItem="{Binding BarRange}" MinWidth="150" Margin="0,0,8,6" />
+                  </WrapPanel>
+                </Grid>
+                <Grid ColumnDefinitions="170,*" ColumnSpacing="16">
+                  <Grid.IsVisible>
+                    <MultiBinding Converter="{x:Static BoolConverters.And}">
+                      <Binding Path="IsBarsKind" />
+                      <Binding Path="IsShiftPeriod" />
+                    </MultiBinding>
+                  </Grid.IsVisible>
+                  <TextBlock Text="Primer turno" VerticalAlignment="Center" FontWeight="Medium" />
+                  <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="8">
+                    <TextBlock Text="empieza a las" Classes="muted" VerticalAlignment="Center" />
+                    <NumericUpDown Value="{Binding ShiftStartHour}" Minimum="0" Maximum="23" Increment="1" FormatString="0" Width="110" />
+                    <TextBlock Text="h (T1, T2 y T3, de 8 h cada uno)" Classes="muted" VerticalAlignment="Center" />
+                  </StackPanel>
+                </Grid>
+                <Grid ColumnDefinitions="170,*" ColumnSpacing="16" IsVisible="{Binding IsGaugesKind}">
+                  <TextBlock Text="Indicador" VerticalAlignment="Center" FontWeight="Medium" />
+                  <ComboBox Grid.Column="1" ItemsSource="{x:Static vm:TrendsViewModel.GaugeStyles}" SelectedItem="{Binding GaugeStyle}" MinWidth="160" />
+                </Grid>
+                <Grid ColumnDefinitions="170,*" RowDefinitions="Auto,Auto" RowSpacing="4" ColumnSpacing="16" IsVisible="{Binding HasLimits}">
+                  <TextBlock Text="{Binding LimitsText}" VerticalAlignment="Center" FontWeight="Medium" />
+                  <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="8">
+                    <TextBlock Text="inferior" Classes="muted" VerticalAlignment="Center" />
+                    <NumericUpDown Value="{Binding LowLimit}" Width="130" FormatString="0.###" PlaceholderText="—" />
+                    <TextBlock Text="superior" Classes="muted" VerticalAlignment="Center" Margin="8,0,0,0" />
+                    <NumericUpDown Value="{Binding HighLimit}" Width="130" FormatString="0.###" PlaceholderText="—" />
+                  </StackPanel>
+                  <TextBlock Grid.Row="1" Grid.Column="1" Text="{Binding LimitsHint}" Classes="muted" FontSize="11.5" TextWrapping="Wrap" />
+                </Grid>
+                <Grid ColumnDefinitions="170,*" ColumnSpacing="16" IsVisible="{Binding HasAxisLimits}">
+                  <TextBlock Text="{Binding AxisCaption}"
+                             VerticalAlignment="Center" FontWeight="Medium" />
+                  <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="8">
                     <CheckBox Content="Automático" IsChecked="{Binding AutoY}" />
                     <TextBlock Text="mín" Classes="muted" VerticalAlignment="Center" IsVisible="{Binding IsManualY}" Margin="8,0,0,0" />
                     <NumericUpDown Value="{Binding YMin}" Width="130" IsVisible="{Binding IsManualY}" />
@@ -98,13 +141,17 @@
                     <NumericUpDown Value="{Binding YMax}" Width="130" IsVisible="{Binding IsManualY}" />
                   </StackPanel>
                 </Grid>
+                <Grid ColumnDefinitions="170,*" ColumnSpacing="16" IsVisible="{Binding IsTrendKind}">
+                  <TextBlock Text="Ejes" VerticalAlignment="Center" FontWeight="Medium" />
+                  <CheckBox Grid.Column="1" Content="Un eje Y por tag (cada uno con su escala)" IsChecked="{Binding SeparateAxes}" />
+                </Grid>
                 <TextBlock Text="{Binding KindError}" Classes="error" TextWrapping="Wrap"
                            IsVisible="{Binding KindError, Converter={x:Static StringConverters.IsNotNullOrEmpty}}" />
               </StackPanel>
             </Border>
 
             <!-- Disparo: solo se ven los valores mientras se cumple, con tiempo antes y después -->
-            <Border Classes="card" Padding="20">
+            <Border Classes="card" Padding="20" IsVisible="{Binding CanTrigger}">
               <StackPanel Spacing="12">
                 <TextBlock Text="DISPARO" Classes="caption" />
                 <CheckBox Content="Mostrar solo mientras un tag cumpla una condición" IsChecked="{Binding TriggerEnabled}" />
@@ -218,8 +265,35 @@
           </StackPanel>
         </ScrollViewer>
 
+        <!-- Barras del histórico de la vista abierta -->
+        <Border Classes="card" Padding="16" IsVisible="{Binding IsViewingBars}">
+          <DockPanel DataContext="{Binding Bars}" x:DataType="vm:PeriodBarsViewModel">
+            <StackPanel DockPanel.Dock="Top" Orientation="Horizontal" Spacing="10" Margin="0,0,0,12">
+              <Button Classes="secondary" Command="{Binding $parent[UserControl].((vm:TrendsViewModel)DataContext).EditCommand}">
+                <StackPanel Orientation="Horizontal" Spacing="6">
+                  <c:Icon Kind="pencil" />
+                  <TextBlock Text="Editar vista" />
+                </StackPanel>
+              </Button>
+              <Button Classes="secondary" Command="{Binding RefreshCommand}">
+                <StackPanel Orientation="Horizontal" Spacing="6">
+                  <c:Icon Kind="refresh" />
+                  <TextBlock Text="Actualizar" />
+                </StackPanel>
+              </Button>
+              <TextBlock Text="{Binding Description}" FontWeight="Medium" VerticalAlignment="Center" Margin="8,0,0,0" />
+              <TextBlock Text="{Binding Summary}" Classes="muted" VerticalAlignment="Center" />
+            </StackPanel>
+            <Border DockPanel.Dock="Top" Classes="pill warn" CornerRadius="8" Padding="12,8" Margin="0,0,0,12" HorizontalAlignment="Stretch"
+                    IsVisible="{Binding Missing, Converter={x:Static StringConverters.IsNotNullOrEmpty}}">
+              <TextBlock Text="{Binding Missing}" TextWrapping="Wrap" />
+            </Border>
+            <v:ChartPanel DataContext="{Binding Chart}" />
+          </DockPanel>
+        </Border>
+
         <!-- Gráfica en vivo de la vista abierta -->
-        <Border Classes="card" Padding="16" IsVisible="{Binding IsViewing}">
+        <Border Classes="card" Padding="16" IsVisible="{Binding IsViewingLive}">
           <DockPanel DataContext="{Binding Live}" x:DataType="vm:LiveTrendViewModel">
             <StackPanel DockPanel.Dock="Top" Orientation="Horizontal" Spacing="10" Margin="0,0,0,12">
               <Button Classes="secondary" Command="{Binding $parent[UserControl].((vm:TrendsViewModel)DataContext).EditCommand}">

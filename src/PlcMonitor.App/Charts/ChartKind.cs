@@ -14,4 +14,48 @@ public enum ChartKind
 
     /// <summary>Una franja por tag con un color por estado, con duraciones y porcentajes.</summary>
     States,
+
+    /// <summary>Reparto de los valores con media, desviación y capacidad (Cp/Cpk) frente a las tolerancias.</summary>
+    Histogram,
+
+    /// <summary>Valor actual de cada tag en grande, con aguja o barra de nivel y límites.</summary>
+    Gauges,
+
+    /// <summary>Barras por hora, turno o día sacadas del histórico del agente.</summary>
+    Bars,
+}
+
+/// <summary>Cómo se dibuja cada indicador de panel.</summary>
+public enum GaugeStyle
+{
+    /// <summary>Solo el valor en grande.</summary>
+    Value,
+
+    /// <summary>Aguja sobre un arco.</summary>
+    Needle,
+
+    /// <summary>Barra de nivel vertical.</summary>
+    Level,
+}
+
+/// <summary>Periodo de las barras del histórico.</summary>
+public enum BarPeriod
+{
+    Hour,
+
+    /// <summary>Turnos de 8 h desde la hora de inicio del primero.</summary>
+    Shift,
+
+    Day,
+}
+
+/// <summary>Qué se calcula en cada periodo de las barras.</summary>
+public enum BarMetric
+{
+    Max,
+    Average,
+    Min,
+
+    /// <summary>Lo que ha subido un contador (con sus reinicios).</summary>
+    Increase,
 }

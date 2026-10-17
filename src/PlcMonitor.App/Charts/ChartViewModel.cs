@@ -83,7 +83,7 @@ public sealed partial class ChartViewModel : ObservableObject
 
     /// <summary>Tipo de gráfica: la tendencia y el cronograma usan <see cref="Series"/>; ciclos y X-Y, <see cref="Curves"/>.</summary>
     [ObservableProperty]
-    [NotifyPropertyChangedFor(nameof(IsTrend), nameof(IsStates), nameof(IsXY), nameof(IsCycles), nameof(HasYAxis), nameof(Hint))]
+    [NotifyPropertyChangedFor(nameof(IsTrend), nameof(IsStates), nameof(IsXY), nameof(IsCycles), nameof(IsHistogram), nameof(IsGauges), nameof(IsBars), nameof(HasYAxis), nameof(Hint), nameof(CanSeparateAxes), nameof(AxisText))]
     public partial ChartKind Kind { get; set; } = ChartKind.Trend;
 
     public bool IsTrend => Kind == ChartKind.Trend;
@@ -92,10 +92,50 @@ public sealed partial class ChartViewModel : ObservableObject
 
     public bool IsCycles => Kind == ChartKind.Cycles;
 
+    public bool IsHistogram => Kind == ChartKind.Histogram;
+
+    public bool IsGauges => Kind == ChartKind.Gauges;
+
+    public bool IsBars => Kind == ChartKind.Bars;
+
+    /// <summary>Texto de la casilla de los límites automáticos según qué eje son.</summary>
+    public string AxisText => Kind switch
+    {
+        ChartKind.Histogram => "Eje de valores automático",
+        ChartKind.Gauges => "Escala automática",
+        _ => "Eje Y automático",
+    };
+
+    /// <summary>Tendencia con un eje Y por tag.</summary>
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(HasYAxis))]
+    public partial bool SeparateAxes { get; set; }
+
+    /// <summary>Se ofrece separar los ejes: tendencia con más de un tag.</summary>
+    public bool CanSeparateAxes => Kind == ChartKind.Trend && Options.Count > 1;
+
+    /// <summary>Tolerancias del histograma y límites de los indicadores (null = sin límite).</summary>
+    [ObservableProperty]
+    public partial double? LowLimit { get; set; }
+
+    [ObservableProperty]
+    public partial double? HighLimit { get; set; }
+
+    [ObservableProperty]
+    public partial GaugeStyle GaugeStyle { get; set; }
+
+    /// <summary>Barras: periodo de cada barra (para las etiquetas) y hora de inicio del primer turno.</summary>
+    [ObservableProperty]
+    public partial BarPeriod BarPeriod { get; set; }
+
+    [ObservableProperty]
+    public partial int ShiftStartHour { get; set; } = 6;
+
     /// <summary>Gráfica con eje X numérico (ciclos superpuestos o X-Y).</summary>
     public bool IsXY => Kind is ChartKind.Cycles or ChartKind.XY;
 
-    public bool HasYAxis => Kind != ChartKind.States;
+    /// <summary>Límites del eje Y a mano: no en el cronograma ni con un eje por tag. En el histograma son los del eje X; en los indicadores, la escala.</summary>
+    public bool HasYAxis => Kind != ChartKind.States && !(Kind == ChartKind.Trend && SeparateAxes && Options.Count > 1);
 
     /// <summary>Curvas de los ciclos superpuestos o de la X-Y (las calcula quien alimenta la gráfica).</summary>
     [ObservableProperty]
@@ -114,6 +154,9 @@ public sealed partial class ChartViewModel : ObservableObject
         ChartKind.Cycles => "Cada ciclo empieza en 0 (el disparo); el último va resaltado y los anteriores, tenues.",
         ChartKind.XY => "Pasa el ratón para ver las coordenadas; el punto marca el valor más reciente.",
         ChartKind.States => "Arrastra para ampliar un tramo; pasa el ratón por una franja para ver el estado y cuánto duró.",
+        ChartKind.Histogram => "Valores recibidos en la ventana. Líneas: media (negra), ±3σ (discontinuas) y tolerancias (rojas). Pasa el ratón por una barra.",
+        ChartKind.Gauges => "Valor actual de cada tag; en rojo si está fuera de los límites.",
+        ChartKind.Bars => "Un grupo de barras por periodo, sacado del histórico del agente. Pasa el ratón para ver los valores.",
         _ => "Arrastra sobre la gráfica para ampliar un tramo; pasa el ratón para ver los valores.",
     };
 
@@ -150,6 +193,8 @@ public sealed partial class ChartViewModel : ObservableObject
             Options.Add(option);
         }
         OnPropertyChanged(nameof(HasOptions));
+        OnPropertyChanged(nameof(CanSeparateAxes));
+        OnPropertyChanged(nameof(HasYAxis));
         var all = Options.SelectMany(o => o.Points).Select(p => p.Time).ToArray();
         DataFrom = from ?? (all.Length > 0 ? all.Min() : null);
         DataTo = to ?? (all.Length > 0 ? all.Max() : null);

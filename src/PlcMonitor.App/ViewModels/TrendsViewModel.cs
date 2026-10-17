@@ -26,12 +26,12 @@ public sealed partial class TrendViewItem(TrendView view) : ObservableObject
     private static string Describe(TrendView view)
     {
         var kind = view.Kind == ChartKind.Trend ? "" : $"{ChartKindChoice.For(view.Kind).Short} · ";
-        return kind + view.Tags.Count switch
-        {
-            0 => "sin tags",
-            1 => $"1 tag · {view.WindowMinutes} min{(view.Trigger is null ? "" : " · disparo")}",
-            var n => $"{n} tags · {view.WindowMinutes} min{(view.Trigger is null ? "" : " · disparo")}",
-        };
+        var tags = view.Tags.Count switch { 0 => "sin tags", 1 => "1 tag", var n => $"{n} tags" };
+        if (view.Tags.Count == 0)
+            return kind + tags;
+        if (view.Kind == ChartKind.Bars)
+            return $"{kind}{tags} · por {PeriodBarsViewModel.Periods.First(p => p.Value == view.BarPeriod).Text.ToLowerInvariant()}";
+        return $"{kind}{tags} · {view.WindowMinutes} min{(view.Trigger is null ? "" : " · disparo")}";
     }
 }
 
@@ -48,6 +48,12 @@ public sealed record ChartKindChoice(ChartKind Value, string Text, string Short,
             "Un tag frente a otro en vez de frente al tiempo, p. ej. fuerza contra posición en una prensa o presión contra caudal. El primer tag de la vista es el eje X y los demás, el Y. Con disparo, una curva por ciclo."),
         new(ChartKind.States, "Cronograma de estados", "Estados",
             "Una franja por tag con un color por estado (marcha/paro/alarma, paso de secuencia…), la duración de cada tramo al pasar el ratón y el porcentaje de tiempo en cada estado. Pensado para booleanos y enteros de estado."),
+        new(ChartKind.Histogram, "Histograma con Cp/Cpk", "Histograma",
+            "Cómo se reparten los valores recibidos en la ventana: barras por clase, media, desviación típica, mínimo y máximo y, con tolerancias, la capacidad del proceso (Cp y Cpk). Con disparo, solo los valores de cada ciclo."),
+        new(ChartKind.Gauges, "Indicadores de panel", "Indicadores",
+            "El valor actual de cada tag en grande, como en un panel de operador: con aguja, barra de nivel o solo el número, y en rojo si sale de los límites. Los booleanos se ven como una luz."),
+        new(ChartKind.Bars, "Barras por periodo (histórico)", "Barras",
+            "Un grupo de barras por hora, turno o día con el máximo, la media, el mínimo o lo que ha subido un contador, sacado del histórico del agente (los tags tienen que historizarse). No es en vivo: se actualiza con un botón."),
     ];
 
     public static ChartKindChoice For(ChartKind kind) => All.FirstOrDefault(k => k.Value == kind) ?? All[0];
@@ -92,23 +98,100 @@ public sealed partial class TrendsViewModel : ObservableObject, IDisposable
 
     /// <summary>Gráfica abierta (null = configurando la vista).</summary>
     [ObservableProperty]
-    [NotifyPropertyChangedFor(nameof(IsEditing), nameof(IsViewing))]
+    [NotifyPropertyChangedFor(nameof(IsEditing), nameof(IsViewing), nameof(IsViewingLive))]
     public partial LiveTrendViewModel? Live { get; private set; }
 
-    public bool IsViewing => Live is not null;
+    public bool IsViewing => Live is not null || Bars is not null;
 
-    public bool IsEditing => Live is null && Selected is not null;
+    public bool IsEditing => !IsViewing && Selected is not null;
 
     public bool HasViews => Views.Count > 0;
 
     // ---- Formulario de la vista seleccionada (se aplica con Guardar o al abrir) ----
 
     [ObservableProperty]
-    [NotifyPropertyChangedFor(nameof(IsXYKind))]
+    [NotifyPropertyChangedFor(nameof(IsXYKind), nameof(IsTrendKind), nameof(IsGaugesKind), nameof(IsBarsKind), nameof(HasLimits), nameof(LimitsText),
+        nameof(LimitsHint), nameof(UsesLiveWindow), nameof(CanTrigger), nameof(AxisCaption), nameof(HasAxisLimits))]
     public partial ChartKindChoice Kind { get; set; } = ChartKindChoice.All[0];
 
     /// <summary>X-Y: el primer tag es el eje X.</summary>
     public bool IsXYKind => Kind.Value == ChartKind.XY;
+
+    public bool IsTrendKind => Kind.Value == ChartKind.Trend;
+
+    /// <summary>El cronograma no tiene eje de valores.</summary>
+    public bool HasAxisLimits => Kind.Value != ChartKind.States;
+
+    /// <summary>Rótulo de los límites mín/máx: el eje Y, el de valores del histograma o la escala de los indicadores.</summary>
+    public string AxisCaption => Kind.Value switch
+    {
+        ChartKind.Histogram => "Eje de valores",
+        ChartKind.Gauges => "Escala",
+        _ => "Eje Y",
+    };
+
+    public bool IsGaugesKind => Kind.Value == ChartKind.Gauges;
+
+    public bool IsBarsKind => Kind.Value == ChartKind.Bars;
+
+    /// <summary>Tolerancias (histograma) o límites (indicadores).</summary>
+    public bool HasLimits => Kind.Value is ChartKind.Histogram or ChartKind.Gauges;
+
+    public string LimitsText => Kind.Value == ChartKind.Histogram ? "Tolerancias" : "Límites";
+
+    public string LimitsHint => Kind.Value == ChartKind.Histogram
+        ? "Inferior y superior de especificación (LIE/LSE) para calcular Cp y Cpk; con una sola, solo Cpk."
+        : "Fuera de ellos el indicador se pone en rojo.";
+
+    /// <summary>La ventana en vivo cuenta (no en ciclos ni en barras del histórico).</summary>
+    public bool UsesLiveWindow => Kind.Value is not (ChartKind.Cycles or ChartKind.Bars);
+
+    /// <summary>El disparo tiene sentido (no en barras del histórico ni en indicadores del valor actual).</summary>
+    public bool CanTrigger => Kind.Value is not (ChartKind.Bars or ChartKind.Gauges);
+
+    [ObservableProperty]
+    public partial bool SeparateAxes { get; set; }
+
+    [ObservableProperty]
+    public partial decimal? LowLimit { get; set; }
+
+    [ObservableProperty]
+    public partial decimal? HighLimit { get; set; }
+
+    public static IReadOnlyList<Choice<Charts.GaugeStyle>> GaugeStyles { get; } =
+    [
+        new("Aguja", Charts.GaugeStyle.Needle),
+        new("Barra de nivel", Charts.GaugeStyle.Level),
+        new("Solo el valor", Charts.GaugeStyle.Value),
+    ];
+
+    [ObservableProperty]
+    public partial Choice<Charts.GaugeStyle> GaugeStyle { get; set; } = GaugeStyles[0];
+
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(IsShiftPeriod))]
+    public partial Choice<Charts.BarPeriod> BarPeriod { get; set; } = PeriodBarsViewModel.Periods[0];
+
+    public bool IsShiftPeriod => BarPeriod.Value == Charts.BarPeriod.Shift;
+
+    [ObservableProperty]
+    public partial Choice<Charts.BarMetric> BarMetric { get; set; } = PeriodBarsViewModel.Metrics[0];
+
+    [ObservableProperty]
+    public partial Choice<int> BarRange { get; set; } = PeriodBarsViewModel.Ranges[0];
+
+    /// <summary>Hora a la que empieza el primer turno (los otros dos, cada 8 h).</summary>
+    [ObservableProperty]
+    public partial decimal ShiftStartHour { get; set; } = 6;
+
+    /// <summary>Barras del histórico abiertas (null = no).</summary>
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(IsEditing), nameof(IsViewing), nameof(IsViewingBars), nameof(IsViewingLive))]
+    public partial PeriodBarsViewModel? Bars { get; private set; }
+
+    public bool IsViewingBars => Bars is not null;
+
+    public bool IsViewingLive => Live is not null;
 
     public string XAxisText => Tags.Count > 0 ? $"Eje X: {Tags[0]}" : "Eje X: el primer tag que añadas";
 
@@ -195,6 +278,7 @@ public sealed partial class TrendsViewModel : ObservableObject, IDisposable
     partial void OnSelectedChanged(TrendViewItem? value)
     {
         Live = null;
+        Bars = null;
         LoadForm(value?.View);
         OnPropertyChanged(nameof(IsEditing));
     }
@@ -206,6 +290,14 @@ public sealed partial class TrendsViewModel : ObservableObject, IDisposable
         Name = view?.Name ?? "";
         Kind = ChartKindChoice.For(view?.Kind ?? ChartKind.Trend);
         KindError = "";
+        SeparateAxes = view?.SeparateAxes ?? false;
+        LowLimit = view?.LowLimit is { } low ? (decimal)low : null;
+        HighLimit = view?.HighLimit is { } high ? (decimal)high : null;
+        GaugeStyle = GaugeStyles.FirstOrDefault(g => g.Value == view?.GaugeStyle) ?? GaugeStyles[0];
+        BarPeriod = PeriodBarsViewModel.Periods.FirstOrDefault(p => p.Value == view?.BarPeriod) ?? PeriodBarsViewModel.Periods[0];
+        BarMetric = PeriodBarsViewModel.Metrics.FirstOrDefault(m => m.Value == view?.BarMetric) ?? PeriodBarsViewModel.Metrics[0];
+        BarRange = PeriodBarsViewModel.Ranges.FirstOrDefault(r => r.Value == view?.BarDays) ?? PeriodBarsViewModel.Ranges[0];
+        ShiftStartHour = view?.ShiftStartHour ?? 6;
         Window = LiveTrendViewModel.Windows.FirstOrDefault(w => (int)w.Value.TotalMinutes == view?.WindowMinutes) ?? LiveTrendViewModel.Windows[1];
         AutoY = view?.AutoY ?? true;
         YMin = view?.YMin is { } min ? (decimal)min : null;
@@ -233,7 +325,7 @@ public sealed partial class TrendsViewModel : ObservableObject, IDisposable
         return choice;
     }
 
-    private TrendTrigger? BuildTrigger() => TriggerEnabled && TriggerTag is { } tag
+    private TrendTrigger? BuildTrigger() => TriggerEnabled && CanTrigger && TriggerTag is { } tag
         ? new TrendTrigger
         {
             Device = tag.Device,
@@ -326,9 +418,11 @@ public sealed partial class TrendsViewModel : ObservableObject, IDisposable
         {
             ChartKind.Cycles when !TriggerEnabled => "Los ciclos superpuestos necesitan un disparo: actívalo abajo.",
             ChartKind.XY when Tags.Count < 2 => "La gráfica X-Y necesita al menos dos tags: el primero es el eje X.",
+            ChartKind.Histogram or ChartKind.Gauges when LowLimit is { } low && HighLimit is { } high && low >= high
+                => $"{LimitsText}: la inferior tiene que ser menor que la superior.",
             _ => "",
         };
-        TriggerError = !TriggerEnabled ? ""
+        TriggerError = !TriggerEnabled || !CanTrigger ? ""
             : TriggerTag is null ? "Elige el tag de disparo."
             : IsValueTrigger && !TriggerFilter.TryParseTarget(TriggerValue, out _) ? "El valor del disparo debe ser un número."
             : "";
@@ -355,6 +449,16 @@ public sealed partial class TrendsViewModel : ObservableObject, IDisposable
             return;
         Apply(item);
         var view = item.View;
+        if (view.Kind == ChartKind.Bars)
+        {
+            Live = null;
+            Bars = new PeriodBarsViewModel(_main, view, t => _main.FindTag(t.Device, t.Tag));
+            Bars.Chart.AutoY = view.AutoY;
+            Bars.Chart.YMinInput = YMin;
+            Bars.Chart.YMaxInput = YMax;
+            _ = Bars.RefreshCommand.ExecuteAsync(null);
+            return;
+        }
         var trigger = view.Trigger;
         var live = new LiveTrendViewModel(
             () => view.Tags.Select(t => (t.ToString(), _main.FindTag(t.Device, t.Tag))).ToArray(),
@@ -369,6 +473,10 @@ public sealed partial class TrendsViewModel : ObservableObject, IDisposable
             : view.Kind == ChartKind.XY ? "Aún no hay valores de los dos ejes"
             : "Aún no hay valores de estos tags";
         live.Chart.AutoY = view.AutoY;
+        live.Chart.SeparateAxes = view.SeparateAxes;
+        live.Chart.LowLimit = view.LowLimit;
+        live.Chart.HighLimit = view.HighLimit;
+        live.Chart.GaugeStyle = view.GaugeStyle;
         live.Chart.YMinInput = YMin;
         live.Chart.YMaxInput = YMax;
         live.RefreshTags();
@@ -380,6 +488,7 @@ public sealed partial class TrendsViewModel : ObservableObject, IDisposable
     private void Edit()
     {
         Live = null;
+        Bars = null;
         RefreshAvailable();
     }
 
@@ -405,6 +514,14 @@ public sealed partial class TrendsViewModel : ObservableObject, IDisposable
         var view = item.View;
         view.Name = Name.Trim();
         view.Kind = Kind.Value;
+        view.SeparateAxes = SeparateAxes;
+        view.LowLimit = LowLimit is { } low ? (double)low : null;
+        view.HighLimit = HighLimit is { } high ? (double)high : null;
+        view.GaugeStyle = GaugeStyle.Value;
+        view.BarPeriod = BarPeriod.Value;
+        view.BarMetric = BarMetric.Value;
+        view.BarDays = BarRange.Value;
+        view.ShiftStartHour = (int)ShiftStartHour;
         view.WindowMinutes = (int)Window.Value.TotalMinutes;
         view.AutoY = AutoY;
         view.YMin = YMin is { } min ? (double)min : null;

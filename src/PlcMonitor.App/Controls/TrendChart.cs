@@ -34,6 +34,9 @@ public sealed class TrendChart : Control
 
     public static readonly StyledProperty<string> EmptyTextProperty = AvaloniaProperty.Register<TrendChart, string>(nameof(EmptyText), "Sin datos");
 
+    /// <summary>Un eje Y por serie (cada tag con su escala); los límites a mano no se aplican.</summary>
+    public static readonly StyledProperty<bool> SeparateAxesProperty = AvaloniaProperty.Register<TrendChart, bool>(nameof(SeparateAxes));
+
     /// <summary>Muestra la leyenda (en la mini tendencia del detalle de tag sobra).</summary>
     public static readonly StyledProperty<bool> ShowLegendProperty = AvaloniaProperty.Register<TrendChart, bool>(nameof(ShowLegend), true);
 
@@ -47,7 +50,7 @@ public sealed class TrendChart : Control
 
     static TrendChart()
     {
-        AffectsRender<TrendChart>(SeriesProperty, FromProperty, ToProperty, YMinProperty, YMaxProperty, RevisionProperty, EmptyTextProperty, ShowLegendProperty);
+        AffectsRender<TrendChart>(SeriesProperty, FromProperty, ToProperty, YMinProperty, YMaxProperty, RevisionProperty, EmptyTextProperty, ShowLegendProperty, SeparateAxesProperty);
     }
 
     public TrendChart()
@@ -99,6 +102,12 @@ public sealed class TrendChart : Control
     {
         get => GetValue(EmptyTextProperty);
         set => SetValue(EmptyTextProperty, value);
+    }
+
+    public bool SeparateAxes
+    {
+        get => GetValue(SeparateAxesProperty);
+        set => SetValue(SeparateAxesProperty, value);
     }
 
     public bool ShowLegend
@@ -171,48 +180,41 @@ public sealed class TrendChart : Control
         var to = To ?? withValues.Max(s => s.Points[^1].Time);
         if (to <= from)
             to = from + TimeSpan.FromSeconds(1);
-        var (min, max) = ValueRange(withValues, from, to);
-        var booleansOnly = withValues.All(s => s.IsBoolean) && YMin is null && YMax is null;
-        double yMin, yMax, yStep;
-        if (booleansOnly)
+        // Ejes Y: uno para todas las series o, con ejes separados, uno por serie con su escala y su color.
+        var ticksWanted = Math.Max(2, (int)(bounds.Height / 55));
+        var groups = SeparateAxes && withValues.Length > 1
+            ? withValues.Select(s => new[] { s }).ToArray()
+            : [withValues];
+        var axes = groups.Select(g => BuildAxis(g, from, to, ticksWanted, manual: groups.Length == 1, muted, groups.Length > 1)).ToArray();
+        var axisOf = new Dictionary<ChartSeries, int>();
+        for (var a = 0; a < groups.Length; a++)
         {
-            (yMin, yMax, yStep) = (-0.15, 1.15, 1);
+            foreach (var s in groups[a])
+                axisOf[s] = a;
         }
-        else
-        {
-            var ticks = Math.Max(2, (int)(bounds.Height / 55));
-            (yMin, yMax, yStep) = ChartAxis.NiceRange(YMin ?? min, YMax ?? max, ticks);
-            // Límites fijados a mano: se respetan tal cual (las marcas siguen siendo redondas).
-            if (YMin is { } fixedMin)
-                yMin = fixedMin;
-            if (YMax is { } fixedMax)
-                yMax = fixedMax;
-            if (yMax <= yMin)
-                yMax = yMin + 1;
-        }
-
-        // Marcas del eje Y y su ancho.
-        var yTicks = new List<(double Value, FormattedText Label)>();
-        var firstTick = booleansOnly ? 0 : Math.Ceiling((yMin - (yStep / 1000)) / yStep) * yStep;
-        for (var v = firstTick; v <= yMax + (yStep / 1000); v += yStep)
-        {
-            var label = booleansOnly ? (v >= 0.5 ? "true" : "false") : ChartAxis.FormatValue(Math.Round(v / yStep) * yStep);
-            yTicks.Add((v, Text(label, muted, AxisFontSize)));
-        }
-        var left = (yTicks.Count == 0 ? 20 : yTicks.Max(t => t.Label.Width)) + 12;
+        var widths = axes.Select(a => (a.Ticks.Count == 0 ? 20 : a.Ticks.Max(t => t.Label.Width)) + 10).ToArray();
+        var left = widths.Sum() + 2;
         var top = ShowLegend ? LegendHeight + 6 : 8;
         var plot = new Rect(left, top, Math.Max(10, bounds.Width - left - 12), Math.Max(10, bounds.Height - top - 24));
         _plot = plot;
         _window = (from, to);
         double X(DateTimeOffset t) => plot.Left + (plot.Width * (t - from).TotalMilliseconds / (to - from).TotalMilliseconds);
-        double Y(double v) => plot.Bottom - (plot.Height * (v - yMin) / (yMax - yMin));
+        Func<double, double> YOf(Axis axis) => v => plot.Bottom - (plot.Height * (v - axis.Min) / (axis.Max - axis.Min));
 
-        // Rejilla y etiquetas.
-        foreach (var (value, label) in yTicks)
+        // Rejilla (la del primer eje) y etiquetas de cada eje, de dentro hacia fuera.
+        var edge = left - 2;
+        for (var a = 0; a < axes.Length; a++)
         {
-            var y = Y(value);
-            context.DrawLine(grid, new Point(plot.Left, y), new Point(plot.Right, y));
-            context.DrawText(label, new Point(left - 8 - label.Width, y - (label.Height / 2)));
+            var y = YOf(axes[a]);
+            foreach (var (value, label) in axes[a].Ticks)
+            {
+                if (a == 0)
+                    context.DrawLine(grid, new Point(plot.Left, y(value)), new Point(plot.Right, y(value)));
+                context.DrawText(label, new Point(edge - 6 - label.Width, y(value) - (label.Height / 2)));
+            }
+            if (axes.Length > 1)
+                context.DrawLine(new Pen(axes[a].Brush, 2), new Point(edge - 2, plot.Top), new Point(edge - 2, plot.Bottom));
+            edge -= widths[a];
         }
         var span = to - from;
         var step = ChartAxis.TimeStep(span, Math.Max(2, (int)(plot.Width / 95)));
@@ -231,6 +233,7 @@ public sealed class TrendChart : Control
             for (var i = 0; i < series.Length; i++)
             {
                 var pen = new Pen(Brush($"App.Chart{series[i].ColorIndex % PaletteSize}", Brushes.SteelBlue), 1.8, lineJoin: PenLineJoin.Round);
+                var Y = YOf(axes[axisOf.GetValueOrDefault(series[i])]);
                 foreach (var segment in Segments(series[i], from, to, plot.Width, X, Y))
                 {
                     if (segment.Count == 1)
@@ -389,6 +392,34 @@ public sealed class TrendChart : Control
             segments.Add(current);
         }
         return segments;
+    }
+
+    /// <summary>Eje Y: rango, paso, marcas y color (el de su serie si hay varios ejes).</summary>
+    private sealed record Axis(double Min, double Max, List<(double Value, FormattedText Label)> Ticks, IBrush Brush);
+
+    private Axis BuildAxis(ChartSeries[] series, DateTimeOffset from, DateTimeOffset to, int ticks, bool manual, IBrush muted, bool colored)
+    {
+        var brush = colored ? Brush($"App.Chart{series[0].ColorIndex % PaletteSize}", Brushes.SteelBlue) : muted;
+        var (yMinFixed, yMaxFixed) = manual ? (YMin, YMax) : (null, null);
+        var labels = new List<(double Value, FormattedText Label)>();
+        if (series.All(s => s.IsBoolean) && yMinFixed is null && yMaxFixed is null)
+        {
+            labels.Add((0, Text("false", brush, AxisFontSize)));
+            labels.Add((1, Text("true", brush, AxisFontSize)));
+            return new Axis(-0.15, 1.15, labels, brush);
+        }
+        var (min, max) = ValueRange(series, from, to);
+        var (yMin, yMax, yStep) = ChartAxis.NiceRange(yMinFixed ?? min, yMaxFixed ?? max, ticks);
+        // Límites fijados a mano: se respetan tal cual (las marcas siguen siendo redondas).
+        if (yMinFixed is { } fixedMin)
+            yMin = fixedMin;
+        if (yMaxFixed is { } fixedMax)
+            yMax = fixedMax;
+        if (yMax <= yMin)
+            yMax = yMin + 1;
+        for (var v = Math.Ceiling((yMin - (yStep / 1000)) / yStep) * yStep; v <= yMax + (yStep / 1000); v += yStep)
+            labels.Add((v, Text(ChartAxis.FormatValue(Math.Round(v / yStep) * yStep), brush, AxisFontSize)));
+        return new Axis(yMin, yMax, labels, brush);
     }
 
     private static (double Min, double Max) ValueRange(ChartSeries[] series, DateTimeOffset from, DateTimeOffset to)

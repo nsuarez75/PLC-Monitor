@@ -352,6 +352,21 @@ public sealed class MainViewModelTests : IDisposable
         await vm.History.QueryCommand.ExecuteAsync(null);
         vm.History.Rows.ShouldAllBe(r => r.Value == "50");
 
+        // Barras por periodo de una vista de tendencia: máximo por hora del tag historizado; el otro no tiene histórico.
+        var barsView = new PlcMonitor.App.Services.TrendView
+        {
+            Kind = PlcMonitor.App.Charts.ChartKind.Bars, BarMetric = PlcMonitor.App.Charts.BarMetric.Max, BarPeriod = PlcMonitor.App.Charts.BarPeriod.Hour,
+            Tags = [new("plc1", "velocidad"), new("plc1", "otro")],
+        };
+        var bars = new PeriodBarsViewModel(vm, barsView, t => vm.FindTag(t.Device, t.Tag));
+        bars.Description.ShouldBe("Máximo por hora · hoy y ayer");
+        await bars.RefreshCommand.ExecuteAsync(null);
+        bars.Missing.ShouldBe("Sin histórico en el agente: plc1 / otro");
+        var barSeries = bars.Chart.Options.ShouldHaveSingleItem();
+        barSeries.Name.ShouldBe("plc1 / velocidad");
+        bars.Chart.Series.Single().Points[^1].Value.ShouldBe(50);
+        bars.Summary.ShouldStartWith("1 periodo");
+
         var csv = Path.Combine(agent.Directory, "export.csv");
         _dialogs.SavePath = csv;
         await vm.History.ExportCommand.ExecuteAsync(null);

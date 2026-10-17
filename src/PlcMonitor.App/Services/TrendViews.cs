@@ -27,6 +27,28 @@ public sealed class TrendView
     [JsonConverter(typeof(JsonStringEnumConverter<PlcMonitor.App.Charts.ChartKind>))]
     public PlcMonitor.App.Charts.ChartKind Kind { get; set; }
 
+    /// <summary>Tendencia: un eje Y por tag.</summary>
+    public bool SeparateAxes { get; set; }
+
+    /// <summary>Histograma: tolerancias (para Cp/Cpk). Indicadores: límites bajo y alto.</summary>
+    public double? LowLimit { get; set; }
+
+    public double? HighLimit { get; set; }
+
+    [JsonConverter(typeof(JsonStringEnumConverter<PlcMonitor.App.Charts.GaugeStyle>))]
+    public PlcMonitor.App.Charts.GaugeStyle GaugeStyle { get; set; } = PlcMonitor.App.Charts.GaugeStyle.Needle;
+
+    /// <summary>Barras del histórico: periodo, cálculo, días hacia atrás e inicio del primer turno.</summary>
+    [JsonConverter(typeof(JsonStringEnumConverter<PlcMonitor.App.Charts.BarPeriod>))]
+    public PlcMonitor.App.Charts.BarPeriod BarPeriod { get; set; } = PlcMonitor.App.Charts.BarPeriod.Hour;
+
+    [JsonConverter(typeof(JsonStringEnumConverter<PlcMonitor.App.Charts.BarMetric>))]
+    public PlcMonitor.App.Charts.BarMetric BarMetric { get; set; }
+
+    public int BarDays { get; set; } = 1;
+
+    public int ShiftStartHour { get; set; } = 6;
+
     public int WindowMinutes { get; set; } = 5;
 
     public bool AutoY { get; set; } = true;
