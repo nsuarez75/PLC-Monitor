@@ -29,8 +29,11 @@ public sealed partial class TrendViewItem(TrendView view) : ObservableObject
         var tags = view.Tags.Count switch { 0 => "sin tags", 1 => "1 tag", var n => $"{n} tags" };
         if (view.Tags.Count == 0)
             return kind + tags;
+        var csv = view.DataSource == TrendDataSource.Csv && view.Kind != ChartKind.Gauges ? $" · CSV {Path.GetFileName(view.CsvPath)}" : "";
         if (view.Kind == ChartKind.Bars)
-            return $"{kind}{tags} · por {PeriodBarsViewModel.Periods.First(p => p.Value == view.BarPeriod).Text.ToLowerInvariant()}";
+            return $"{kind}{tags} · por {PeriodBarsViewModel.Periods.First(p => p.Value == view.BarPeriod).Text.ToLowerInvariant()}{csv}";
+        if (csv.Length > 0)
+            return $"{kind}{tags}{csv}{(view.Trigger is null ? "" : " · disparo")}";
         if (view.DataSource == TrendDataSource.History && TrendsViewModel.CanReadHistory(view.Kind))
             return $"{kind}{tags} · histórico, {TrendHistory.Describe(view)}{(view.Trigger is null ? "" : " · disparo")}";
         return $"{kind}{tags} · {view.WindowMinutes} min{(view.Trigger is null ? "" : " · disparo")}";
@@ -87,7 +90,8 @@ public sealed partial class TrendsViewModel : ObservableObject, IDisposable
         _path = path;
         _all = TrendViewStore.Load(path);
         Tags.CollectionChanged += (_, _) => OnPropertyChanged(nameof(XAxisText));
-        foreach (var view in _all.Where(v => v.Agent == main.AgentKey))
+        // Las vistas de CSV no dependen del agente: se ven siempre.
+        foreach (var view in _all.Where(v => v.Agent == main.AgentKey || v.DataSource == TrendDataSource.Csv))
             Views.Add(new TrendViewItem(view));
         _main.TagsChanged += OnTagsChanged;
         Selected = Views.FirstOrDefault();
@@ -113,7 +117,8 @@ public sealed partial class TrendsViewModel : ObservableObject, IDisposable
 
     [ObservableProperty]
     [NotifyPropertyChangedFor(nameof(IsXYKind), nameof(IsTrendKind), nameof(IsGaugesKind), nameof(IsBarsKind), nameof(HasLimits), nameof(LimitsText),
-        nameof(LimitsHint), nameof(UsesLiveWindow), nameof(CanTrigger), nameof(AxisCaption), nameof(HasAxisLimits), nameof(CanUseHistory), nameof(UsesHistory))]
+        nameof(LimitsHint), nameof(UsesLiveWindow), nameof(CanTrigger), nameof(AxisCaption), nameof(HasAxisLimits), nameof(CanUseHistory), nameof(UsesHistory), nameof(UsesCsv), nameof(ShowHistoryRange), nameof(IsCustomRange),
+        nameof(AvailableCaption))]
     public partial ChartKindChoice Kind { get; set; } = ChartKindChoice.All[0];
 
     /// <summary>X-Y: el primer tag es el eje X.</summary>
@@ -145,11 +150,11 @@ public sealed partial class TrendsViewModel : ObservableObject, IDisposable
         ? "Inferior y superior de especificación (LIE/LSE) para calcular Cp y Cpk; con una sola, solo Cpk."
         : "Fuera de ellos el indicador se pone en rojo.";
 
-    /// <summary>La ventana en vivo cuenta (no en ciclos, en barras ni leyendo del histórico).</summary>
-    public bool UsesLiveWindow => Kind.Value is not (ChartKind.Cycles or ChartKind.Bars) && !UsesHistory;
+    /// <summary>La ventana en vivo cuenta (no en ciclos, en barras ni leyendo del histórico o de un CSV).</summary>
+    public bool UsesLiveWindow => Kind.Value is not (ChartKind.Cycles or ChartKind.Bars) && !UsesHistory && !UsesCsv;
 
-    /// <summary>Tipos que pueden leer del histórico (los indicadores son el valor actual; las barras ya lo leen siempre).</summary>
-    public static bool CanReadHistory(ChartKind kind) => kind is not (ChartKind.Gauges or ChartKind.Bars);
+    /// <summary>Tipos que pueden leer datos grabados (histórico o CSV): todos menos los indicadores, que son el valor actual.</summary>
+    public static bool CanReadHistory(ChartKind kind) => kind != ChartKind.Gauges;
 
     public bool CanUseHistory => CanReadHistory(Kind.Value);
 
@@ -157,21 +162,80 @@ public sealed partial class TrendsViewModel : ObservableObject, IDisposable
     [
         new("En vivo (lo que llega, última hora)", TrendDataSource.Live),
         new("Histórico del agente", TrendDataSource.History),
+        new("Fichero CSV exportado", TrendDataSource.Csv),
     ];
 
     [ObservableProperty]
-    [NotifyPropertyChangedFor(nameof(UsesHistory), nameof(UsesLiveWindow), nameof(IsCustomRange))]
+    [NotifyPropertyChangedFor(nameof(UsesHistory), nameof(UsesCsv), nameof(UsesLiveWindow), nameof(IsCustomRange), nameof(ShowHistoryRange), nameof(AvailableCaption))]
     public partial Choice<TrendDataSource> DataSource { get; set; } = DataSources[0];
 
-    /// <summary>La vista lee del histórico (si el tipo lo admite).</summary>
+    /// <summary>La vista lee del histórico del agente (si el tipo lo admite).</summary>
     public bool UsesHistory => CanUseHistory && DataSource.Value == TrendDataSource.History;
+
+    /// <summary>La vista lee de un CSV exportado (sus tags son los del fichero).</summary>
+    public bool UsesCsv => CanUseHistory && DataSource.Value == TrendDataSource.Csv;
+
+    /// <summary>Se elige el periodo del histórico (las barras tienen el suyo).</summary>
+    public bool ShowHistoryRange => UsesHistory && Kind.Value != ChartKind.Bars;
+
+    public string AvailableCaption => UsesCsv ? "TAGS DEL CSV" : "TAGS DEL AGENTE";
+
+    /// <summary>Fichero CSV de la vista.</summary>
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(CsvText))]
+    public partial string? CsvPath { get; set; }
+
+    public string CsvText => CsvPath is { Length: > 0 } path ? Path.GetFileName(path) : "Ningún fichero elegido";
+
+    /// <summary>Por qué no se ha podido leer el CSV (vacío si se ha leído).</summary>
+    [ObservableProperty]
+    public partial string CsvError { get; private set; } = "";
+
+    private HistoryCsvContent? _csv;
+
+    partial void OnCsvPathChanged(string? value)
+    {
+        _csv = null;
+        CsvError = "";
+        KindError = "";
+        if (value is { Length: > 0 } path)
+        {
+            try
+            {
+                _csv = HistoryCsv.Load(path);
+            }
+            catch (Exception ex) when (ex is FormatException or IOException or UnauthorizedAccessException)
+            {
+                CsvError = ex.Message;
+            }
+        }
+        RefreshAvailable();
+    }
+
+    partial void OnDataSourceChanged(Choice<TrendDataSource> value) => RefreshAvailable();
+
+    // Los indicadores solo van en vivo; las barras, del histórico o de un CSV.
+    partial void OnKindChanged(ChartKindChoice value)
+    {
+        if (value.Value == ChartKind.Gauges && DataSource.Value != TrendDataSource.Live)
+            DataSource = DataSources[0];
+        else if (value.Value == ChartKind.Bars && DataSource.Value == TrendDataSource.Live)
+            DataSource = DataSources[1];
+    }
+
+    [RelayCommand]
+    private async Task ChooseCsvAsync()
+    {
+        if (await _main.Dialogs.OpenFileAsync("Abrir histórico (CSV)", "csv") is { } path)
+            CsvPath = path;
+    }
 
     [ObservableProperty]
     [NotifyPropertyChangedFor(nameof(IsCustomRange))]
     public partial Choice<int> HistoryRange { get; set; } = TrendHistory.Ranges[1];
 
     /// <summary>Periodo con fechas concretas (desde/hasta).</summary>
-    public bool IsCustomRange => UsesHistory && HistoryRange.Value == 0;
+    public bool IsCustomRange => ShowHistoryRange && HistoryRange.Value == 0;
 
     [ObservableProperty]
     public partial string HistoryFromText { get; set; } = "";
@@ -339,6 +403,7 @@ public sealed partial class TrendsViewModel : ObservableObject, IDisposable
         Kind = ChartKindChoice.For(view?.Kind ?? ChartKind.Trend);
         KindError = "";
         SeparateAxes = view?.SeparateAxes ?? false;
+        CsvPath = view?.CsvPath;
         DataSource = DataSources.FirstOrDefault(d => d.Value == view?.DataSource) ?? DataSources[0];
         HistoryFromText = view?.HistoryFrom is { } historyFrom ? TrendHistory.Format(historyFrom) : "";
         HistoryToText = view?.HistoryTo is { } historyTo ? TrendHistory.Format(historyTo) : "";
@@ -389,33 +454,30 @@ public sealed partial class TrendsViewModel : ObservableObject, IDisposable
         }
         : null;
 
-    /// <summary>Tags que se pueden añadir: los del agente conectado (dibujables) que no estén ya.</summary>
+    /// <summary>Tags que se pueden añadir: los del CSV o los del agente conectado (dibujables) que no estén ya.</summary>
     private void RefreshAvailable()
     {
+        var all = UsesCsv
+            ? (_csv?.Keys.Select((k, i) => new TrendTagChoice(k.Device, k.Tag, _csv.Series[i].IsBoolean ? "Boolean" : "Número")) ?? []).ToList()
+            : _main.Devices.SelectMany(d => d.Tags.Where(t => t.IsChartable).Select(t => new TrendTagChoice(d.Name, t.Name, t.DataType))).ToList();
         var trigger = TriggerTag?.Ref;
         TriggerChoices.Clear();
-        foreach (var device in _main.Devices)
-        {
-            foreach (var tag in device.Tags.Where(t => t.IsChartable))
-                TriggerChoices.Add(new TrendTagChoice(device.Name, tag.Name, tag.DataType));
-        }
+        foreach (var choice in all)
+            TriggerChoices.Add(choice);
         if (trigger is not null)
             TriggerTag = TriggerChoices.FirstOrDefault(c => c.Ref == trigger) ?? AddMissingTrigger(trigger);
         Available.Clear();
         var search = Search.Trim();
-        foreach (var device in _main.Devices)
+        foreach (var choice in all)
         {
-            foreach (var tag in device.Tags.Where(t => t.IsChartable))
-            {
-                var choice = new TrendTagChoice(device.Name, tag.Name, tag.DataType);
-                if (Tags.Contains(choice.Ref))
-                    continue;
-                if (search.Length > 0 && !choice.Text.Contains(search, StringComparison.OrdinalIgnoreCase))
-                    continue;
-                Available.Add(choice);
-            }
+            if (Tags.Contains(choice.Ref))
+                continue;
+            if (search.Length > 0 && !choice.Text.Contains(search, StringComparison.OrdinalIgnoreCase))
+                continue;
+            Available.Add(choice);
         }
-        Note = _main.IsConnected ? "" : "Conéctate al agente para ver sus tags y añadirlos.";
+        Note = UsesCsv ? (_csv is null ? "Elige un fichero CSV exportado del histórico para ver sus tags." : "")
+            : _main.IsConnected ? "" : "Conéctate al agente para ver sus tags y añadirlos.";
     }
 
     [RelayCommand]
@@ -449,6 +511,14 @@ public sealed partial class TrendsViewModel : ObservableObject, IDisposable
         Tags.Insert(0, tag);
     }
 
+    /// <summary>Añade todos los tags de la lista (los que deja la búsqueda).</summary>
+    [RelayCommand]
+    private void AddAll()
+    {
+        foreach (var choice in Available.ToArray())
+            AddTag(choice);
+    }
+
     [RelayCommand]
     private void RemoveTag(TrendTagRef? tag)
     {
@@ -472,6 +542,8 @@ public sealed partial class TrendsViewModel : ObservableObject, IDisposable
             ChartKind.XY when Tags.Count < 2 => "La gráfica X-Y necesita al menos dos tags: el primero es el eje X.",
             ChartKind.Histogram or ChartKind.Gauges when LowLimit is { } low && HighLimit is { } high && low >= high
                 => $"{LimitsText}: la inferior tiene que ser menor que la superior.",
+            _ when UsesCsv && CsvPath is not { Length: > 0 } => "Elige el fichero CSV.",
+            _ when UsesCsv && CsvError.Length > 0 => $"No se puede leer el CSV: {CsvError}",
             _ when IsCustomRange && !(TrendHistory.TryParse(HistoryFromText, out var from) && TrendHistory.TryParse(HistoryToText, out var to) && from < to)
                 => "Periodo: escribe las fechas como 17/10/2026 06:00, con «desde» antes que «hasta».",
             _ => "",
@@ -503,6 +575,11 @@ public sealed partial class TrendsViewModel : ObservableObject, IDisposable
             return;
         Apply(item);
         var view = item.View;
+        if (view.DataSource == TrendDataSource.Csv && CanReadHistory(view.Kind))
+        {
+            OpenCsv(view);
+            return;
+        }
         if (view.Kind == ChartKind.Bars)
         {
             Live = null;
@@ -584,6 +661,53 @@ public sealed partial class TrendsViewModel : ObservableObject, IDisposable
         Show(live, view);
     }
 
+    /// <summary>Lee el CSV de la vista (otra vez, por si ha cambiado) y abre su gráfica con los tags elegidos.</summary>
+    private void OpenCsv(TrendView view)
+    {
+        HistoryCsvContent content;
+        try
+        {
+            content = HistoryCsv.Load(view.CsvPath!);
+        }
+        catch (Exception ex) when (ex is FormatException or IOException or UnauthorizedAccessException)
+        {
+            KindError = $"No se puede leer el CSV: {ex.Message}";
+            return;
+        }
+        var sources = new Dictionary<TrendTagRef, TrendSource>();
+        for (var i = 0; i < content.Keys.Count; i++)
+        {
+            var series = content.Series[i];
+            sources[new TrendTagRef(content.Keys[i].Device, content.Keys[i].Tag)] =
+                new TrendSource(series.Points as List<ChartPoint> ?? series.Points.ToList(), series.IsBoolean, series.Step);
+        }
+        var file = Path.GetFileName(view.CsvPath!);
+        if (view.Kind == ChartKind.Bars)
+        {
+            Live = null;
+            Bars = new PeriodBarsViewModel(view, sources, file);
+            Bars.Chart.AutoY = view.AutoY;
+            Bars.Chart.YMinInput = YMin;
+            Bars.Chart.YMaxInput = YMax;
+            _ = Bars.RefreshCommand.ExecuteAsync(null);
+            return;
+        }
+        var now = DateTimeOffset.UtcNow;
+        var trigger = view.Trigger;
+        var live = new LiveTrendViewModel(
+            () => view.Tags.Select(t => (t.ToString(), sources.GetValueOrDefault(t))).ToArray(),
+            trigger,
+            trigger is null ? null : () => sources.GetValueOrDefault(trigger.Ref),
+            view.Kind)
+        {
+            FixedWindow = (content.From ?? now, content.To ?? now),
+            HistoryText = $"CSV {file} · {content.Rows} filas",
+            MissingText = "No están en el CSV",
+        };
+        live.Chart.EmptyText = view.Tags.Count == 0 ? "Esta vista no tiene tags: edítala y añade los del CSV" : "El CSV no tiene valores de estos tags";
+        Show(live, view);
+    }
+
     private void Show(LiveTrendViewModel live, TrendView view)
     {
         live.Chart.AutoY = view.AutoY;
@@ -630,6 +754,7 @@ public sealed partial class TrendsViewModel : ObservableObject, IDisposable
         view.Kind = Kind.Value;
         view.SeparateAxes = SeparateAxes;
         view.DataSource = DataSource.Value;
+        view.CsvPath = CsvPath;
         view.HistoryMinutes = HistoryRange.Value;
         view.HistoryFrom = IsCustomRange && TrendHistory.TryParse(HistoryFromText, out var historyFrom) ? historyFrom : null;
         view.HistoryTo = IsCustomRange && TrendHistory.TryParse(HistoryToText, out var historyTo) ? historyTo : null;

@@ -59,16 +59,10 @@
         </Border>
 
         <StackPanel Grid.Column="3" Orientation="Horizontal" Spacing="2">
-        <Button Classes="ghost" Command="{Binding OpenTrendsCommand}" ToolTip.Tip="Vistas de tendencia en vivo con tags de cualquier dispositivo">
+        <Button Classes="ghost" Command="{Binding OpenTrendsCommand}" ToolTip.Tip="Gráficas de tags de cualquier dispositivo o de un CSV: en vivo, del histórico o del fichero">
           <StackPanel Orientation="Horizontal" Spacing="6">
             <c:Icon Kind="pulse" Width="16" Height="16" />
             <TextBlock Text="Tendencias" Classes="barlabel" />
-          </StackPanel>
-        </Button>
-        <Button Classes="ghost" Command="{Binding OpenCsvCommand}" ToolTip.Tip="Ver un CSV exportado del histórico (sin conexión)">
-          <StackPanel Orientation="Horizontal" Spacing="6">
-            <c:Icon Kind="chart" Width="16" Height="16" />
-            <TextBlock Text="Abrir CSV" Classes="barlabel" />
           </StackPanel>
         </Button>
         <Button Classes="ghost" Command="{Binding OpenAgentsCommand}" ToolTip.Tip="Gestionar agentes (instalar en equipos por SSH)">

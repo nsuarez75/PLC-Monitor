@@ -14,7 +14,4 @@ public interface IDialogs
 
     /// <summary>Pide un fichero que abrir. Devuelve la ruta o null si se cancela.</summary>
     Task<string?> OpenFileAsync(string title, string extension);
-
-    /// <summary>Abre (sin bloquear) la ventana del visor de CSV.</summary>
-    void ShowCsvViewer(ViewModels.CsvViewerViewModel viewer);
 }

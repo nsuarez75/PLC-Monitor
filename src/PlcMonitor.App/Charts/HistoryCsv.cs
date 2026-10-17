@@ -37,6 +37,7 @@ public static class HistoryCsv
 
         var multiDevice = rows.Select(r => r.Device).Distinct(StringComparer.Ordinal).Count() > 1;
         var series = new List<ChartSeriesData>();
+        var keys = new List<(string Device, string Tag)>();
         foreach (var group in rows.GroupBy(r => (r.Device, r.Tag)).OrderBy(g => g.Key.Device, StringComparer.Ordinal).ThenBy(g => g.Key.Tag, StringComparer.Ordinal))
         {
             var values = group.OrderBy(r => r.Time).ToArray();
@@ -53,11 +54,14 @@ public static class HistoryCsv
                 points.Add(new ChartPoint(v.Time, number));
             }
             if (numeric)
+            {
                 series.Add(new ChartSeriesData(multiDevice ? $"{group.Key.Device}/{group.Key.Tag}" : group.Key.Tag, points, Step: true, isBoolean));
+                keys.Add(group.Key);
+            }
         }
         var devices = rows.Select(r => r.Device).Distinct(StringComparer.Ordinal).Order(StringComparer.Ordinal).ToArray();
         return new HistoryCsvContent(series, devices, rows.Count, skipped,
-            rows.Count == 0 ? null : rows.Min(r => r.Time), rows.Count == 0 ? null : rows.Max(r => r.Time));
+            rows.Count == 0 ? null : rows.Min(r => r.Time), rows.Count == 0 ? null : rows.Max(r => r.Time)) { Keys = keys };
     }
 
     public static HistoryCsvContent Load(string path)
@@ -134,4 +138,8 @@ public static class HistoryCsv
 
 /// <summary>Contenido de un CSV de histórico.</summary>
 public sealed record HistoryCsvContent(
-    IReadOnlyList<ChartSeriesData> Series, IReadOnlyList<string> Devices, int Rows, int SkippedRows, DateTimeOffset? From, DateTimeOffset? To);
+    IReadOnlyList<ChartSeriesData> Series, IReadOnlyList<string> Devices, int Rows, int SkippedRows, DateTimeOffset? From, DateTimeOffset? To)
+{
+    /// <summary>Dispositivo y tag de cada serie (en el mismo orden que <see cref="Series"/>).</summary>
+    public IReadOnlyList<(string Device, string Tag)> Keys { get; init; } = [];
+}

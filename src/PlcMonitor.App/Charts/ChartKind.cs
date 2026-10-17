@@ -68,4 +68,7 @@ public enum TrendDataSource
 
     /// <summary>El histórico del agente en un periodo.</summary>
     History,
+
+    /// <summary>Un CSV exportado del histórico (sin conexión).</summary>
+    Csv,
 }

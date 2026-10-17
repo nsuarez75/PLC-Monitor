@@ -38,6 +38,9 @@ public sealed class TrendView
 
     public DateTimeOffset? HistoryTo { get; set; }
 
+    /// <summary>Datos de un CSV exportado: su ruta. Las vistas de CSV se ven con cualquier agente (o sin conexión).</summary>
+    public string? CsvPath { get; set; }
+
     /// <summary>Tendencia: un eje Y por tag.</summary>
     public bool SeparateAxes { get; set; }
 

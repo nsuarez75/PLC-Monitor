@@ -79,6 +79,9 @@ public sealed partial class LiveTrendViewModel : ObservableObject, IDisposable
 
     public bool IsLive => FixedWindow is null;
 
+    /// <summary>Texto del aviso de tags que faltan; null = el de en vivo o el del histórico.</summary>
+    public string? MissingText { get; init; }
+
     /// <summary>Qué periodo del histórico se ve y cuándo se consultó (vacío en vivo).</summary>
     public string HistoryText { get; init; } = "";
 
@@ -151,7 +154,8 @@ public sealed partial class LiveTrendViewModel : ObservableObject, IDisposable
         var missing = tags.Where(t => t.Tag is null).Select(t => t.Name).ToList();
         if (_trigger is not null && _triggerSource is null)
             missing.Add($"{_trigger.Ref} (disparo)");
-        Missing = missing.Count == 0 ? "" : IsLive ? $"No disponibles en el agente: {string.Join(", ", missing)}" : $"Sin histórico en el agente: {string.Join(", ", missing)}";
+        Missing = missing.Count == 0 ? ""
+            : $"{MissingText ?? (IsLive ? "No disponibles en el agente" : "Sin histórico en el agente")}: {string.Join(", ", missing)}";
         Refresh(now);
     }
 

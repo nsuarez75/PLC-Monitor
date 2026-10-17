@@ -35,7 +35,7 @@
       <Grid DockPanel.Dock="Top" ColumnDefinitions="*,Auto" Margin="0,0,0,14">
         <StackPanel Spacing="2">
           <TextBlock Text="{Binding Selected.Name, FallbackValue='Tendencias'}" Classes="title" />
-          <TextBlock Classes="muted" Text="Elige los tags de cualquier dispositivo del agente y ábrelos juntos en una gráfica, en vivo o del histórico." />
+          <TextBlock Classes="muted" Text="Tags del agente o de un CSV en una gráfica: en vivo, del histórico o del fichero." />
         </StackPanel>
         <Button Grid.Column="1" Classes="secondary" VerticalAlignment="Top"
                 Command="{Binding $parent[Window].((vm:MainViewModel)DataContext).CloseTrendsCommand}">
@@ -93,7 +93,23 @@
                   <TextBlock Text="Datos" VerticalAlignment="Center" FontWeight="Medium" />
                   <ComboBox Grid.Column="1" ItemsSource="{x:Static vm:TrendsViewModel.DataSources}" SelectedItem="{Binding DataSource}" MinWidth="280" />
                 </Grid>
-                <Grid ColumnDefinitions="170,*" RowDefinitions="Auto,Auto" RowSpacing="4" ColumnSpacing="16" IsVisible="{Binding UsesHistory}">
+                <Grid ColumnDefinitions="170,*" RowDefinitions="Auto,Auto" RowSpacing="4" ColumnSpacing="16" IsVisible="{Binding UsesCsv}">
+                  <TextBlock Text="Fichero" VerticalAlignment="Center" FontWeight="Medium" />
+                  <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="10">
+                    <Button Classes="secondary" Command="{Binding ChooseCsvCommand}">
+                      <StackPanel Orientation="Horizontal" Spacing="6">
+                        <c:Icon Kind="folder" />
+                        <TextBlock Text="Elegir CSV…" />
+                      </StackPanel>
+                    </Button>
+                    <TextBlock Text="{Binding CsvText}" VerticalAlignment="Center" TextTrimming="CharacterEllipsis" ToolTip.Tip="{Binding CsvPath}" />
+                  </StackPanel>
+                  <TextBlock Grid.Row="1" Grid.Column="1" Classes="muted" FontSize="11.5" TextWrapping="Wrap"
+                             Text="Un CSV exportado desde la pestaña Histórico de un dispositivo; no hace falta estar conectado. Elige abajo qué tags del fichero quieres ver." />
+                </Grid>
+                <TextBlock Text="{Binding CsvError}" Classes="error" TextWrapping="Wrap" Margin="186,0,0,0"
+                           IsVisible="{Binding CsvError, Converter={x:Static StringConverters.IsNotNullOrEmpty}}" />
+                <Grid ColumnDefinitions="170,*" RowDefinitions="Auto,Auto" RowSpacing="4" ColumnSpacing="16" IsVisible="{Binding ShowHistoryRange}">
                   <TextBlock Text="Periodo" VerticalAlignment="Center" FontWeight="Medium" />
                   <WrapPanel Grid.Column="1">
                     <ComboBox ItemsSource="{x:Static vm:TrendHistory.Ranges}" SelectedItem="{Binding HistoryRange}" MinWidth="170" Margin="0,0,12,4" />
@@ -117,7 +133,8 @@
                     <ComboBox ItemsSource="{x:Static vm:PeriodBarsViewModel.Metrics}" SelectedItem="{Binding BarMetric}" MinWidth="190" Margin="0,0,8,6" ToolTip.Tip="Qué se calcula en cada periodo" />
                     <TextBlock Text="por" Classes="muted" VerticalAlignment="Center" Margin="0,0,8,6" />
                     <ComboBox ItemsSource="{x:Static vm:PeriodBarsViewModel.Periods}" SelectedItem="{Binding BarPeriod}" MinWidth="120" Margin="0,0,8,6" />
-                    <ComboBox ItemsSource="{x:Static vm:PeriodBarsViewModel.Ranges}" SelectedItem="{Binding BarRange}" MinWidth="150" Margin="0,0,8,6" />
+                    <ComboBox ItemsSource="{x:Static vm:PeriodBarsViewModel.Ranges}" SelectedItem="{Binding BarRange}" MinWidth="150" Margin="0,0,8,6"
+                              IsVisible="{Binding UsesHistory}" />
                   </WrapPanel>
                 </Grid>
                 <Grid ColumnDefinitions="170,*" ColumnSpacing="16">
@@ -232,7 +249,16 @@
                   </ItemsControl>
                 </StackPanel>
                 <StackPanel Grid.Column="1" Spacing="10">
-                  <TextBlock Text="TAGS DEL AGENTE" Classes="caption" />
+                  <Grid ColumnDefinitions="*,Auto">
+                    <TextBlock Text="{Binding AvailableCaption}" Classes="caption" VerticalAlignment="Center" />
+                    <Button Grid.Column="1" Classes="ghost" Command="{Binding AddAllCommand}" FontSize="12"
+                            IsVisible="{Binding Available.Count, Converter={x:Static vm:Converters.IsPositive}}" ToolTip.Tip="Añadir a la vista todos los de la lista">
+                      <StackPanel Orientation="Horizontal" Spacing="4">
+                        <c:Icon Kind="plus" Width="12" Height="12" />
+                        <TextBlock Text="Añadir todos" />
+                      </StackPanel>
+                    </Button>
+                  </Grid>
                   <TextBox Text="{Binding Search}" PlaceholderText="Buscar dispositivo o tag">
                     <TextBox.InnerLeftContent>
                       <c:Icon Kind="search" Width="14" Height="14" Margin="8,0,0,0" Foreground="{DynamicResource App.TextMuted}" />

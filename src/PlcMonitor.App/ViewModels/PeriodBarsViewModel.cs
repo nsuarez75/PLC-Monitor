@@ -36,9 +36,10 @@ public sealed partial class PeriodBarsViewModel : ObservableObject
         new("Últimos 30 días", 30),
     ];
 
-    private readonly IAgentContext _context;
+    private readonly IAgentContext? _context;
     private readonly TrendView _view;
-    private readonly Func<TrendTagRef, TagViewModel?> _findTag;
+    private readonly Func<TrendTagRef, TagViewModel?>? _findTag;
+    private readonly IReadOnlyDictionary<TrendTagRef, TrendSource>? _local;
 
     public PeriodBarsViewModel(IAgentContext context, TrendView view, Func<TrendTagRef, TagViewModel?> findTag)
     {
@@ -49,6 +50,16 @@ public sealed partial class PeriodBarsViewModel : ObservableObject
         Chart.ShiftStartHour = view.ShiftStartHour;
         var range = Ranges.FirstOrDefault(r => r.Value == view.BarDays) ?? Ranges[0];
         Description = $"{Text(Metrics, view.BarMetric)} por {Text(Periods, view.BarPeriod).ToLowerInvariant()} · {range.Text.ToLowerInvariant()}";
+    }
+
+    /// <summary>Barras de los datos de un CSV, calculadas aquí (todo el fichero, sin agente).</summary>
+    public PeriodBarsViewModel(TrendView view, IReadOnlyDictionary<TrendTagRef, TrendSource> local, string file)
+    {
+        _view = view;
+        _local = local;
+        Chart.BarPeriod = view.BarPeriod;
+        Chart.ShiftStartHour = view.ShiftStartHour;
+        Description = $"{Text(Metrics, view.BarMetric)} por {Text(Periods, view.BarPeriod).ToLowerInvariant()} · CSV {file}";
     }
 
     public ChartViewModel Chart { get; } = new() { Kind = ChartKind.Bars, EmptyText = "Consultando el histórico…" };
@@ -72,13 +83,18 @@ public sealed partial class PeriodBarsViewModel : ObservableObject
     [RelayCommand(CanExecute = nameof(CanRefresh))]
     private async Task RefreshAsync()
     {
-        if (_context.Client is not { } client)
+        if (_local is not null)
+        {
+            ComputeLocal(_local);
+            return;
+        }
+        if (_context!.Client is not { } client)
         {
             Chart.EmptyText = "Conéctate al agente para consultar su histórico";
             Chart.SetData([]);
             return;
         }
-        var historized = _view.Tags.Where(t => _findTag(t)?.Historized == true).ToList();
+        var historized = _view.Tags.Where(t => _findTag!(t)?.Historized == true).ToList();
         var missing = _view.Tags.Except(historized).Select(t => t.ToString()).ToList();
         Missing = missing.Count == 0 ? "" : $"Sin histórico en el agente: {string.Join(", ", missing)}";
         if (historized.Count == 0)
@@ -140,6 +156,19 @@ public sealed partial class PeriodBarsViewModel : ObservableObject
         {
             IsBusy = false;
         }
+    }
+
+    private void ComputeLocal(IReadOnlyDictionary<TrendTagRef, TrendSource> local)
+    {
+        var present = _view.Tags.Where(local.ContainsKey).ToList();
+        var missing = _view.Tags.Except(present).Select(t => t.ToString()).ToList();
+        Missing = missing.Count == 0 ? "" : $"No están en el CSV: {string.Join(", ", missing)}";
+        var data = present.Select(t => new ChartSeriesData(t.ToString(),
+            PeriodBars.Compute(local[t].Points, _view.BarPeriod, _view.BarMetric, _view.ShiftStartHour), Step: false)).ToList();
+        Chart.EmptyText = "El CSV no tiene valores de estos tags";
+        Chart.SetData(data);
+        var periods = data.SelectMany(d => d.Points).Select(p => p.Time).Distinct().Count();
+        Summary = $"{periods} {(periods == 1 ? "periodo" : "periodos")}";
     }
 
     private static string Text<T>(IReadOnlyList<Choice<T>> choices, T value) =>

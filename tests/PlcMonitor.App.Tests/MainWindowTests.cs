@@ -308,10 +308,11 @@ public class MainWindowTests
     });
 
     [Fact]
-    public Task Csv_viewer_shows_an_exported_history() => HeadlessApp.RunAsync(() =>
+    public Task Trend_views_read_an_exported_csv() => HeadlessApp.RunAsync(() =>
     {
         Avalonia.Application.Current!.RequestedThemeVariant = Avalonia.Styling.ThemeVariant.Light;
-        var path = Path.Combine(Path.GetTempPath(), $"plcmon-{Guid.NewGuid():N}.csv");
+        var dir = Directory.CreateTempSubdirectory("plcmon-csv-").FullName;
+        var path = Path.Combine(dir, "prensa.csv");
         var start = new DateTimeOffset(2026, 10, 17, 8, 0, 0, TimeSpan.Zero);
         var csv = new System.Text.StringBuilder("device,tag,timestamp,value,quality\n");
         for (var i = 0; i < 600; i++)
@@ -319,37 +320,70 @@ public class MainWindowTests
             var t = start.AddSeconds(i * 6).UtcDateTime.ToString("yyyy-MM-ddTHH:mm:ss.fffZ", System.Globalization.CultureInfo.InvariantCulture);
             csv.Append(System.Globalization.CultureInfo.InvariantCulture, $"casa1200,temperatura,{t},{20 + (5 * Math.Sin(i / 40.0)):0.##},Good\n");
             csv.Append(System.Globalization.CultureInfo.InvariantCulture, $"casa1200,presion,{t},{3 + Math.Cos(i / 25.0):0.###},Good\n");
+            csv.Append(System.Globalization.CultureInfo.InvariantCulture, $"casa1200,contador,{t},{i * 3},Good\n");
         }
         File.WriteAllText(path, csv.ToString());
-        var viewer = new CsvViewerViewModel(new FakeDialogs());
-        viewer.Load(path).ShouldBeTrue(viewer.Error);
-        var window = new CsvViewerWindow { DataContext = viewer };
+        var vm = ViewModelWithData(Path.Combine(dir, "app.json"));
+        ((FakeDialogs)vm.Dialogs).OpenPath = path;
+        var window = new MainWindow { DataContext = vm };
         window.Show();
 
-        viewer.Chart.Series.Select(s => s.Name).ShouldBe(["presion", "temperatura"]);
-        viewer.Summary.ShouldContain("2 tags · 1200 puntos");
-        Capture(window, "csv-viewer.png");
-        viewer.Chart.AutoY = false;
-        viewer.Chart.YMinInput = 0;
-        viewer.Chart.YMaxInput = 40;
-        viewer.Chart.Zoom(start.AddMinutes(10), start.AddMinutes(30));
-        Avalonia.Application.Current.RequestedThemeVariant = Avalonia.Styling.ThemeVariant.Dark;
-        Capture(window, "csv-viewer-dark.png");
-        Avalonia.Application.Current.RequestedThemeVariant = Avalonia.Styling.ThemeVariant.Light;
-        viewer.Chart.ResetZoomCommand.Execute(null);
-        viewer.Chart.AutoY = true;
-        viewer.Analysis.Kind = ChartKindChoice.For(PlcMonitor.App.Charts.ChartKind.Histogram);
-        viewer.Analysis.LowLimit = 15;
-        viewer.Analysis.HighLimit = 26;
-        viewer.Chart.Options.Single(o => o.Name == "presion").IsSelected = false;
+        // En Tendencias, datos de un CSV: sus tags se eligen como los del agente.
+        vm.OpenTrendsCommand.Execute(null);
+        var trends = vm.Trends.ShouldNotBeNull();
+        trends.NewCommand.Execute(null);
+        trends.Name = "Prensa (CSV)";
+        trends.DataSource = TrendsViewModel.DataSources.Single(d => d.Value == PlcMonitor.App.Charts.TrendDataSource.Csv);
+        (trends.UsesCsv, trends.UsesLiveWindow, trends.AvailableCaption).ShouldBe((true, false, "TAGS DEL CSV"));
+        trends.Available.ShouldBeEmpty();
+        trends.Note.ShouldContain("Elige un fichero CSV");
+        trends.OpenCommand.Execute(null);
+        trends.KindError.ShouldBe("Elige el fichero CSV.");
+        trends.ChooseCsvCommand.Execute(null);
+        trends.CsvText.ShouldBe("prensa.csv");
+        trends.Available.Select(c => c.Text).ShouldBe(["casa1200 / contador", "casa1200 / presion", "casa1200 / temperatura"]);
+        trends.AddTagCommand.Execute(trends.Available.Single(c => c.Tag == "temperatura"));
         window.UpdateLayout();
-        Capture(window, "csv-viewer-histogram.png");
-        viewer.Analysis.Kind = ChartKindChoice.For(PlcMonitor.App.Charts.ChartKind.XY);
-        viewer.Analysis.XTag = "presion";
-        viewer.Chart.Options.Single().IsSelected = true;
-        window.UpdateLayout();
-        Capture(window, "csv-viewer-xy.png");
-        File.Delete(path);
+        Capture(window, "trends-edit-csv.png");
+
+        trends.OpenCommand.Execute(null);
+        var live = trends.Live.ShouldNotBeNull();
+        (live.IsLive, live.HistoryText).ShouldBe((false, "CSV prensa.csv · 1800 filas"));
+        live.Chart.Series.Single().Name.ShouldBe("casa1200 / temperatura");
+        (live.Chart.From, live.Chart.To).ShouldBe((start, start.AddSeconds(599 * 6)));
+        trends.Selected!.Description.ShouldBe("1 tag · CSV prensa.csv");
+        Capture(window, "trend-csv.png");
+
+        // Mismos datos, otros tipos: histograma, X-Y con todos los tags y barras del contador.
+        trends.EditCommand.Execute(null);
+        trends.Kind = ChartKindChoice.For(PlcMonitor.App.Charts.ChartKind.Histogram);
+        trends.OpenCommand.Execute(null);
+        trends.Live!.Chart.Kind.ShouldBe(PlcMonitor.App.Charts.ChartKind.Histogram);
+        Capture(window, "trend-csv-histogram.png");
+        trends.EditCommand.Execute(null);
+        trends.Kind = ChartKindChoice.For(PlcMonitor.App.Charts.ChartKind.XY);
+        trends.AddAllCommand.Execute(null);
+        trends.Tags.Count.ShouldBe(3);
+        trends.MakeXAxisCommand.Execute(new PlcMonitor.App.Services.TrendTagRef("casa1200", "presion"));
+        trends.OpenCommand.Execute(null);
+        trends.Live!.Chart.Curves.Count.ShouldBe(2);
+        trends.EditCommand.Execute(null);
+        trends.Kind = ChartKindChoice.For(PlcMonitor.App.Charts.ChartKind.Bars);
+        trends.DataSource.Value.ShouldBe(PlcMonitor.App.Charts.TrendDataSource.Csv); // las barras admiten CSV
+        trends.BarMetric = PeriodBarsViewModel.Metrics.Single(m => m.Value == PlcMonitor.App.Charts.BarMetric.Increase);
+        trends.BarPeriod = PeriodBarsViewModel.Periods.Single(p => p.Value == PlcMonitor.App.Charts.BarPeriod.Hour);
+        trends.OpenCommand.Execute(null);
+        var bars = trends.Bars.ShouldNotBeNull();
+        bars.Description.ShouldBe("Incremento (contador) por hora · CSV prensa.csv");
+        // El contador sube 3 por muestra: 1797 en total entre las horas que toque.
+        bars.Chart.Options.Single(o => o.Name == "casa1200 / contador").Points.Sum(p => p.Value ?? 0).ShouldBe(599 * 3);
+        Capture(window, "trend-csv-bars.png");
+
+        // Las vistas de CSV se ven aunque se cambie de agente.
+        PlcMonitor.App.Services.TrendViewStore.Load(PlcMonitor.App.Services.TrendViewStore.PathNextTo(Path.Combine(dir, "app.json")))
+            .Single().CsvPath.ShouldBe(path);
+        vm.CloseTrendsCommand.Execute(null);
+        Directory.Delete(dir, recursive: true);
     });
 
     /// <summary>

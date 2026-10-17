@@ -35,5 +35,4 @@ public sealed class WindowDialogs(Window owner) : IDialogs
         return files.Count == 0 ? null : files[0].TryGetLocalPath();
     }
 
-    public void ShowCsvViewer(ViewModels.CsvViewerViewModel viewer) => new CsvViewerWindow { DataContext = viewer }.Show(owner);
 }
