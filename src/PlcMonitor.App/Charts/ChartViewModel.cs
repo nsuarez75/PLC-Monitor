@@ -166,6 +166,14 @@ public sealed partial class ChartViewModel : ObservableObject
     [ObservableProperty]
     public partial string Caption { get; set; } = "";
 
+    /// <summary>El resumen avisa de algo (el último ciclo se sale de la referencia): en rojo.</summary>
+    [ObservableProperty]
+    public partial bool CaptionAlarm { get; set; }
+
+    /// <summary>Bandas de tolerancia de los ciclos de referencia.</summary>
+    [ObservableProperty]
+    public partial IReadOnlyList<ReferenceBand> Bands { get; set; } = [];
+
     public string Hint => Kind switch
     {
         ChartKind.Cycles => "Cada ciclo empieza en 0 (el disparo); el último va resaltado y los anteriores, tenues.",

@@ -28,6 +28,10 @@ public sealed class XYChart : Control
     /// <summary>Línea vertical en X = 0 (el instante del disparo en los ciclos).</summary>
     public static readonly StyledProperty<bool> ZeroLineProperty = AvaloniaProperty.Register<XYChart, bool>(nameof(ZeroLine));
 
+    /// <summary>Bandas de tolerancia de los ciclos de referencia (detrás de las curvas).</summary>
+    public static readonly StyledProperty<IReadOnlyList<ReferenceBand>?> BandsProperty =
+        AvaloniaProperty.Register<XYChart, IReadOnlyList<ReferenceBand>?>(nameof(Bands));
+
     public static readonly StyledProperty<int> RevisionProperty = AvaloniaProperty.Register<XYChart, int>(nameof(Revision));
 
     public static readonly StyledProperty<string> EmptyTextProperty = AvaloniaProperty.Register<XYChart, string>(nameof(EmptyText), "Sin datos");
@@ -40,7 +44,7 @@ public sealed class XYChart : Control
 
     static XYChart()
     {
-        AffectsRender<XYChart>(CurvesProperty, YMinProperty, YMaxProperty, XLabelProperty, ZeroLineProperty, RevisionProperty, EmptyTextProperty);
+        AffectsRender<XYChart>(CurvesProperty, BandsProperty, YMinProperty, YMaxProperty, XLabelProperty, ZeroLineProperty, RevisionProperty, EmptyTextProperty);
     }
 
     public XYChart()
@@ -53,6 +57,12 @@ public sealed class XYChart : Control
     {
         get => GetValue(CurvesProperty);
         set => SetValue(CurvesProperty, value);
+    }
+
+    public IReadOnlyList<ReferenceBand>? Bands
+    {
+        get => GetValue(BandsProperty);
+        set => SetValue(BandsProperty, value);
     }
 
     public double? YMin
@@ -124,7 +134,11 @@ public sealed class XYChart : Control
         }
 
         // Rangos: X de los puntos con valor; Y automático o fijado a mano.
-        var valued = curves.SelectMany(c => c.Points).Where(p => p.Y is not null).ToArray();
+        var bands = Bands ?? [];
+        var valued = curves.SelectMany(c => c.Points).Where(p => p.Y is not null)
+            .Concat(bands.SelectMany(b => b.Reference.Where(p => p.Y is not null)
+                .SelectMany(p => new[] { p with { Y = p.Y - b.Tolerance }, p with { Y = p.Y + b.Tolerance } })))
+            .ToArray();
         var (xMin, xMax) = (valued.Min(p => p.X), valued.Max(p => p.X));
         if (ZeroLine)
             (xMin, xMax) = (Math.Min(xMin, 0), Math.Max(xMax, 0));
@@ -179,13 +193,16 @@ public sealed class XYChart : Control
         if (ZeroLine && x0 <= 0 && x1 >= 0)
             context.DrawLine(new Pen(muted, 1.2, dashStyle: DashStyle.Dash), new Point(X(0), plot.Top), new Point(X(0), plot.Bottom));
 
-        // Curvas: primero las tenues, encima las resaltadas.
+        // Curvas: primero las bandas de referencia, luego las tenues y encima las resaltadas; las que se salen, en rojo.
+        var bad = Brush("App.Bad", Brushes.Red);
         using (context.PushClip(plot.Inflate(2)))
         {
-            foreach (var curve in curves.OrderBy(c => c.Highlight))
+            foreach (var band in bands)
+                DrawBand(context, band, X, Y, text);
+            foreach (var curve in curves.OrderBy(c => c.Highlight).ThenBy(c => c.IsOut))
             {
-                var color = Brush($"App.Chart{curve.ColorIndex % TrendChart.PaletteSize}", Brushes.SteelBlue);
-                var brush = curve.Highlight ? color : Faded(color);
+                var color = curve.IsOut ? bad : Brush($"App.Chart{curve.ColorIndex % TrendChart.PaletteSize}", Brushes.SteelBlue);
+                var brush = curve.Highlight ? color : curve.IsOut ? Faded(color, 0.55) : Faded(color);
                 var pen = new Pen(brush, curve.Highlight ? 2 : 1.3, lineJoin: PenLineJoin.Round);
                 foreach (var segment in Segments(curve, X, Y))
                 {
@@ -288,10 +305,44 @@ public sealed class XYChart : Control
         return segments;
     }
 
+    /// <summary>Banda de una referencia: relleno entre referencia − tolerancia y + tolerancia, y la referencia discontinua.</summary>
+    private void DrawBand(DrawingContext context, ReferenceBand band, Func<double, double> x, Func<double, double> y, IBrush text)
+    {
+        var color = Brush($"App.Chart{band.ColorIndex % TrendChart.PaletteSize}", Brushes.SteelBlue);
+        var reference = new XYCurve(band.Name, band.Reference, band.ColorIndex, Step: band.Step);
+        foreach (var segment in Segments(reference, x, y))
+        {
+            if (segment.Count < 2)
+                continue;
+            // Desplazamiento vertical en píxeles de la tolerancia (la escala es lineal).
+            var dy = Math.Abs(y(band.Tolerance) - y(0));
+            var geometry = new StreamGeometry();
+            using (var g = geometry.Open())
+            {
+                g.BeginFigure(new Point(segment[0].X, segment[0].Y - dy), true);
+                foreach (var p in segment.Skip(1))
+                    g.LineTo(new Point(p.X, p.Y - dy));
+                foreach (var p in Enumerable.Reverse(segment))
+                    g.LineTo(new Point(p.X, p.Y + dy));
+                g.EndFigure(true);
+            }
+            context.DrawGeometry(Faded(color, 0.14), null, geometry);
+            var line = new StreamGeometry();
+            using (var g = line.Open())
+            {
+                g.BeginFigure(segment[0], false);
+                foreach (var p in segment.Skip(1))
+                    g.LineTo(p);
+                g.EndFigure(false);
+            }
+            context.DrawGeometry(null, new Pen(text, 1.4, dashStyle: new DashStyle([6, 3], 0)), line);
+        }
+    }
+
     private static double Round(double value, double step) => Math.Round(value / (step / 100)) * (step / 100);
 
-    private static IBrush Faded(IBrush brush) =>
-        brush is ISolidColorBrush solid ? new SolidColorBrush(solid.Color, FadedOpacity) : brush;
+    private static IBrush Faded(IBrush brush, double opacity = FadedOpacity) =>
+        brush is ISolidColorBrush solid ? new SolidColorBrush(solid.Color, opacity) : brush;
 
     private IBrush Brush(string key, IBrush fallback) =>
         this.TryFindResource(key, ActualThemeVariant, out var value) && value is IBrush brush ? brush : fallback;

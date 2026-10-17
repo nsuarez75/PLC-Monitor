@@ -376,6 +376,28 @@
               </Border>
             </StackPanel>
             <TextBlock DockPanel.Dock="Top" Text="{Binding TriggerText}" Classes="muted" Margin="0,0,0,10" IsVisible="{Binding IsTriggered}" TextTrimming="CharacterEllipsis" />
+            <!-- Ciclo de referencia con banda de tolerancia (ciclos superpuestos) -->
+            <WrapPanel DockPanel.Dock="Top" Margin="0,0,0,10" IsVisible="{Binding CanUseReference}">
+              <Button Classes="secondary" Command="{Binding SetReferenceCommand}" Margin="0,0,8,4"
+                      ToolTip.Tip="El último ciclo de cada tag pasa a ser el patrón; los ciclos que se salgan de la banda se ven en rojo">
+                <StackPanel Orientation="Horizontal" Spacing="6">
+                  <c:Icon Kind="check" />
+                  <TextBlock Text="Fijar último ciclo como referencia" />
+                </StackPanel>
+              </Button>
+              <StackPanel Orientation="Horizontal" Spacing="8" IsVisible="{Binding HasReference}" Margin="0,0,0,4">
+                <TextBlock Text="Tolerancia ±" Classes="muted" VerticalAlignment="Center" Margin="6,0,0,0" />
+                <NumericUpDown Value="{Binding Tolerance}" Minimum="0" Increment="1" FormatString="0.###" Width="120" />
+                <CheckBox Content="% del rango" IsChecked="{Binding TolerancePercent}"
+                          ToolTip.Tip="Marcado: porcentaje del rango (máx − mín) de la referencia; sin marcar: en unidades del tag" />
+                <Button Classes="ghost danger" Command="{Binding ClearReferenceCommand}" ToolTip.Tip="Quitar la referencia">
+                  <StackPanel Orientation="Horizontal" Spacing="6">
+                    <c:Icon Kind="x" Width="14" Height="14" />
+                    <TextBlock Text="Quitar" />
+                  </StackPanel>
+                </Button>
+              </StackPanel>
+            </WrapPanel>
             <Border DockPanel.Dock="Top" Classes="pill warn" CornerRadius="8" Padding="12,8" Margin="0,0,0,12" HorizontalAlignment="Stretch"
                     IsVisible="{Binding Missing, Converter={x:Static StringConverters.IsNotNullOrEmpty}}">
               <TextBlock Text="{Binding Missing}" TextWrapping="Wrap" />

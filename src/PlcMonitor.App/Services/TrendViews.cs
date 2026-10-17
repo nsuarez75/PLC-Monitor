@@ -41,6 +41,14 @@ public sealed class TrendView
     /// <summary>Datos de un CSV exportado: su ruta. Las vistas de CSV se ven con cualquier agente (o sin conexión).</summary>
     public string? CsvPath { get; set; }
 
+    /// <summary>Ciclos superpuestos: ciclo de referencia de cada tag (por nombre «dispositivo / tag») como pares [x, y].</summary>
+    public Dictionary<string, List<double[]>>? ReferenceCycles { get; set; }
+
+    /// <summary>Tolerancia de la banda de referencia: valor o % del rango de la referencia.</summary>
+    public double ReferenceTolerance { get; set; } = 5;
+
+    public bool ReferenceTolerancePercent { get; set; } = true;
+
     /// <summary>Tendencia: un eje Y por tag.</summary>
     public bool SeparateAxes { get; set; }
 

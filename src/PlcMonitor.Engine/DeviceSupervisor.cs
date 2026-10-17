@@ -119,6 +119,9 @@ internal sealed class DeviceSupervisor : IAsyncDisposable
 
     public async Task StopAsync()
     {
+        // Ya liberado (la parada del host y la liberación del contenedor pueden coincidir): nada que parar.
+        if (Volatile.Read(ref _disposed) == 1 && _cts is null)
+            return;
         await _lifecycle.WaitAsync();
         try
         {
