@@ -6,28 +6,38 @@ using PlcMonitor.App.Services;
 namespace PlcMonitor.App.ViewModels;
 
 /// <summary>
-/// Tendencia en vivo de unos tags (los de una vista de tendencia), con los valores que llegan del agente, en una
-/// ventana que avanza con el reloj. Se pausa al hacer zoom o con el botón; «Seguir» quita el zoom y continúa.
+/// Puntos de un tag para una gráfica: la lista en vivo del tag (la misma, que va creciendo) o lo leído del histórico.
+/// </summary>
+public sealed record TrendSource(List<ChartPoint> Points, bool IsBoolean)
+{
+    public static TrendSource? Of(TagViewModel? tag) => tag is null ? null : new TrendSource(tag.TrendPoints, tag.IsBoolean);
+}
+
+/// <summary>
+/// Gráfica de una vista de tendencia. En vivo, con los valores que llegan del agente, en una ventana que avanza con el
+/// reloj (se pausa al hacer zoom o con el botón; «Seguir» quita el zoom y continúa). Del histórico, con una ventana
+/// fija (<see cref="FixedWindow"/>) y los puntos leídos del agente.
 /// </summary>
 public sealed partial class LiveTrendViewModel : ObservableObject
 {
-    private readonly Func<IReadOnlyList<(string Name, TagViewModel? Tag)>> _tags;
+    private readonly Func<IReadOnlyList<(string Name, TrendSource? Tag)>> _tags;
     private readonly TrendTrigger? _trigger;
-    private readonly Func<TagViewModel?>? _triggerTag;
-    private readonly List<(TagViewModel Source, List<ChartPoint> Shown)> _filtered = [];
+    private readonly Func<TrendSource?>? _triggerTag;
+    private readonly List<(TrendSource Source, List<ChartPoint> Shown)> _filtered = [];
     private readonly ChartKind _kind;
-    private TagViewModel? _triggerSource;
-    private TagViewModel? _xSource;
+    private TrendSource? _triggerSource;
+    private TrendSource? _xSource;
     private string _xName = "";
+    private bool _drawn;
 
     /// <summary>Ciclos superpuestos que se dibujan como mucho (los más recientes).</summary>
     public const int MaxCycles = 20;
 
     /// <param name="tags">Tags a dibujar con su nombre en la leyenda; null si el tag ya no existe en el agente.</param>
     /// <param name="trigger">Tendencia de disparo: solo se ven los tramos en que se cumple (más el tiempo extra).</param>
-    /// <param name="triggerTag">El tag disparo en el agente conectado (null si no existe).</param>
+    /// <param name="triggerTag">Los puntos del tag disparo (null si no existe).</param>
     /// <param name="kind">Tipo de gráfica; en X-Y el primer tag es el eje X.</param>
-    public LiveTrendViewModel(Func<IReadOnlyList<(string Name, TagViewModel? Tag)>> tags, TrendTrigger? trigger = null, Func<TagViewModel?>? triggerTag = null,
+    public LiveTrendViewModel(Func<IReadOnlyList<(string Name, TrendSource? Tag)>> tags, TrendTrigger? trigger = null, Func<TrendSource?>? triggerTag = null,
         ChartKind kind = ChartKind.Trend)
     {
         _tags = tags;
@@ -40,15 +50,26 @@ public sealed partial class LiveTrendViewModel : ObservableObject
         Chart.PropertyChanged += (_, e) =>
         {
             if (e.PropertyName == nameof(ChartViewModel.Series) && UsesCurves)
-                BuildCurves(DateTimeOffset.UtcNow);
+                BuildCurves(FixedWindow?.To ?? DateTimeOffset.UtcNow);
         };
     }
 
     /// <summary>Ciclos y X-Y dibujan curvas calculadas, no las series en el tiempo.</summary>
     private bool UsesCurves => _kind is ChartKind.Cycles or ChartKind.XY;
 
-    /// <summary>La ventana de tiempo cuenta (los ciclos usan todo lo recibido, la última hora).</summary>
-    public bool UsesWindow => _kind != ChartKind.Cycles;
+    /// <summary>Histórico: ventana fija (null = en vivo, la ventana avanza con el reloj).</summary>
+    public (DateTimeOffset From, DateTimeOffset To)? FixedWindow { get; init; }
+
+    public bool IsLive => FixedWindow is null;
+
+    /// <summary>Qué periodo del histórico se ve y cuándo se consultó (vacío en vivo).</summary>
+    public string HistoryText { get; init; } = "";
+
+    /// <summary>Se elige la ventana en vivo (los ciclos usan todo lo recibido, la última hora; el histórico, su periodo).</summary>
+    public bool UsesWindow => _kind != ChartKind.Cycles && IsLive;
+
+    /// <summary>Estado del disparo ahora mismo: solo en vivo.</summary>
+    public bool ShowTriggerState => IsTriggered && IsLive;
 
     /// <summary>Es una tendencia de disparo.</summary>
     public bool IsTriggered => _trigger is not null;
@@ -89,8 +110,10 @@ public sealed partial class LiveTrendViewModel : ObservableObject
     public void RefreshTags()
     {
         var tags = _tags();
-        var now = DateTimeOffset.UtcNow;
+        var now = FixedWindow?.To ?? DateTimeOffset.UtcNow;
+        var from = FixedWindow?.From ?? now - Window.Value;
         _filtered.Clear();
+        _drawn = false;
         _triggerSource = _triggerTag?.Invoke();
         // X-Y: el primer tag es el eje X; en la gráfica se marcan los demás.
         var plotted = tags;
@@ -106,21 +129,32 @@ public sealed partial class LiveTrendViewModel : ObservableObject
         }
         Chart.SetData(
             plotted.Where(t => t.Tag is not null).Select(t => new ChartSeriesData(t.Name, Shown(t.Tag!), Step: true, t.Tag!.IsBoolean)),
-            now - Window.Value, now);
+            from, now);
         var missing = tags.Where(t => t.Tag is null).Select(t => t.Name).ToList();
         if (_trigger is not null && _triggerSource is null)
             missing.Add($"{_trigger.Ref} (disparo)");
-        Missing = missing.Count == 0 ? "" : $"No disponibles en el agente: {string.Join(", ", missing)}";
+        Missing = missing.Count == 0 ? "" : IsLive ? $"No disponibles en el agente: {string.Join(", ", missing)}" : $"Sin histórico en el agente: {string.Join(", ", missing)}";
         Refresh(now);
     }
 
-    /// <summary>Avanza la ventana hasta <paramref name="now"/> y redibuja (lo llama un temporizador de la vista).</summary>
+    /// <summary>
+    /// Avanza la ventana hasta <paramref name="now"/> y redibuja (lo llama un temporizador de la vista). Con ventana
+    /// fija, solo la primera vez: los datos del histórico no cambian.
+    /// </summary>
     public void Refresh(DateTimeOffset now)
     {
+        if (FixedWindow is { } window)
+        {
+            if (_drawn)
+                return;
+            now = window.To;
+        }
+        _drawn = true;
         Refilter(now);
         if (!Paused)
         {
-            Chart.SetWindow(now - Window.Value, now);
+            if (IsLive)
+                Chart.SetWindow(now - Window.Value, now);
             if (UsesCurves)
                 BuildCurves(now);
         }
@@ -131,10 +165,10 @@ public sealed partial class LiveTrendViewModel : ObservableObject
     /// Puntos que dibuja la gráfica: los del tag o, con disparo, una copia con solo los tramos activos (ciclos y X-Y
     /// recortan ellos mismos por activación).
     /// </summary>
-    private List<ChartPoint> Shown(TagViewModel tag)
+    private List<ChartPoint> Shown(TrendSource tag)
     {
         if (_trigger is null || UsesCurves)
-            return tag.TrendPoints;
+            return tag.Points;
         var shown = new List<ChartPoint>();
         _filtered.Add((tag, shown));
         return shown;
@@ -145,12 +179,12 @@ public sealed partial class LiveTrendViewModel : ObservableObject
         if (_trigger is null)
             return;
         var spans = _triggerSource is { } source && TriggerFilter.TryParseTarget(_trigger.Value, out var target)
-            ? TriggerFilter.Spans(source.TrendPoints, v => TriggerFilter.IsMet(v, _trigger.Condition, target),
+            ? TriggerFilter.Spans(source.Points, v => TriggerFilter.IsMet(v, _trigger.Condition, target),
                 TimeSpan.FromSeconds(Math.Max(0, _trigger.HoldSeconds)), TimeSpan.FromSeconds(Math.Max(0, _trigger.BeforeSeconds)))
             : [];
         TriggerActive = spans.Count > 0 && (spans[^1].To is not { } end || end > now);
         foreach (var (tag, shown) in _filtered)
-            TriggerFilter.Apply(tag.TrendPoints, spans, now, shown);
+            TriggerFilter.Apply(tag.Points, spans, now, shown);
     }
 
     /// <summary>Activaciones del disparo en lo recibido (vacío si no hay disparo o no se puede evaluar).</summary>
@@ -158,7 +192,7 @@ public sealed partial class LiveTrendViewModel : ObservableObject
     {
         if (_trigger is null || _triggerSource is not { } source || !TriggerFilter.TryParseTarget(_trigger.Value, out var target))
             return [];
-        return XYData.Activations(source.TrendPoints, v => TriggerFilter.IsMet(v, _trigger.Condition, target));
+        return XYData.Activations(source.Points, v => TriggerFilter.IsMet(v, _trigger.Condition, target));
     }
 
     /// <summary>
@@ -190,7 +224,7 @@ public sealed partial class LiveTrendViewModel : ObservableObject
         }
         else if (_xSource is { } xTag)
         {
-            var x = new ChartSeries(_xName, xTag.TrendPoints);
+            var x = new ChartSeries(_xName, xTag.Points);
             var windows = _trigger is null
                 ? [(now - Window.Value, now)]
                 : activations.Select(a => XYData.CycleWindow(a, before, hold, now)).ToList();
@@ -205,7 +239,11 @@ public sealed partial class LiveTrendViewModel : ObservableObject
         Chart.Curves = curves;
     }
 
-    partial void OnWindowChanged(Choice<TimeSpan> value) => Refresh(DateTimeOffset.UtcNow);
+    partial void OnWindowChanged(Choice<TimeSpan> value)
+    {
+        if (IsLive)
+            Refresh(DateTimeOffset.UtcNow);
+    }
 
     [RelayCommand]
     private void TogglePause()

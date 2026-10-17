@@ -154,7 +154,7 @@ public sealed partial class ChartViewModel : ObservableObject
         ChartKind.Cycles => "Cada ciclo empieza en 0 (el disparo); el último va resaltado y los anteriores, tenues.",
         ChartKind.XY => "Pasa el ratón para ver las coordenadas; el punto marca el valor más reciente.",
         ChartKind.States => "Arrastra para ampliar un tramo; pasa el ratón por una franja para ver el estado y cuánto duró.",
-        ChartKind.Histogram => "Valores recibidos en la ventana. Líneas: media (negra), ±3σ (discontinuas) y tolerancias (rojas). Pasa el ratón por una barra.",
+        ChartKind.Histogram => "Valores de la ventana. Líneas: media (negra), ±3σ (discontinuas) y tolerancias (rojas). Pasa el ratón por una barra.",
         ChartKind.Gauges => "Valor actual de cada tag; en rojo si está fuera de los límites.",
         ChartKind.Bars => "Un grupo de barras por periodo, sacado del histórico del agente. Pasa el ratón para ver los valores.",
         _ => "Arrastra sobre la gráfica para ampliar un tramo; pasa el ratón para ver los valores.",

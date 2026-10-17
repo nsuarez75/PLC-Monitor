@@ -367,6 +367,23 @@ public sealed class MainViewModelTests : IDisposable
         bars.Chart.Series.Single().Points[^1].Value.ShouldBe(50);
         bars.Summary.ShouldStartWith("1 periodo");
 
+        // Vista con datos del histórico: histograma de la última hora; el tag sin histórico se avisa.
+        using var historyTrends = new TrendsViewModel(vm, Path.Combine(agent.Directory, "trends.json"));
+        historyTrends.NewCommand.Execute(null);
+        historyTrends.Tags.Add(new("plc1", "velocidad"));
+        historyTrends.Tags.Add(new("plc1", "otro"));
+        historyTrends.Kind = ChartKindChoice.For(PlcMonitor.App.Charts.ChartKind.Histogram);
+        historyTrends.DataSource = TrendsViewModel.DataSources[1];
+        historyTrends.HistoryRange = TrendHistory.Ranges[0];
+        await historyTrends.OpenCommand.ExecuteAsync(null);
+        historyTrends.KindError.ShouldBeEmpty();
+        var fromHistory = historyTrends.Live.ShouldNotBeNull();
+        (fromHistory.IsLive, fromHistory.UsesWindow).ShouldBe((false, false));
+        fromHistory.HistoryText.ShouldStartWith("Histórico última hora · ");
+        fromHistory.Missing.ShouldBe("Sin histórico en el agente: plc1 / otro");
+        fromHistory.Chart.Series.Single().Points.Where(p => p.Value is not null).Select(p => p.Value).ShouldBe([5, 50]);
+        (fromHistory.Chart.To - fromHistory.Chart.From).ShouldBe(TimeSpan.FromHours(1));
+
         var csv = Path.Combine(agent.Directory, "export.csv");
         _dialogs.SavePath = csv;
         await vm.History.ExportCommand.ExecuteAsync(null);

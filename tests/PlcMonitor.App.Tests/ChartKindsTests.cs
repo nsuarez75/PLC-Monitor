@@ -162,7 +162,7 @@ public sealed class ChartKindsTests : IDisposable
         main.Apply(new SubscribeEvent { TagUpdates = updates });
 
         var trigger = new TrendTrigger { Device = "casa1200", Tag = "clock", Value = "true", BeforeSeconds = 2 };
-        var live = new LiveTrendViewModel(() => [("peso", main.FindTag("casa1200", "peso"))], trigger, () => main.FindTag("casa1200", "clock"), ChartKind.Cycles);
+        var live = new LiveTrendViewModel(() => [("peso", TrendSource.Of(main.FindTag("casa1200", "peso")))], trigger, () => TrendSource.Of(main.FindTag("casa1200", "clock")), ChartKind.Cycles);
         live.RefreshTags();
         live.Refresh(start.AddSeconds(200));
 
@@ -314,6 +314,65 @@ public sealed class ChartKindsTests : IDisposable
         trends.TriggerEnabled = false;
         trends.SaveCommand.Execute(null);
         TrendViewStore.Load(path).Single().SeparateAxes.ShouldBeTrue();
+    }
+
+    [Fact]
+    public void History_periods_are_parsed_and_described()
+    {
+        TrendHistory.TryParse("17/10/2026 06:00", out var from).ShouldBeTrue();
+        from.ShouldBe(new DateTimeOffset(new DateTime(2026, 10, 17, 6, 0, 0, DateTimeKind.Local)));
+        TrendHistory.TryParse("7-10-2026 6:30", out var other).ShouldBeTrue();
+        other.ShouldBe(new DateTimeOffset(new DateTime(2026, 10, 7, 6, 30, 0, DateTimeKind.Local)));
+        TrendHistory.TryParse("17/10/2026", out var day).ShouldBeTrue();
+        day.Hour.ShouldBe(0);
+        TrendHistory.TryParse("mañana", out _).ShouldBeFalse();
+        TrendHistory.TryParse("", out _).ShouldBeFalse();
+        TrendHistory.Format(from).ShouldBe("17/10/2026 06:00");
+
+        var now = At(0);
+        var view = new TrendView { HistoryMinutes = 480 };
+        TrendHistory.Window(view, now).ShouldBe((now.AddHours(-8), now));
+        TrendHistory.Describe(view).ShouldBe("últimas 8 h");
+        view = new TrendView { HistoryMinutes = 0, HistoryFrom = from, HistoryTo = from.AddHours(8) };
+        TrendHistory.Window(view, now).ShouldBe((from, from.AddHours(8)));
+        TrendHistory.Describe(view).ShouldBe("del 17/10/2026 06:00 al 17/10/2026 14:00");
+    }
+
+    [Fact]
+    public async Task The_data_source_is_saved_and_history_needs_the_agent()
+    {
+        var path = Path.Combine(_dir, "trends.json");
+        var main = MainWindowTests.ViewModelWithData(Path.Combine(_dir, "app.json"));
+        using var trends = new TrendsViewModel(main, path);
+        trends.NewCommand.Execute(null);
+        trends.AddTagCommand.Execute(trends.Available.Single(c => c.Tag == "peso"));
+        (trends.CanUseHistory, trends.UsesHistory, trends.UsesLiveWindow).ShouldBe((true, false, true));
+
+        trends.DataSource = TrendsViewModel.DataSources.Single(d => d.Value == TrendDataSource.History);
+        (trends.UsesHistory, trends.UsesLiveWindow, trends.IsCustomRange).ShouldBe((true, false, false));
+        trends.HistoryRange = TrendHistory.Ranges.Single(r => r.Value == 0);
+        trends.IsCustomRange.ShouldBeTrue();
+        trends.HistoryFromText.ShouldNotBeEmpty(); // propone las últimas 8 h
+        trends.HistoryFromText = "17/10/2026 14:00";
+        trends.HistoryToText = "17/10/2026 06:00";
+        trends.SaveCommand.Execute(null);
+        trends.KindError.ShouldStartWith("Periodo:");
+        trends.HistoryToText = "17/10/2026 22:00";
+        trends.SaveCommand.Execute(null);
+        trends.KindError.ShouldBeEmpty();
+        var saved = TrendViewStore.Load(path).Single();
+        (saved.DataSource, saved.HistoryMinutes).ShouldBe((TrendDataSource.History, 0));
+        TrendHistory.Format(saved.HistoryFrom!.Value).ShouldBe("17/10/2026 14:00");
+        trends.Selected!.Description.ShouldBe("1 tag · histórico, del 17/10/2026 14:00 al 17/10/2026 22:00");
+
+        // Sin conexión no se puede leer el histórico.
+        await trends.OpenCommand.ExecuteAsync(null);
+        trends.Live.ShouldBeNull();
+        trends.KindError.ShouldBe("Conéctate al agente para leer su histórico.");
+
+        // Los indicadores son el valor actual: siempre en vivo.
+        trends.Kind = ChartKindChoice.For(ChartKind.Gauges);
+        (trends.CanUseHistory, trends.UsesHistory).ShouldBe((false, false));
     }
 
     [Fact]

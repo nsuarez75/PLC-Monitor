@@ -35,7 +35,7 @@
       <Grid DockPanel.Dock="Top" ColumnDefinitions="*,Auto" Margin="0,0,0,14">
         <StackPanel Spacing="2">
           <TextBlock Text="{Binding Selected.Name, FallbackValue='Tendencias'}" Classes="title" />
-          <TextBlock Classes="muted" Text="Elige los tags de cualquier dispositivo del agente y ábrelos juntos en una gráfica en vivo." />
+          <TextBlock Classes="muted" Text="Elige los tags de cualquier dispositivo del agente y ábrelos juntos en una gráfica, en vivo o del histórico." />
         </StackPanel>
         <Button Grid.Column="1" Classes="secondary" VerticalAlignment="Top"
                 Command="{Binding $parent[Window].((vm:MainViewModel)DataContext).CloseTrendsCommand}">
@@ -89,6 +89,24 @@
                   <TextBlock Grid.Row="2" Grid.Column="1" Text="{Binding Kind.Description}" Classes="muted" FontSize="11.5" TextWrapping="Wrap" />
                 </Grid>
                 <!-- Opciones según el tipo: una fila por opción, las que no aplican se ocultan. -->
+                <Grid ColumnDefinitions="170,*" ColumnSpacing="16" IsVisible="{Binding CanUseHistory}">
+                  <TextBlock Text="Datos" VerticalAlignment="Center" FontWeight="Medium" />
+                  <ComboBox Grid.Column="1" ItemsSource="{x:Static vm:TrendsViewModel.DataSources}" SelectedItem="{Binding DataSource}" MinWidth="280" />
+                </Grid>
+                <Grid ColumnDefinitions="170,*" RowDefinitions="Auto,Auto" RowSpacing="4" ColumnSpacing="16" IsVisible="{Binding UsesHistory}">
+                  <TextBlock Text="Periodo" VerticalAlignment="Center" FontWeight="Medium" />
+                  <WrapPanel Grid.Column="1">
+                    <ComboBox ItemsSource="{x:Static vm:TrendHistory.Ranges}" SelectedItem="{Binding HistoryRange}" MinWidth="170" Margin="0,0,12,4" />
+                    <StackPanel Orientation="Horizontal" Spacing="8" IsVisible="{Binding IsCustomRange}" Margin="0,0,0,4">
+                      <TextBlock Text="desde" Classes="muted" VerticalAlignment="Center" />
+                      <TextBox Text="{Binding HistoryFromText}" Width="150" PlaceholderText="17/10/2026 06:00" />
+                      <TextBlock Text="hasta" Classes="muted" VerticalAlignment="Center" />
+                      <TextBox Text="{Binding HistoryToText}" Width="150" PlaceholderText="17/10/2026 14:00" />
+                    </StackPanel>
+                  </WrapPanel>
+                  <TextBlock Grid.Row="1" Grid.Column="1" Classes="muted" FontSize="11.5" TextWrapping="Wrap"
+                             Text="Se lee del histórico del agente al abrir la vista (solo los tags que se historizan); «Actualizar» lo vuelve a leer." />
+                </Grid>
                 <Grid ColumnDefinitions="170,*" ColumnSpacing="16" IsVisible="{Binding UsesLiveWindow}">
                   <TextBlock Text="Ventana" VerticalAlignment="Center" FontWeight="Medium" />
                   <ComboBox Grid.Column="1" ItemsSource="{x:Static vm:LiveTrendViewModel.Windows}" SelectedItem="{Binding Window}" MinWidth="110" />
@@ -249,6 +267,7 @@
                   <TextBlock Text="Abrir" />
                 </StackPanel>
               </Button>
+              <TextBlock Text="Leyendo el histórico…" Classes="muted" VerticalAlignment="Center" IsVisible="{Binding IsLoading}" />
               <Button Classes="secondary" Command="{Binding SaveCommand}">
                 <StackPanel Orientation="Horizontal" Spacing="6">
                   <c:Icon Kind="save" />
@@ -304,7 +323,15 @@
               </Button>
               <TextBlock Text="Ventana" Classes="muted" VerticalAlignment="Center" Margin="8,0,0,0" IsVisible="{Binding UsesWindow}" />
               <ComboBox ItemsSource="{x:Static vm:LiveTrendViewModel.Windows}" SelectedItem="{Binding Window}" MinWidth="110" IsVisible="{Binding UsesWindow}" />
-              <Button Classes="secondary" Command="{Binding TogglePauseCommand}">
+              <Button Classes="secondary" Command="{Binding $parent[UserControl].((vm:TrendsViewModel)DataContext).OpenCommand}" IsVisible="{Binding !IsLive}"
+                      ToolTip.Tip="Volver a leer el histórico">
+                <StackPanel Orientation="Horizontal" Spacing="6">
+                  <c:Icon Kind="refresh" />
+                  <TextBlock Text="Actualizar" />
+                </StackPanel>
+              </Button>
+              <TextBlock Text="{Binding HistoryText}" Classes="muted" VerticalAlignment="Center" IsVisible="{Binding !IsLive}" TextTrimming="CharacterEllipsis" />
+              <Button Classes="secondary" Command="{Binding TogglePauseCommand}" IsVisible="{Binding IsLive}">
                 <StackPanel Orientation="Horizontal" Spacing="6">
                   <c:Icon Kind="pause" IsVisible="{Binding !Paused}" />
                   <c:Icon Kind="play" IsVisible="{Binding Paused}" />
@@ -314,7 +341,7 @@
               <Border Classes="pill warn" IsVisible="{Binding Paused}" VerticalAlignment="Center">
                 <TextBlock Text="En pausa" />
               </Border>
-              <Border Classes="pill" Classes.good="{Binding TriggerActive}" IsVisible="{Binding IsTriggered}" VerticalAlignment="Center"
+              <Border Classes="pill" Classes.good="{Binding TriggerActive}" IsVisible="{Binding ShowTriggerState}" VerticalAlignment="Center"
                       ToolTip.Tip="{Binding TriggerText}">
                 <StackPanel Orientation="Horizontal" Spacing="6">
                   <Ellipse Classes="dot" Classes.good="{Binding TriggerActive}" />

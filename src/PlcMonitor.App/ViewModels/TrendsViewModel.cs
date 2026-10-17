@@ -31,6 +31,8 @@ public sealed partial class TrendViewItem(TrendView view) : ObservableObject
             return kind + tags;
         if (view.Kind == ChartKind.Bars)
             return $"{kind}{tags} · por {PeriodBarsViewModel.Periods.First(p => p.Value == view.BarPeriod).Text.ToLowerInvariant()}";
+        if (view.DataSource == TrendDataSource.History && TrendsViewModel.CanReadHistory(view.Kind))
+            return $"{kind}{tags} · histórico, {TrendHistory.Describe(view)}{(view.Trigger is null ? "" : " · disparo")}";
         return $"{kind}{tags} · {view.WindowMinutes} min{(view.Trigger is null ? "" : " · disparo")}";
     }
 }
@@ -49,7 +51,7 @@ public sealed record ChartKindChoice(ChartKind Value, string Text, string Short,
         new(ChartKind.States, "Cronograma de estados", "Estados",
             "Una franja por tag con un color por estado (marcha/paro/alarma, paso de secuencia…), la duración de cada tramo al pasar el ratón y el porcentaje de tiempo en cada estado. Pensado para booleanos y enteros de estado."),
         new(ChartKind.Histogram, "Histograma con Cp/Cpk", "Histograma",
-            "Cómo se reparten los valores recibidos en la ventana: barras por clase, media, desviación típica, mínimo y máximo y, con tolerancias, la capacidad del proceso (Cp y Cpk). Con disparo, solo los valores de cada ciclo."),
+            "Cómo se reparten los valores de la ventana (en vivo o del histórico): barras por clase, media, desviación típica, mínimo y máximo y, con tolerancias, la capacidad del proceso (Cp y Cpk). Con disparo, solo los valores de cada ciclo."),
         new(ChartKind.Gauges, "Indicadores de panel", "Indicadores",
             "El valor actual de cada tag en grande, como en un panel de operador: con aguja, barra de nivel o solo el número, y en rojo si sale de los límites. Los booleanos se ven como una luz."),
         new(ChartKind.Bars, "Barras por periodo (histórico)", "Barras",
@@ -111,7 +113,7 @@ public sealed partial class TrendsViewModel : ObservableObject, IDisposable
 
     [ObservableProperty]
     [NotifyPropertyChangedFor(nameof(IsXYKind), nameof(IsTrendKind), nameof(IsGaugesKind), nameof(IsBarsKind), nameof(HasLimits), nameof(LimitsText),
-        nameof(LimitsHint), nameof(UsesLiveWindow), nameof(CanTrigger), nameof(AxisCaption), nameof(HasAxisLimits))]
+        nameof(LimitsHint), nameof(UsesLiveWindow), nameof(CanTrigger), nameof(AxisCaption), nameof(HasAxisLimits), nameof(CanUseHistory), nameof(UsesHistory))]
     public partial ChartKindChoice Kind { get; set; } = ChartKindChoice.All[0];
 
     /// <summary>X-Y: el primer tag es el eje X.</summary>
@@ -143,8 +145,54 @@ public sealed partial class TrendsViewModel : ObservableObject, IDisposable
         ? "Inferior y superior de especificación (LIE/LSE) para calcular Cp y Cpk; con una sola, solo Cpk."
         : "Fuera de ellos el indicador se pone en rojo.";
 
-    /// <summary>La ventana en vivo cuenta (no en ciclos ni en barras del histórico).</summary>
-    public bool UsesLiveWindow => Kind.Value is not (ChartKind.Cycles or ChartKind.Bars);
+    /// <summary>La ventana en vivo cuenta (no en ciclos, en barras ni leyendo del histórico).</summary>
+    public bool UsesLiveWindow => Kind.Value is not (ChartKind.Cycles or ChartKind.Bars) && !UsesHistory;
+
+    /// <summary>Tipos que pueden leer del histórico (los indicadores son el valor actual; las barras ya lo leen siempre).</summary>
+    public static bool CanReadHistory(ChartKind kind) => kind is not (ChartKind.Gauges or ChartKind.Bars);
+
+    public bool CanUseHistory => CanReadHistory(Kind.Value);
+
+    public static IReadOnlyList<Choice<TrendDataSource>> DataSources { get; } =
+    [
+        new("En vivo (lo que llega, última hora)", TrendDataSource.Live),
+        new("Histórico del agente", TrendDataSource.History),
+    ];
+
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(UsesHistory), nameof(UsesLiveWindow), nameof(IsCustomRange))]
+    public partial Choice<TrendDataSource> DataSource { get; set; } = DataSources[0];
+
+    /// <summary>La vista lee del histórico (si el tipo lo admite).</summary>
+    public bool UsesHistory => CanUseHistory && DataSource.Value == TrendDataSource.History;
+
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(IsCustomRange))]
+    public partial Choice<int> HistoryRange { get; set; } = TrendHistory.Ranges[1];
+
+    /// <summary>Periodo con fechas concretas (desde/hasta).</summary>
+    public bool IsCustomRange => UsesHistory && HistoryRange.Value == 0;
+
+    [ObservableProperty]
+    public partial string HistoryFromText { get; set; } = "";
+
+    [ObservableProperty]
+    public partial string HistoryToText { get; set; } = "";
+
+    /// <summary>Consultando el histórico al abrir.</summary>
+    [ObservableProperty]
+    public partial bool IsLoading { get; private set; }
+
+    partial void OnHistoryRangeChanged(Choice<int> value)
+    {
+        // Al pasar a fechas concretas, propone el último turno de 8 h que acaba ahora.
+        if (value.Value != 0 || HistoryFromText.Length > 0)
+            return;
+        var now = DateTimeOffset.Now;
+        var to = new DateTimeOffset(now.Year, now.Month, now.Day, now.Hour, 0, 0, now.Offset);
+        HistoryFromText = TrendHistory.Format(to.AddHours(-8));
+        HistoryToText = TrendHistory.Format(to);
+    }
 
     /// <summary>El disparo tiene sentido (no en barras del histórico ni en indicadores del valor actual).</summary>
     public bool CanTrigger => Kind.Value is not (ChartKind.Bars or ChartKind.Gauges);
@@ -291,6 +339,10 @@ public sealed partial class TrendsViewModel : ObservableObject, IDisposable
         Kind = ChartKindChoice.For(view?.Kind ?? ChartKind.Trend);
         KindError = "";
         SeparateAxes = view?.SeparateAxes ?? false;
+        DataSource = DataSources.FirstOrDefault(d => d.Value == view?.DataSource) ?? DataSources[0];
+        HistoryFromText = view?.HistoryFrom is { } historyFrom ? TrendHistory.Format(historyFrom) : "";
+        HistoryToText = view?.HistoryTo is { } historyTo ? TrendHistory.Format(historyTo) : "";
+        HistoryRange = TrendHistory.Ranges.FirstOrDefault(r => r.Value == view?.HistoryMinutes) ?? TrendHistory.Ranges[1];
         LowLimit = view?.LowLimit is { } low ? (decimal)low : null;
         HighLimit = view?.HighLimit is { } high ? (decimal)high : null;
         GaugeStyle = GaugeStyles.FirstOrDefault(g => g.Value == view?.GaugeStyle) ?? GaugeStyles[0];
@@ -420,6 +472,8 @@ public sealed partial class TrendsViewModel : ObservableObject, IDisposable
             ChartKind.XY when Tags.Count < 2 => "La gráfica X-Y necesita al menos dos tags: el primero es el eje X.",
             ChartKind.Histogram or ChartKind.Gauges when LowLimit is { } low && HighLimit is { } high && low >= high
                 => $"{LimitsText}: la inferior tiene que ser menor que la superior.",
+            _ when IsCustomRange && !(TrendHistory.TryParse(HistoryFromText, out var from) && TrendHistory.TryParse(HistoryToText, out var to) && from < to)
+                => "Periodo: escribe las fechas como 17/10/2026 06:00, con «desde» antes que «hasta».",
             _ => "",
         };
         TriggerError = !TriggerEnabled || !CanTrigger ? ""
@@ -441,9 +495,9 @@ public sealed partial class TrendsViewModel : ObservableObject, IDisposable
         _main.Report($"Tendencia «{item.Name}» guardada");
     }
 
-    /// <summary>Guarda y abre la gráfica en vivo de la vista.</summary>
+    /// <summary>Guarda y abre la gráfica de la vista: en vivo, del histórico (lo consulta) o las barras.</summary>
     [RelayCommand(CanExecute = nameof(CanSave))]
-    private void Open()
+    private async Task OpenAsync()
     {
         if (Selected is not { } item || !CheckTrigger())
             return;
@@ -459,11 +513,16 @@ public sealed partial class TrendsViewModel : ObservableObject, IDisposable
             _ = Bars.RefreshCommand.ExecuteAsync(null);
             return;
         }
+        if (view.DataSource == TrendDataSource.History && CanReadHistory(view.Kind))
+        {
+            await OpenHistoryAsync(view);
+            return;
+        }
         var trigger = view.Trigger;
         var live = new LiveTrendViewModel(
-            () => view.Tags.Select(t => (t.ToString(), _main.FindTag(t.Device, t.Tag))).ToArray(),
+            () => view.Tags.Select(t => (t.ToString(), TrendSource.Of(_main.FindTag(t.Device, t.Tag)))).ToArray(),
             trigger,
-            trigger is null ? null : () => _main.FindTag(trigger.Device, trigger.Tag),
+            trigger is null ? null : () => TrendSource.Of(_main.FindTag(trigger.Device, trigger.Tag)),
             view.Kind)
         {
             Window = Window,
@@ -472,6 +531,61 @@ public sealed partial class TrendsViewModel : ObservableObject, IDisposable
             : trigger is not null ? "Esperando el disparo"
             : view.Kind == ChartKind.XY ? "Aún no hay valores de los dos ejes"
             : "Aún no hay valores de estos tags";
+        Show(live, view);
+    }
+
+    /// <summary>
+    /// Lee del histórico del agente los tags de la vista (y el disparo) en su periodo y abre la gráfica con esos datos.
+    /// Los tags que no se historizan se avisan como no disponibles.
+    /// </summary>
+    private async Task OpenHistoryAsync(TrendView view)
+    {
+        if (_main.Client is not { } client)
+        {
+            KindError = "Conéctate al agente para leer su histórico.";
+            return;
+        }
+        var (from, to) = TrendHistory.Window(view, DateTimeOffset.UtcNow);
+        var trigger = view.Trigger;
+        var refs = view.Tags.Concat(trigger is null ? [] : [trigger.Ref])
+            .Select(r => (Ref: r, Tag: _main.FindTag(r.Device, r.Tag)))
+            .Where(r => r.Tag?.Historized == true)
+            .Select(r => (r.Ref, r.Tag!.IsBoolean))
+            .ToList();
+        Dictionary<TrendTagRef, TrendSource> sources;
+        var truncated = false;
+        IsLoading = true;
+        try
+        {
+            (sources, truncated) = refs.Count == 0 ? ([], false) : await TrendHistory.LoadAsync(client, refs, from, to);
+        }
+        catch (Grpc.Core.RpcException ex)
+        {
+            _main.Report(_main.Describe(ex), isError: true);
+            return;
+        }
+        finally
+        {
+            IsLoading = false;
+        }
+        var points = sources.Values.Sum(s => s.Points.Count);
+        var live = new LiveTrendViewModel(
+            () => view.Tags.Select(t => (t.ToString(), sources.GetValueOrDefault(t))).ToArray(),
+            trigger,
+            trigger is null ? null : () => sources.GetValueOrDefault(trigger.Ref),
+            view.Kind)
+        {
+            FixedWindow = (from, to),
+            HistoryText = $"Histórico {TrendHistory.Describe(view)} · {points} puntos" + (truncated ? $" · recortado a {TrendHistory.MaxPoints} por tag" : ""),
+        };
+        live.Chart.EmptyText = view.Tags.Count == 0 ? "Esta vista no tiene tags: edítala y añade alguno"
+            : refs.Count == 0 ? "Ningún tag de la vista se historiza: actívalo en la configuración del tag"
+            : "No hay histórico de estos tags en ese periodo";
+        Show(live, view);
+    }
+
+    private void Show(LiveTrendViewModel live, TrendView view)
+    {
         live.Chart.AutoY = view.AutoY;
         live.Chart.SeparateAxes = view.SeparateAxes;
         live.Chart.LowLimit = view.LowLimit;
@@ -515,6 +629,10 @@ public sealed partial class TrendsViewModel : ObservableObject, IDisposable
         view.Name = Name.Trim();
         view.Kind = Kind.Value;
         view.SeparateAxes = SeparateAxes;
+        view.DataSource = DataSource.Value;
+        view.HistoryMinutes = HistoryRange.Value;
+        view.HistoryFrom = IsCustomRange && TrendHistory.TryParse(HistoryFromText, out var historyFrom) ? historyFrom : null;
+        view.HistoryTo = IsCustomRange && TrendHistory.TryParse(HistoryToText, out var historyTo) ? historyTo : null;
         view.LowLimit = LowLimit is { } low ? (double)low : null;
         view.HighLimit = HighLimit is { } high ? (double)high : null;
         view.GaugeStyle = GaugeStyle.Value;

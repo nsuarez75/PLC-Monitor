@@ -27,6 +27,17 @@ public sealed class TrendView
     [JsonConverter(typeof(JsonStringEnumConverter<PlcMonitor.App.Charts.ChartKind>))]
     public PlcMonitor.App.Charts.ChartKind Kind { get; set; }
 
+    /// <summary>Datos en vivo o del histórico del agente (no aplica a indicadores ni a barras).</summary>
+    [JsonConverter(typeof(JsonStringEnumConverter<PlcMonitor.App.Charts.TrendDataSource>))]
+    public PlcMonitor.App.Charts.TrendDataSource DataSource { get; set; }
+
+    /// <summary>Histórico: los últimos minutos que se leen; 0 = el periodo fijo de <see cref="HistoryFrom"/> a <see cref="HistoryTo"/>.</summary>
+    public int HistoryMinutes { get; set; } = 480;
+
+    public DateTimeOffset? HistoryFrom { get; set; }
+
+    public DateTimeOffset? HistoryTo { get; set; }
+
     /// <summary>Tendencia: un eje Y por tag.</summary>
     public bool SeparateAxes { get; set; }
 

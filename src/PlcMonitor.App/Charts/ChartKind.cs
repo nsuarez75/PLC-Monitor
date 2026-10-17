@@ -59,3 +59,13 @@ public enum BarMetric
     /// <summary>Lo que ha subido un contador (con sus reinicios).</summary>
     Increase,
 }
+
+/// <summary>De dónde salen los datos de una vista.</summary>
+public enum TrendDataSource
+{
+    /// <summary>Lo que llega del agente mientras se está conectado (la app guarda la última hora).</summary>
+    Live,
+
+    /// <summary>El histórico del agente en un periodo.</summary>
+    History,
+}

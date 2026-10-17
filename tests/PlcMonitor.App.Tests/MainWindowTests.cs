@@ -262,6 +262,11 @@ public class MainWindowTests
         trends.HighLimit = 15;
         window.UpdateLayout();
         Capture(window, "trends-edit-histogram.png");
+        trends.DataSource = TrendsViewModel.DataSources[1];
+        trends.HistoryRange = TrendHistory.Ranges.Single(r => r.Value == 0);
+        window.UpdateLayout();
+        Capture(window, "trends-edit-history.png");
+        trends.DataSource = TrendsViewModel.DataSources[0];
         trends.OpenCommand.Execute(null);
         trends.Refresh(now);
         window.UpdateLayout();
