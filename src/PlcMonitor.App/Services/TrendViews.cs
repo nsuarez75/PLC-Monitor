@@ -23,6 +23,46 @@ public sealed class TrendView
 
     public List<TrendTagRef> Tags { get; set; } = [];
 
+    /// <summary>Tipo de gráfica (las vistas guardadas antes de haber tipos son tendencias).</summary>
+    [JsonConverter(typeof(JsonStringEnumConverter<PlcMonitor.App.Charts.ChartKind>))]
+    public PlcMonitor.App.Charts.ChartKind Kind { get; set; }
+
+    /// <summary>Datos en vivo o del histórico del agente (no aplica a indicadores ni a barras).</summary>
+    [JsonConverter(typeof(JsonStringEnumConverter<PlcMonitor.App.Charts.TrendDataSource>))]
+    public PlcMonitor.App.Charts.TrendDataSource DataSource { get; set; }
+
+    /// <summary>Histórico: los últimos minutos que se leen; 0 = el periodo fijo de <see cref="HistoryFrom"/> a <see cref="HistoryTo"/>.</summary>
+    public int HistoryMinutes { get; set; } = 480;
+
+    public DateTimeOffset? HistoryFrom { get; set; }
+
+    public DateTimeOffset? HistoryTo { get; set; }
+
+    /// <summary>Datos de un CSV exportado: su ruta. Las vistas de CSV se ven con cualquier agente (o sin conexión).</summary>
+    public string? CsvPath { get; set; }
+
+    /// <summary>Tendencia: un eje Y por tag.</summary>
+    public bool SeparateAxes { get; set; }
+
+    /// <summary>Histograma: tolerancias (para Cp/Cpk). Indicadores: límites bajo y alto.</summary>
+    public double? LowLimit { get; set; }
+
+    public double? HighLimit { get; set; }
+
+    [JsonConverter(typeof(JsonStringEnumConverter<PlcMonitor.App.Charts.GaugeStyle>))]
+    public PlcMonitor.App.Charts.GaugeStyle GaugeStyle { get; set; } = PlcMonitor.App.Charts.GaugeStyle.Needle;
+
+    /// <summary>Barras del histórico: periodo, cálculo, días hacia atrás e inicio del primer turno.</summary>
+    [JsonConverter(typeof(JsonStringEnumConverter<PlcMonitor.App.Charts.BarPeriod>))]
+    public PlcMonitor.App.Charts.BarPeriod BarPeriod { get; set; } = PlcMonitor.App.Charts.BarPeriod.Hour;
+
+    [JsonConverter(typeof(JsonStringEnumConverter<PlcMonitor.App.Charts.BarMetric>))]
+    public PlcMonitor.App.Charts.BarMetric BarMetric { get; set; }
+
+    public int BarDays { get; set; } = 1;
+
+    public int ShiftStartHour { get; set; } = 6;
+
     public int WindowMinutes { get; set; } = 5;
 
     public bool AutoY { get; set; } = true;

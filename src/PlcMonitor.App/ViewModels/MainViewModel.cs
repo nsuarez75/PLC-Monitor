@@ -56,6 +56,11 @@ public sealed partial class MainViewModel : ObservableObject, IAgentContext, IAs
         RecentAgents = [.. settings.RecentAgents];
         Browse = new BrowseViewModel(this, () => SelectedDevice);
         History = new HistoryViewModel(this, () => SelectedDevice);
+        History.OpenInTrendsRequested += (_, view) =>
+        {
+            OpenTrends();
+            _ = Trends!.AddAndOpenAsync(view);
+        };
     }
 
     public AgentService.AgentServiceClient? Client { get; private set; }
@@ -147,21 +152,6 @@ public sealed partial class MainViewModel : ObservableObject, IAgentContext, IAs
     {
         Trends?.Dispose();
         Trends = null;
-    }
-
-    /// <summary>Abre un CSV exportado del histórico en un visor aparte (no hace falta estar conectado).</summary>
-    [RelayCommand]
-    private async Task OpenCsvAsync()
-    {
-        if (await Dialogs.OpenFileAsync("Abrir histórico (CSV)", "csv") is not { } path)
-            return;
-        var viewer = new CsvViewerViewModel(Dialogs);
-        if (!viewer.Load(path))
-        {
-            Report($"No se pudo abrir {Path.GetFileName(path)}: {viewer.Error}", isError: true);
-            return;
-        }
-        Dialogs.ShowCsvViewer(viewer);
     }
 
     /// <summary>El agente conectado tiene el historiador activado.</summary>

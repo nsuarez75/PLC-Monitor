@@ -81,6 +81,106 @@ public sealed partial class ChartViewModel : ObservableObject
 
     public bool HasOptions => Options.Count > 0;
 
+    /// <summary>Tipo de gráfica: la tendencia y el cronograma usan <see cref="Series"/>; ciclos y X-Y, <see cref="Curves"/>.</summary>
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(IsTrend), nameof(IsStates), nameof(IsXY), nameof(IsCycles), nameof(IsHistogram), nameof(IsGauges), nameof(IsBars), nameof(HasYAxis), nameof(Hint), nameof(CanSeparateAxes), nameof(AxisText))]
+    public partial ChartKind Kind { get; set; } = ChartKind.Trend;
+
+    public bool IsTrend => Kind == ChartKind.Trend;
+
+    public bool IsStates => Kind == ChartKind.States;
+
+    public bool IsCycles => Kind == ChartKind.Cycles;
+
+    public bool IsHistogram => Kind == ChartKind.Histogram;
+
+    public bool IsGauges => Kind == ChartKind.Gauges;
+
+    public bool IsBars => Kind == ChartKind.Bars;
+
+    /// <summary>Texto de la casilla de los límites automáticos según qué eje son.</summary>
+    public string AxisText => Kind switch
+    {
+        ChartKind.Histogram => "Eje de valores automático",
+        ChartKind.Gauges => "Escala automática",
+        _ => "Eje Y automático",
+    };
+
+    /// <summary>Cursores de medida A y B en la tendencia (al quitarlos se borran).</summary>
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(Hint))]
+    public partial bool ShowCursors { get; set; }
+
+    [ObservableProperty]
+    public partial DateTimeOffset? CursorA { get; set; }
+
+    [ObservableProperty]
+    public partial DateTimeOffset? CursorB { get; set; }
+
+    partial void OnShowCursorsChanged(bool value)
+    {
+        if (!value)
+            (CursorA, CursorB) = (null, null);
+    }
+
+    /// <summary>Tendencia con un eje Y por tag.</summary>
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(HasYAxis))]
+    public partial bool SeparateAxes { get; set; }
+
+    /// <summary>Se ofrece separar los ejes: tendencia con más de un tag.</summary>
+    public bool CanSeparateAxes => Kind == ChartKind.Trend && Options.Count > 1;
+
+    /// <summary>Tolerancias del histograma y límites de los indicadores (null = sin límite).</summary>
+    [ObservableProperty]
+    public partial double? LowLimit { get; set; }
+
+    [ObservableProperty]
+    public partial double? HighLimit { get; set; }
+
+    [ObservableProperty]
+    public partial GaugeStyle GaugeStyle { get; set; }
+
+    /// <summary>Barras: periodo de cada barra (para las etiquetas) y hora de inicio del primer turno.</summary>
+    [ObservableProperty]
+    public partial BarPeriod BarPeriod { get; set; }
+
+    [ObservableProperty]
+    public partial int ShiftStartHour { get; set; } = 6;
+
+    /// <summary>Gráfica con eje X numérico (ciclos superpuestos o X-Y).</summary>
+    public bool IsXY => Kind is ChartKind.Cycles or ChartKind.XY;
+
+    /// <summary>Límites del eje Y a mano: no en el cronograma ni con un eje por tag. En el histograma son los del eje X; en los indicadores, la escala.</summary>
+    public bool HasYAxis => Kind != ChartKind.States && !(Kind == ChartKind.Trend && SeparateAxes && Options.Count > 1);
+
+    /// <summary>Curvas de los ciclos superpuestos o de la X-Y (las calcula quien alimenta la gráfica).</summary>
+    [ObservableProperty]
+    public partial IReadOnlyList<XYCurve> Curves { get; set; } = [];
+
+    /// <summary>Texto del eje X de las gráficas X-Y y de ciclos.</summary>
+    [ObservableProperty]
+    public partial string XLabel { get; set; } = "";
+
+    /// <summary>Resumen junto a la ayuda (p. ej. cuántos ciclos se ven).</summary>
+    [ObservableProperty]
+    public partial string Caption { get; set; } = "";
+
+    public string Hint => Kind switch
+    {
+        ChartKind.Cycles => "Cada ciclo empieza en 0 (el disparo); el último va resaltado y los anteriores, tenues.",
+        ChartKind.XY => "Pasa el ratón para ver las coordenadas; el punto marca el valor más reciente.",
+        ChartKind.States => "Arrastra para ampliar un tramo; pasa el ratón por una franja para ver el estado y cuánto duró.",
+        ChartKind.Histogram => "Valores de la ventana. Líneas: media (negra), ±3σ (discontinuas) y tolerancias (rojas). Pasa el ratón por una barra.",
+        ChartKind.Gauges => "Valor actual de cada tag; en rojo si está fuera de los límites.",
+        ChartKind.Bars => "Un grupo de barras por periodo. Pasa el ratón para ver los valores.",
+        _ when ShowCursors => "Clic para poner los cursores A y B; arrástralos para moverlos. Quita «Cursores» para volver al zoom.",
+        _ => "Arrastra sobre la gráfica para ampliar un tramo; pasa el ratón para ver los valores.",
+    };
+
+    /// <summary>Tags marcados, con sus puntos.</summary>
+    internal IEnumerable<ChartSeriesOption> SelectedOptions => Options.Where(o => o.IsSelected);
+
     /// <summary>El usuario ha hecho zoom o lo ha quitado (la tendencia en vivo se pausa con el zoom).</summary>
     public event EventHandler? ZoomChanged;
 
@@ -111,6 +211,8 @@ public sealed partial class ChartViewModel : ObservableObject
             Options.Add(option);
         }
         OnPropertyChanged(nameof(HasOptions));
+        OnPropertyChanged(nameof(CanSeparateAxes));
+        OnPropertyChanged(nameof(HasYAxis));
         var all = Options.SelectMany(o => o.Points).Select(p => p.Time).ToArray();
         DataFrom = from ?? (all.Length > 0 ? all.Min() : null);
         DataTo = to ?? (all.Length > 0 ? all.Max() : null);

@@ -53,10 +53,6 @@ internal sealed class FakeDialogs : IDialogs
     public string? OpenPath { get; set; }
 
     public Task<string?> OpenFileAsync(string title, string extension) => Task.FromResult(OpenPath);
-
-    public List<PlcMonitor.App.ViewModels.CsvViewerViewModel> CsvViewers { get; } = [];
-
-    public void ShowCsvViewer(PlcMonitor.App.ViewModels.CsvViewerViewModel viewer) => CsvViewers.Add(viewer);
 }
 
 /// <summary>Conecta con el agente en memoria sea cual sea la URL.</summary>

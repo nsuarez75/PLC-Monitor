@@ -74,9 +74,10 @@ public static class TriggerFilter
 
     /// <summary>
     /// Deja en <paramref name="output"/> los puntos de <paramref name="points"/> dentro de los tramos: al empezar cada uno, el
-    /// valor que tenía el tag en ese momento; al acabar, un hueco para que la línea se corte.
+    /// valor que tenía el tag en ese momento (salvo con <paramref name="includeStart"/> = false: el histograma solo cuenta
+    /// muestras de verdad); al acabar, un hueco para que la línea se corte.
     /// </summary>
-    public static void Apply(IReadOnlyList<ChartPoint> points, IReadOnlyList<TriggerSpan> spans, DateTimeOffset now, List<ChartPoint> output)
+    public static void Apply(IReadOnlyList<ChartPoint> points, IReadOnlyList<TriggerSpan> spans, DateTimeOffset now, List<ChartPoint> output, bool includeStart = true)
     {
         output.Clear();
         if (points.Count == 0)
@@ -88,8 +89,10 @@ public static class TriggerFilter
             // vaya algo por delante del reloj de este equipo.
             var end = span.To is { } to && to < now ? to : DateTimeOffset.MaxValue;
             var first = series.LastIndexAtOrBefore(span.From);
-            if (first >= 0)
+            if (first >= 0 && includeStart && points[first].Time < span.From)
                 output.Add(new ChartPoint(span.From, points[first].Value));
+            else if (first >= 0 && points[first].Time >= span.From)
+                output.Add(points[first]);
             for (var i = Math.Max(first + 1, 0); i < points.Count && points[i].Time < end; i++)
                 output.Add(points[i]);
             if (span.To is { } closed && closed < now)

@@ -77,6 +77,9 @@ public sealed partial class HistoryViewModel(IAgentContext context, Func<DeviceV
     /// <summary>Gráfica del resultado (los tags consultados, todos marcados).</summary>
     public ChartViewModel Chart { get; } = new() { EmptyText = "Consulta el histórico para ver la gráfica" };
 
+    /// <summary>Se pide abrir los tags marcados y el periodo en una vista de Tendencias (con todos los tipos de gráfica).</summary>
+    public event EventHandler<PlcMonitor.App.Services.TrendView>? OpenInTrendsRequested;
+
     /// <summary>Muestra la tabla de puntos además de la gráfica.</summary>
     [ObservableProperty]
     public partial bool ShowTable { get; set; }
@@ -162,7 +165,7 @@ public sealed partial class HistoryViewModel(IAgentContext context, Func<DeviceV
                     s.Points.Select(p => new ChartPoint(p.Timestamp.ToDateTimeOffset(),
                         p.HasNumber && p.Quality is Quality.Good or Quality.Uncertain ? p.Number : null)).ToArray(),
                     Step: Aggregate.Value is null,
-                    IsBoolean: types.GetValueOrDefault(s.Tag))),
+                    IsBoolean: types.GetValueOrDefault(s.Tag))).ToArray(),
                 request.From.ToDateTimeOffset(), request.To.ToDateTimeOffset());
             var truncated = reply.Series.Any(s => s.Truncated);
             Summary = $"{Rows.Count} puntos de {tags.Length} tags · {Range.Text.ToLowerInvariant()}" +
@@ -178,6 +181,27 @@ public sealed partial class HistoryViewModel(IAgentContext context, Func<DeviceV
         {
             IsBusy = false;
         }
+    }
+
+    /// <summary>Crea una vista de Tendencias con los tags marcados y el periodo, leída del histórico, y la abre.</summary>
+    [RelayCommand]
+    private void OpenInTrends()
+    {
+        if (device() is not { } target)
+            return;
+        var tags = Tags.Where(t => t.IsSelected).Select(t => new PlcMonitor.App.Services.TrendTagRef(target.Name, t.Name)).ToList();
+        if (tags.Count == 0)
+        {
+            Summary = "Marca al menos un tag.";
+            return;
+        }
+        OpenInTrendsRequested?.Invoke(this, new PlcMonitor.App.Services.TrendView
+        {
+            Name = $"{target.Name} · {Range.Text.ToLowerInvariant()}",
+            Tags = tags,
+            DataSource = TrendDataSource.History,
+            HistoryMinutes = (int)Range.Value.TotalMinutes,
+        });
     }
 
     /// <summary>Guarda el resultado en CSV (dispositivo, tag, hora UTC ISO 8601, valor, calidad).</summary>
