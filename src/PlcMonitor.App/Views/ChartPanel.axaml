@@ -23,6 +23,8 @@
         </ItemsControl.ItemTemplate>
       </ItemsControl>
       <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="8" VerticalAlignment="Center">
+        <CheckBox Content="Cursores" IsChecked="{Binding ShowCursors}" IsVisible="{Binding IsTrend}"
+                  ToolTip.Tip="Dos cursores, A y B, para medir el tiempo entre dos instantes y cuánto cambia cada tag" />
         <CheckBox Content="Un eje por tag" IsChecked="{Binding SeparateAxes}" IsVisible="{Binding CanSeparateAxes}"
                   ToolTip.Tip="Cada tag con su propia escala, a la izquierda y con su color" />
         <CheckBox Content="{Binding AxisText}" IsChecked="{Binding AutoY}" IsVisible="{Binding HasYAxis}" />
@@ -54,7 +56,8 @@
       <c:TrendChart x:Name="Chart" MinHeight="220" IsVisible="{Binding IsTrend}"
                     Series="{Binding Series}" From="{Binding From}" To="{Binding To}"
                     YMin="{Binding YMin}" YMax="{Binding YMax}" Revision="{Binding Revision}" EmptyText="{Binding EmptyText}"
-                    SeparateAxes="{Binding SeparateAxes}" />
+                    SeparateAxes="{Binding SeparateAxes}" CursorsEnabled="{Binding ShowCursors}"
+                    CursorA="{Binding CursorA}" CursorB="{Binding CursorB}" />
       <c:StateChart x:Name="States" MinHeight="220" IsVisible="{Binding IsStates}"
                     Series="{Binding Series}" From="{Binding From}" To="{Binding To}"
                     Revision="{Binding Revision}" EmptyText="{Binding EmptyText}" />

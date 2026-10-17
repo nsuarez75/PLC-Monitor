@@ -123,6 +123,8 @@ public sealed class HistogramChart : Control
         var bounds = new Rect(Bounds.Size);
         if (bounds.Width < 40 || bounds.Height < 40)
             return;
+        // Fondo transparente: el ratón llega a toda la gráfica, también a las zonas sin dibujo.
+        context.FillRectangle(Brushes.Transparent, bounds);
         var muted = Brush("App.TextMuted", Brushes.Gray);
         var from = From ?? DateTimeOffset.MinValue;
         var to = To ?? DateTimeOffset.MaxValue;

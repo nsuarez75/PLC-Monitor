@@ -437,6 +437,78 @@ public sealed class ChartKindsTests : IDisposable
             .ShouldBe([P(0, 1), P(30, 9), P(60, 5), P(120, null)]);
     }
 
+    [Theory]
+    [InlineData(0.85, "+850 ms")]
+    [InlineData(-12.3456, "−12.346 s")]
+    [InlineData(62.156, "+1 min 02.156 s")]
+    [InlineData(245, "+4 min 05 s")]
+    [InlineData(7620, "+2 h 07 min")]
+    public void Cursor_delta_is_signed_and_precise(double seconds, string expected) =>
+        CursorReadout.FormatDelta(TimeSpan.FromSeconds(seconds)).ShouldBe(expected);
+
+    [Fact]
+    public void Cursor_rows_read_each_tag_at_a_and_b()
+    {
+        var rows = CursorReadout.Rows(
+        [
+            new ChartSeries("presion", [P(0, 3), P(10, 4.5)]) { ColorIndex = 1 },
+            new ChartSeries("bomba", [P(0, 0), P(5, 1)]) { IsBoolean = true },
+            new ChartSeries("hueco", [P(0, 1), P(8, null)]),
+        ], At(2), At(12));
+
+        rows.Select(r => r.Text).ShouldBe(["A 3 · B 4.5 · Δ +1.5", "A false · B true", "A 1 · B —"]);
+        (rows[0].A, rows[0].B, rows[0].ColorIndex).ShouldBe((3, 4.5, 1));
+        CursorReadout.Rows([new ChartSeries("v", [P(0, 10), P(5, 4)])], At(1), At(6)).Single().Text.ShouldBe("A 10 · B 4 · Δ −6");
+    }
+
+    [Fact]
+    public Task Cursors_are_placed_and_moved_with_the_mouse() => HeadlessApp.RunAsync(() =>
+    {
+        Avalonia.Application.Current!.RequestedThemeVariant = Avalonia.Styling.ThemeVariant.Light;
+        var chart = new ChartViewModel();
+        chart.SetData(
+        [
+            new ChartSeriesData("Presión bar", Enumerable.Range(0, 120).Select(i => P(i, 4 + Math.Sin(i / 10.0))).ToList()),
+            new ChartSeriesData("Bomba", Enumerable.Range(0, 120).Select(i => P(i, i % 40 < 25 ? 1 : 0)).ToList(), IsBoolean: true),
+        ], At(0), At(120));
+        var panel = new ChartPanel { DataContext = chart };
+        var window = new Window { Width = 900, Height = 420, Content = new Border { Padding = new Avalonia.Thickness(16), Child = panel } };
+        window.Show();
+        var trend = window.GetVisualDescendants().OfType<TrendChart>().Single();
+        window.CaptureRenderedFrame()?.Dispose(); // la gráfica sabe dónde está su área al dibujarse
+        Avalonia.Point Px(double fraction) => Avalonia.VisualExtensions.TranslatePoint(trend, new Avalonia.Point(trend.Bounds.Width * fraction, trend.Bounds.Height / 2), window)!.Value;
+
+        // Sin cursores, arrastrar hace zoom.
+        window.MouseDown(Px(0.3), Avalonia.Input.MouseButton.Left);
+        window.MouseMove(Px(0.5));
+        window.MouseUp(Px(0.5), Avalonia.Input.MouseButton.Left);
+        chart.IsZoomed.ShouldBeTrue();
+        chart.ResetZoomCommand.Execute(null);
+
+        chart.ShowCursors = true;
+        chart.Hint.ShouldStartWith("Clic para poner los cursores");
+        window.MouseDown(Px(0.3), Avalonia.Input.MouseButton.Left);
+        window.MouseUp(Px(0.3), Avalonia.Input.MouseButton.Left);
+        chart.CursorA.ShouldNotBeNull();
+        chart.CursorB.ShouldBeNull();
+        window.MouseDown(Px(0.7), Avalonia.Input.MouseButton.Left);
+        window.MouseUp(Px(0.7), Avalonia.Input.MouseButton.Left);
+        var b = chart.CursorB.ShouldNotBeNull();
+        (b > chart.CursorA).ShouldBeTrue();
+        chart.IsZoomed.ShouldBeFalse();
+
+        // Arrastrar mueve el cursor más cercano (B).
+        window.MouseDown(Px(0.68), Avalonia.Input.MouseButton.Left);
+        window.MouseMove(Px(0.8));
+        window.MouseUp(Px(0.8), Avalonia.Input.MouseButton.Left);
+        (chart.CursorB > b).ShouldBeTrue();
+        window.MouseMove(Px(0.5));
+        MainWindowTests.Capture(window, "chart-cursors.png");
+
+        chart.ShowCursors = false;
+        (chart.CursorA, chart.CursorB).ShouldBe((null, null));
+    });
+
     [Fact]
     public Task The_new_charts_are_drawn() => HeadlessApp.RunAsync(() =>
     {

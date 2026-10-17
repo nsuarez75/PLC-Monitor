@@ -37,6 +37,15 @@ public sealed class TrendChart : Control
     /// <summary>Un eje Y por serie (cada tag con su escala); los límites a mano no se aplican.</summary>
     public static readonly StyledProperty<bool> SeparateAxesProperty = AvaloniaProperty.Register<TrendChart, bool>(nameof(SeparateAxes));
 
+    /// <summary>Cursores de medida: con un clic se ponen A y B, se arrastran, y se lee Δt y el valor de cada tag (sin zoom al arrastrar).</summary>
+    public static readonly StyledProperty<bool> CursorsEnabledProperty = AvaloniaProperty.Register<TrendChart, bool>(nameof(CursorsEnabled));
+
+    public static readonly StyledProperty<DateTimeOffset?> CursorAProperty =
+        AvaloniaProperty.Register<TrendChart, DateTimeOffset?>(nameof(CursorA), defaultBindingMode: Avalonia.Data.BindingMode.TwoWay);
+
+    public static readonly StyledProperty<DateTimeOffset?> CursorBProperty =
+        AvaloniaProperty.Register<TrendChart, DateTimeOffset?>(nameof(CursorB), defaultBindingMode: Avalonia.Data.BindingMode.TwoWay);
+
     /// <summary>Muestra la leyenda (en la mini tendencia del detalle de tag sobra).</summary>
     public static readonly StyledProperty<bool> ShowLegendProperty = AvaloniaProperty.Register<TrendChart, bool>(nameof(ShowLegend), true);
 
@@ -50,7 +59,8 @@ public sealed class TrendChart : Control
 
     static TrendChart()
     {
-        AffectsRender<TrendChart>(SeriesProperty, FromProperty, ToProperty, YMinProperty, YMaxProperty, RevisionProperty, EmptyTextProperty, ShowLegendProperty, SeparateAxesProperty);
+        AffectsRender<TrendChart>(SeriesProperty, FromProperty, ToProperty, YMinProperty, YMaxProperty, RevisionProperty, EmptyTextProperty, ShowLegendProperty, SeparateAxesProperty, CursorsEnabledProperty,
+            CursorAProperty, CursorBProperty);
     }
 
     public TrendChart()
@@ -104,6 +114,24 @@ public sealed class TrendChart : Control
         set => SetValue(EmptyTextProperty, value);
     }
 
+    public bool CursorsEnabled
+    {
+        get => GetValue(CursorsEnabledProperty);
+        set => SetValue(CursorsEnabledProperty, value);
+    }
+
+    public DateTimeOffset? CursorA
+    {
+        get => GetValue(CursorAProperty);
+        set => SetValue(CursorAProperty, value);
+    }
+
+    public DateTimeOffset? CursorB
+    {
+        get => GetValue(CursorBProperty);
+        set => SetValue(CursorBProperty, value);
+    }
+
     public bool SeparateAxes
     {
         get => GetValue(SeparateAxesProperty);
@@ -120,6 +148,55 @@ public sealed class TrendChart : Control
     {
         base.OnPointerMoved(e);
         _hover = e.GetPosition(this);
+        if (_dragging is { } which && TimeAt(_hover.Value.X) is { } time)
+            SetCursor(which, time);
+        InvalidateVisual();
+    }
+
+    /// <summary>Cursor que se está arrastrando: 'A' o 'B'.</summary>
+    private char? _dragging;
+
+    private DateTimeOffset? TimeAt(double x)
+    {
+        if (_window is not { } window)
+            return null;
+        var (from, to) = window;
+        x = Math.Clamp(x, _plot.Left, _plot.Right);
+        return from + TimeSpan.FromMilliseconds((to - from).TotalMilliseconds * (x - _plot.Left) / _plot.Width);
+    }
+
+    private double? XOf(DateTimeOffset? time)
+    {
+        if (time is not { } t || _window is not { } window)
+            return null;
+        var (from, to) = window;
+        return _plot.Left + (_plot.Width * (t - from).TotalMilliseconds / (to - from).TotalMilliseconds);
+    }
+
+    private void SetCursor(char which, DateTimeOffset time)
+    {
+        if (which == 'A')
+            CursorA = time;
+        else
+            CursorB = time;
+    }
+
+    /// <summary>Clic con cursores: pone A, luego B; después mueve el más cercano. Se arrastra mientras se mantiene pulsado.</summary>
+    private void PressCursor(PointerPressedEventArgs e)
+    {
+        var x = e.GetPosition(this).X;
+        if (TimeAt(x) is not { } time)
+            return;
+        char which;
+        if (CursorA is null)
+            which = 'A';
+        else if (CursorB is null)
+            which = 'B';
+        else
+            which = Math.Abs((XOf(CursorA) ?? double.MaxValue) - x) <= Math.Abs((XOf(CursorB) ?? double.MaxValue) - x) ? 'A' : 'B';
+        SetCursor(which, time);
+        _dragging = which;
+        e.Pointer.Capture(this);
         InvalidateVisual();
     }
 
@@ -135,6 +212,11 @@ public sealed class TrendChart : Control
         base.OnPointerPressed(e);
         if (!e.GetCurrentPoint(this).Properties.IsLeftButtonPressed || !_plot.Contains(e.GetPosition(this)))
             return;
+        if (CursorsEnabled)
+        {
+            PressCursor(e);
+            return;
+        }
         _dragStart = e.GetPosition(this).X;
         e.Pointer.Capture(this);
     }
@@ -142,6 +224,12 @@ public sealed class TrendChart : Control
     protected override void OnPointerReleased(PointerReleasedEventArgs e)
     {
         base.OnPointerReleased(e);
+        if (_dragging is not null)
+        {
+            _dragging = null;
+            e.Pointer.Capture(null);
+            return;
+        }
         if (_dragStart is not { } start)
             return;
         _dragStart = null;
@@ -162,6 +250,8 @@ public sealed class TrendChart : Control
         var bounds = new Rect(Bounds.Size);
         if (bounds.Width < 40 || bounds.Height < 40)
             return;
+        // Fondo transparente: el ratón llega a toda la gráfica, también a las zonas sin dibujo.
+        context.FillRectangle(Brushes.Transparent, bounds);
         var text = Brush("App.Text", Brushes.Black);
         var muted = Brush("App.TextMuted", Brushes.Gray);
         var grid = new Pen(Brush("App.Border", Brushes.LightGray), 1);
@@ -254,6 +344,9 @@ public sealed class TrendChart : Control
             }
         }
 
+        if (CursorsEnabled)
+            DrawCursors(context, series, plot, text, muted, span);
+
         // Tramo que se está seleccionando para el zoom.
         if (_dragStart is { } dragStart && _hover is { } dragNow)
         {
@@ -276,6 +369,68 @@ public sealed class TrendChart : Control
 
         if (ShowLegend)
             DrawLegend(context, series, at ?? to, text, muted, bounds.Width);
+    }
+
+    /// <summary>Cursores A y B: líneas, tramo entre ellos y recuadro con Δt y la lectura de cada tag.</summary>
+    private void DrawCursors(DrawingContext context, ChartSeries[] series, Rect plot, IBrush text, IBrush muted, TimeSpan span)
+    {
+        var accent = Brush("App.Accent", Brushes.RoyalBlue);
+        var (xa, xb) = (XOf(CursorA), XOf(CursorB));
+        if (xa is { } a && xb is { } b)
+        {
+            var (left, right) = (Math.Clamp(Math.Min(a, b), plot.Left, plot.Right), Math.Clamp(Math.Max(a, b), plot.Left, plot.Right));
+            var tint = accent is ISolidColorBrush solid ? new SolidColorBrush(solid.Color, 0.08) : accent;
+            context.DrawRectangle(tint, null, new Rect(left, plot.Top, right - left, plot.Height));
+        }
+        foreach (var (x, label, dashed) in new[] { (xa, "A", false), (xb, "B", true) })
+        {
+            if (x is not { } px || px < plot.Left - 1 || px > plot.Right + 1)
+                continue;
+            context.DrawLine(new Pen(accent, 1.6, dashStyle: dashed ? new DashStyle([5, 3], 0) : null), new Point(px, plot.Top), new Point(px, plot.Bottom));
+            var tag = Text(label, Brushes.White, 11, FontWeight.Bold);
+            var box = new Rect(px - (tag.Width / 2) - 5, plot.Top, tag.Width + 10, tag.Height + 2);
+            context.DrawRectangle(accent, null, box, 3, 3);
+            context.DrawText(tag, new Point(box.X + 5, box.Y + 1));
+        }
+
+        // Lectura: con los dos cursores, Δt y cada tag; con uno, pide el otro.
+        var lines = new List<(FormattedText Text, IBrush? Swatch)>();
+        if (CursorA is { } ca && CursorB is { } cb)
+        {
+            var format = span > TimeSpan.FromDays(1) ? "dd/MM HH:mm:ss.fff" : "HH:mm:ss.fff";
+            lines.Add((Text($"Δt {CursorReadout.FormatDelta(cb - ca)}", text, 12, FontWeight.SemiBold), null));
+            lines.Add((Text($"A {ca.ToLocalTime().ToString(format, CultureInfo.InvariantCulture)}   B {cb.ToLocalTime().ToString(format, CultureInfo.InvariantCulture)}", muted, 11), null));
+            foreach (var row in CursorReadout.Rows(series, ca, cb))
+                lines.Add((Text($"{row.Name}: {row.Text}", text, 11.5), Brush($"App.Chart{row.ColorIndex % PaletteSize}", Brushes.SteelBlue)));
+        }
+        else
+        {
+            lines.Add((Text(CursorA is null ? "Haz clic para poner el cursor A" : "Haz clic para poner el cursor B", muted, 11.5), null));
+        }
+        var width = lines.Max(l => l.Text.Width + (l.Swatch is null ? 0 : 16)) + 16;
+        var height = lines.Sum(l => l.Text.Height + 2) + 10;
+        // En el hueco libre: a la derecha de los cursores, entre ellos o a su izquierda (si no cabe, arriba a la izquierda).
+        var marks = new[] { xa, xb }.OfType<double>().Select(v => Math.Clamp(v, plot.Left, plot.Right)).Order().ToArray();
+        var (low, high) = marks.Length == 0 ? (plot.Right, plot.Right) : (marks[0], marks[^1]);
+        var need = width + 16;
+        var x0 = plot.Right - high >= need ? plot.Right - width - 8
+            : high - low >= need ? low + 8
+            : low - plot.Left >= need ? plot.Left + 8
+            : plot.Left + 8;
+        var panel = new Rect(x0, plot.Top + 22, Math.Min(width, plot.Width - 16), height);
+        context.DrawRectangle(Brush("App.Surface", Brushes.White), new Pen(Brush("App.Border", Brushes.LightGray), 1), panel, 6, 6);
+        var y = panel.Y + 5;
+        foreach (var (line, swatch) in lines)
+        {
+            var x = panel.X + 8;
+            if (swatch is not null)
+            {
+                context.DrawRectangle(swatch, null, new Rect(x, y + (line.Height / 2) - 1.5, 10, 3), 1.5, 1.5);
+                x += 16;
+            }
+            context.DrawText(line, new Point(x, y));
+            y += line.Height + 2;
+        }
     }
 
     /// <summary>Leyenda: color, nombre y valor (al final de la ventana o bajo el cursor).</summary>

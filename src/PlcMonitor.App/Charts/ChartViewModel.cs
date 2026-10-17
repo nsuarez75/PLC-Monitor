@@ -106,6 +106,23 @@ public sealed partial class ChartViewModel : ObservableObject
         _ => "Eje Y automático",
     };
 
+    /// <summary>Cursores de medida A y B en la tendencia (al quitarlos se borran).</summary>
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(Hint))]
+    public partial bool ShowCursors { get; set; }
+
+    [ObservableProperty]
+    public partial DateTimeOffset? CursorA { get; set; }
+
+    [ObservableProperty]
+    public partial DateTimeOffset? CursorB { get; set; }
+
+    partial void OnShowCursorsChanged(bool value)
+    {
+        if (!value)
+            (CursorA, CursorB) = (null, null);
+    }
+
     /// <summary>Tendencia con un eje Y por tag.</summary>
     [ObservableProperty]
     [NotifyPropertyChangedFor(nameof(HasYAxis))]
@@ -157,6 +174,7 @@ public sealed partial class ChartViewModel : ObservableObject
         ChartKind.Histogram => "Valores de la ventana. Líneas: media (negra), ±3σ (discontinuas) y tolerancias (rojas). Pasa el ratón por una barra.",
         ChartKind.Gauges => "Valor actual de cada tag; en rojo si está fuera de los límites.",
         ChartKind.Bars => "Un grupo de barras por periodo. Pasa el ratón para ver los valores.",
+        _ when ShowCursors => "Clic para poner los cursores A y B; arrástralos para moverlos. Quita «Cursores» para volver al zoom.",
         _ => "Arrastra sobre la gráfica para ampliar un tramo; pasa el ratón para ver los valores.",
     };
 

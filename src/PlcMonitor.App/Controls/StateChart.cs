@@ -122,6 +122,8 @@ public sealed class StateChart : Control
         var bounds = new Rect(Bounds.Size);
         if (bounds.Width < 40 || bounds.Height < 40)
             return;
+        // Fondo transparente: el ratón llega a toda la gráfica, también a las zonas sin dibujo.
+        context.FillRectangle(Brushes.Transparent, bounds);
         var text = Brush("App.Text", Brushes.Black);
         var muted = Brush("App.TextMuted", Brushes.Gray);
         var border = Brush("App.Border", Brushes.LightGray);
