@@ -9,7 +9,10 @@ namespace PlcMonitor.App.ViewModels;
 /// <summary>Visor sin conexión de un CSV exportado desde la pestaña Histórico.</summary>
 public sealed partial class CsvViewerViewModel(IDialogs dialogs) : ObservableObject
 {
-    public ChartViewModel Chart { get; } = new() { EmptyText = "Marca uno o más tags" };
+    /// <summary>Tipo de gráfica y sus opciones sobre los datos del fichero.</summary>
+    public ChartAnalysisViewModel Analysis { get; } = new("Marca uno o más tags");
+
+    public ChartViewModel Chart => Analysis.Chart;
 
     [ObservableProperty]
     public partial string Title { get; private set; } = "Visor de histórico";
@@ -26,7 +29,7 @@ public sealed partial class CsvViewerViewModel(IDialogs dialogs) : ObservableObj
         try
         {
             var content = HistoryCsv.Load(path);
-            Chart.SetData(content.Series, content.From, content.To, selectFirst: 4);
+            Analysis.SetData(content.Series, content.From, content.To, selectFirst: 4);
             Title = Path.GetFileName(path);
             Error = "";
             var range = content.From is { } from && content.To is { } to

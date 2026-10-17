@@ -61,6 +61,39 @@ public static class PeriodBars
     };
 
     /// <summary>
+    /// Barras calculadas aquí a partir de los puntos (CSV o histórico ya leído): un punto por periodo con valores, con su
+    /// inicio como hora. La media es la de las muestras; el incremento suma lo que sube entre muestras seguidas (si baja,
+    /// el contador se ha reiniciado y cuenta su valor) y se apunta al periodo de la muestra nueva.
+    /// </summary>
+    public static List<ChartPoint> Compute(IReadOnlyList<ChartPoint> points, BarPeriod period, BarMetric metric, int shiftStartHour)
+    {
+        var groups = new SortedDictionary<DateTimeOffset, List<double>>();
+        double? previous = null;
+        foreach (var point in points)
+        {
+            if (point.Value is not { } value)
+                continue;
+            var start = Start(point.Time, period, shiftStartHour);
+            if (!groups.TryGetValue(start, out var values))
+                groups[start] = values = [];
+            if (metric != BarMetric.Increase)
+                values.Add(value);
+            else if (previous is { } p)
+                values.Add(value >= p ? value - p : value);
+            else
+                values.Add(0);
+            previous = value;
+        }
+        return groups.Select(g => new ChartPoint(g.Key, metric switch
+        {
+            BarMetric.Max => g.Value.Max(),
+            BarMetric.Min => g.Value.Min(),
+            BarMetric.Increase => g.Value.Sum(),
+            _ => g.Value.Average(),
+        })).ToList();
+    }
+
+    /// <summary>
     /// Incremento de un contador por periodo a partir del último valor de cada uno (el primero solo sirve de referencia):
     /// la diferencia con el anterior o, si el contador se ha reiniciado (baja), su valor actual.
     /// </summary>

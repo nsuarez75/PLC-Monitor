@@ -1,0 +1,72 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:vm="using:PlcMonitor.App.ViewModels"
+             xmlns:v="using:PlcMonitor.App.Views"
+             x:Class="PlcMonitor.App.Views.ChartAnalysisPanel"
+             x:DataType="vm:ChartAnalysisViewModel">
+  <!-- Tipo de gráfica y sus opciones sobre datos ya cargados (CSV o histórico), y la gráfica. -->
+  <DockPanel>
+    <WrapPanel DockPanel.Dock="Top" Margin="0,0,0,6">
+      <StackPanel Orientation="Horizontal" Spacing="8" Margin="0,0,18,6">
+        <TextBlock Text="Gráfica" Classes="muted" VerticalAlignment="Center" />
+        <ComboBox ItemsSource="{x:Static vm:ChartAnalysisViewModel.Kinds}" SelectedItem="{Binding Kind}" MinWidth="220"
+                  ToolTip.Tip="{Binding Kind.Description}">
+          <ComboBox.ItemTemplate>
+            <DataTemplate x:DataType="vm:ChartKindChoice">
+              <StackPanel Spacing="2" Margin="0,2">
+                <TextBlock Text="{Binding Text}" FontWeight="Medium" />
+                <TextBlock Text="{Binding Description}" Classes="muted" FontSize="11.5" TextWrapping="Wrap" MaxWidth="460" />
+              </StackPanel>
+            </DataTemplate>
+          </ComboBox.ItemTemplate>
+          <ComboBox.SelectionBoxItemTemplate>
+            <DataTemplate x:DataType="vm:ChartKindChoice">
+              <TextBlock Text="{Binding Text}" />
+            </DataTemplate>
+          </ComboBox.SelectionBoxItemTemplate>
+        </ComboBox>
+      </StackPanel>
+
+      <StackPanel Orientation="Horizontal" Spacing="8" Margin="0,0,18,6" IsVisible="{Binding IsXY}">
+        <TextBlock Text="Eje X" Classes="muted" VerticalAlignment="Center" />
+        <ComboBox ItemsSource="{Binding Names}" SelectedItem="{Binding XTag}" MinWidth="160" />
+      </StackPanel>
+
+      <StackPanel Orientation="Horizontal" Spacing="8" Margin="0,0,18,6" IsVisible="{Binding IsHistogram}">
+        <TextBlock Text="Tolerancias" Classes="muted" VerticalAlignment="Center" />
+        <NumericUpDown Value="{Binding LowLimit}" Width="120" FormatString="0.###" PlaceholderText="LIE" />
+        <NumericUpDown Value="{Binding HighLimit}" Width="120" FormatString="0.###" PlaceholderText="LSE" />
+      </StackPanel>
+
+      <StackPanel Orientation="Horizontal" Spacing="8" Margin="0,0,18,6" IsVisible="{Binding IsBars}">
+        <ComboBox ItemsSource="{x:Static vm:PeriodBarsViewModel.Metrics}" SelectedItem="{Binding BarMetric}" MinWidth="180" />
+        <TextBlock Text="por" Classes="muted" VerticalAlignment="Center" />
+        <ComboBox ItemsSource="{x:Static vm:PeriodBarsViewModel.Periods}" SelectedItem="{Binding BarPeriod}" MinWidth="120" />
+        <StackPanel Orientation="Horizontal" Spacing="8" IsVisible="{Binding IsShiftPeriod}">
+          <TextBlock Text="1.er turno a las" Classes="muted" VerticalAlignment="Center" />
+          <NumericUpDown Value="{Binding ShiftStartHour}" Minimum="0" Maximum="23" Increment="1" FormatString="0" Width="100" />
+        </StackPanel>
+      </StackPanel>
+
+      <StackPanel Orientation="Horizontal" Spacing="8" Margin="0,0,0,6" IsVisible="{Binding CanTrigger}">
+        <CheckBox Content="Disparo" IsChecked="{Binding TriggerEnabled}"
+                  ToolTip.Tip="Solo los tramos en que un tag cumple una condición, con segundos antes y después" />
+        <StackPanel Orientation="Horizontal" Spacing="8" IsVisible="{Binding TriggerEnabled}">
+          <ComboBox ItemsSource="{Binding Names}" SelectedItem="{Binding TriggerTag}" MinWidth="150" PlaceholderText="tag" />
+          <ComboBox ItemsSource="{x:Static vm:TagDetailsViewModel.Conditions}" SelectedItem="{Binding TriggerCondition}" MinWidth="64" />
+          <TextBox Text="{Binding TriggerValue}" Width="80" PlaceholderText="valor" />
+          <TextBlock Text="−" Classes="muted" VerticalAlignment="Center" ToolTip.Tip="Segundos antes de cumplirse" />
+          <NumericUpDown Value="{Binding TriggerBeforeSeconds}" Minimum="0" Maximum="3600" Increment="1" FormatString="0.#" Width="100"
+                         ToolTip.Tip="Segundos antes de cumplirse" />
+          <TextBlock Text="+" Classes="muted" VerticalAlignment="Center" ToolTip.Tip="Segundos después de dejar de cumplirse" />
+          <NumericUpDown Value="{Binding TriggerHoldSeconds}" Minimum="0" Maximum="3600" Increment="1" FormatString="0.#" Width="100"
+                         ToolTip.Tip="Segundos después de dejar de cumplirse" />
+          <TextBlock Text="s" Classes="muted" VerticalAlignment="Center" />
+        </StackPanel>
+      </StackPanel>
+    </WrapPanel>
+    <TextBlock DockPanel.Dock="Top" Text="{Binding Note}" Classes="muted" TextWrapping="Wrap" Margin="0,0,0,8"
+               IsVisible="{Binding Note, Converter={x:Static StringConverters.IsNotNullOrEmpty}}" />
+    <v:ChartPanel DataContext="{Binding Chart}" />
+  </DockPanel>
+</UserControl>

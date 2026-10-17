@@ -74,8 +74,10 @@ public sealed partial class HistoryViewModel(IAgentContext context, Func<DeviceV
 
     public ObservableCollection<HistoryRowViewModel> Rows { get; } = [];
 
-    /// <summary>Gráfica del resultado (los tags consultados, todos marcados).</summary>
-    public ChartViewModel Chart { get; } = new() { EmptyText = "Consulta el histórico para ver la gráfica" };
+    /// <summary>Gráfica del resultado (los tags consultados, todos marcados) con el tipo y las opciones elegidos.</summary>
+    public ChartAnalysisViewModel Analysis { get; } = new("Consulta el histórico para ver la gráfica");
+
+    public ChartViewModel Chart => Analysis.Chart;
 
     /// <summary>Muestra la tabla de puntos además de la gráfica.</summary>
     [ObservableProperty]
@@ -107,7 +109,7 @@ public sealed partial class HistoryViewModel(IAgentContext context, Func<DeviceV
     {
         Rows.Clear();
         Summary = "";
-        Chart.SetData([]);
+        Analysis.SetData([]);
         RefreshTags();
     }
 
@@ -156,13 +158,13 @@ public sealed partial class HistoryViewModel(IAgentContext context, Func<DeviceV
                          .OrderByDescending(r => r.Timestamp))
                 Rows.Add(row);
             var types = target.Tags.ToDictionary(t => t.Name, t => t.IsBoolean, StringComparer.Ordinal);
-            Chart.SetData(
+            Analysis.SetData(
                 reply.Series.Select(s => new ChartSeriesData(
                     s.Tag,
                     s.Points.Select(p => new ChartPoint(p.Timestamp.ToDateTimeOffset(),
                         p.HasNumber && p.Quality is Quality.Good or Quality.Uncertain ? p.Number : null)).ToArray(),
                     Step: Aggregate.Value is null,
-                    IsBoolean: types.GetValueOrDefault(s.Tag))),
+                    IsBoolean: types.GetValueOrDefault(s.Tag))).ToArray(),
                 request.From.ToDateTimeOffset(), request.To.ToDateTimeOffset());
             var truncated = reply.Series.Any(s => s.Truncated);
             Summary = $"{Rows.Count} puntos de {tags.Length} tags · {Range.Text.ToLowerInvariant()}" +

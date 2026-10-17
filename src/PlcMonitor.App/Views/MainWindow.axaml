@@ -308,7 +308,7 @@
 
                 <Panel>
                 <Border Classes="card" Padding="16" IsVisible="{Binding !ShowTable}">
-                  <v:ChartPanel DataContext="{Binding Chart}" MinHeight="320" />
+                  <v:ChartAnalysisPanel DataContext="{Binding Analysis}" MinHeight="320" />
                 </Border>
 
                 <Border Classes="card" ClipToBounds="True" IsVisible="{Binding ShowTable}">

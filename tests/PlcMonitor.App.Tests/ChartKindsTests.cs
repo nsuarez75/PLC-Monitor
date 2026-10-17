@@ -376,6 +376,85 @@ public sealed class ChartKindsTests : IDisposable
     }
 
     [Fact]
+    public void Local_bars_group_by_period()
+    {
+        var day = new DateTimeOffset(new DateTime(2026, 10, 17, 8, 0, 0, DateTimeKind.Local));
+        ChartPoint L(double minutes, double? v) => new(day.AddMinutes(minutes), v);
+        // Contador: sube 10 en la 1.ª hora, se reinicia y sube 5 + 3 en la 2.ª.
+        ChartPoint[] counter = [L(0, 100), L(30, 105), L(59, 110), L(70, 2), L(80, 5), L(90, null), L(100, 8)];
+
+        PeriodBars.Compute(counter, BarPeriod.Hour, BarMetric.Increase, 6).ShouldBe([new(day, 10), new(day.AddHours(1), 8)]);
+        PeriodBars.Compute(counter, BarPeriod.Hour, BarMetric.Max, 6).ShouldBe([new(day, 110), new(day.AddHours(1), 8)]);
+        PeriodBars.Compute(counter, BarPeriod.Hour, BarMetric.Min, 6).ShouldBe([new(day, 100), new(day.AddHours(1), 2)]);
+        PeriodBars.Compute(counter, BarPeriod.Shift, BarMetric.Average, 6).ShouldHaveSingleItem().Time.ShouldBe(day.AddHours(-2));
+    }
+
+    [Fact]
+    public void Analysis_switches_kinds_over_the_same_data()
+    {
+        // Prensa: «ciclo» activo de 10 a 20 s y de 60 a 70 s; fuerza sube con la posición durante cada ciclo.
+        var clock = new List<ChartPoint> { P(0, 0), P(10, 1), P(20, 0), P(60, 1), P(70, 0) };
+        var position = Enumerable.Range(0, 100).Select(i => P(i, i % 50 < 10 ? 0 : i % 50 - 10)).ToList();
+        var force = Enumerable.Range(0, 100).Select(i => P(i, 2 * (i % 50))).ToList();
+        using var analysis = new ChartAnalysisViewModel("Sin datos");
+        analysis.SetData(
+        [
+            new ChartSeriesData("ciclo", clock, IsBoolean: true),
+            new ChartSeriesData("posicion", position),
+            new ChartSeriesData("fuerza", force),
+        ], At(0), At(100));
+        ChartAnalysisViewModel.Kinds.ShouldNotContain(k => k.Value == ChartKind.Gauges);
+        analysis.Names.ShouldBe(["ciclo", "posicion", "fuerza"]);
+        analysis.Chart.Kind.ShouldBe(ChartKind.Trend);
+        analysis.Chart.Series.Count.ShouldBe(3);
+        analysis.Chart.Options[0].IsSelected = false; // lo desmarcado se conserva al cambiar de tipo
+
+        analysis.Kind = ChartKindChoice.For(ChartKind.Cycles);
+        analysis.Note.ShouldContain("necesitan un disparo");
+        analysis.Chart.Curves.ShouldBeEmpty();
+        analysis.TriggerEnabled = true;
+        analysis.Note.ShouldContain("Disparo incompleto");
+        analysis.TriggerTag = "ciclo";
+        analysis.TriggerValue.ShouldBe("true");
+        analysis.TriggerBeforeSeconds = 2;
+        analysis.Note.ShouldBeEmpty();
+        analysis.Chart.Caption.ShouldBe("2 ciclos");
+        analysis.Chart.Curves.Count.ShouldBe(4); // 2 tags × 2 ciclos
+        analysis.Chart.Curves.ShouldAllBe(c => c.Points[0].X == -2);
+        analysis.Chart.Options.Single(o => o.Name == "ciclo").IsSelected.ShouldBeFalse();
+
+        analysis.Kind = ChartKindChoice.For(ChartKind.XY);
+        analysis.XTag.ShouldBe("ciclo");
+        analysis.XTag = "posicion";
+        analysis.Chart.XLabel.ShouldBe("X: posicion");
+        analysis.Chart.Options.Select(o => o.Name).ShouldBe(["ciclo", "fuerza"]);
+        analysis.Chart.Curves.Where(c => c.Name == "fuerza").Count().ShouldBe(2); // con disparo, una curva por ciclo
+
+        // Sin disparo, una sola curva con todo el periodo de los datos (no la ventana en vivo).
+        analysis.TriggerEnabled = false;
+        var whole = analysis.Chart.Curves.Single(c => c.Name == "fuerza");
+        whole.Points.Count(p => p.Y is not null).ShouldBe(100);
+        analysis.TriggerEnabled = true;
+
+        analysis.Kind = ChartKindChoice.For(ChartKind.Histogram);
+        analysis.LowLimit = 0;
+        analysis.HighLimit = 100;
+        (analysis.Chart.LowLimit, analysis.Chart.HighLimit).ShouldBe((0, 100));
+
+        analysis.Kind = ChartKindChoice.For(ChartKind.Bars);
+        analysis.CanTrigger.ShouldBeFalse();
+        analysis.Chart.Kind.ShouldBe(ChartKind.Bars);
+        analysis.Chart.Options.Single(o => o.Name == "fuerza").Points.ShouldNotBeEmpty();
+
+        analysis.Kind = ChartKindChoice.For(ChartKind.Trend);
+        analysis.TriggerEnabled = false;
+        analysis.Chart.Options.Single(o => o.Name == "fuerza").Points.Count.ShouldBe(100);
+
+        analysis.SetData([]);
+        analysis.Chart.Options.ShouldBeEmpty();
+    }
+
+    [Fact]
     public Task The_new_charts_are_drawn() => HeadlessApp.RunAsync(() =>
     {
         Avalonia.Application.Current!.RequestedThemeVariant = Avalonia.Styling.ThemeVariant.Light;

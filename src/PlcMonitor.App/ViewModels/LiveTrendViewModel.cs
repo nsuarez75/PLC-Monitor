@@ -8,7 +8,8 @@ namespace PlcMonitor.App.ViewModels;
 /// <summary>
 /// Puntos de un tag para una gráfica: la lista en vivo del tag (la misma, que va creciendo) o lo leído del histórico.
 /// </summary>
-public sealed record TrendSource(List<ChartPoint> Points, bool IsBoolean)
+/// <param name="Step">Escalón (valores por cambio, en bruto) o rectas entre puntos (agregados).</param>
+public sealed record TrendSource(List<ChartPoint> Points, bool IsBoolean, bool Step = true)
 {
     public static TrendSource? Of(TagViewModel? tag) => tag is null ? null : new TrendSource(tag.TrendPoints, tag.IsBoolean);
 }
@@ -18,7 +19,7 @@ public sealed record TrendSource(List<ChartPoint> Points, bool IsBoolean)
 /// reloj (se pausa al hacer zoom o con el botón; «Seguir» quita el zoom y continúa). Del histórico, con una ventana
 /// fija (<see cref="FixedWindow"/>) y los puntos leídos del agente.
 /// </summary>
-public sealed partial class LiveTrendViewModel : ObservableObject
+public sealed partial class LiveTrendViewModel : ObservableObject, IDisposable
 {
     private readonly Func<IReadOnlyList<(string Name, TrendSource? Tag)>> _tags;
     private readonly TrendTrigger? _trigger;
@@ -37,21 +38,37 @@ public sealed partial class LiveTrendViewModel : ObservableObject
     /// <param name="trigger">Tendencia de disparo: solo se ven los tramos en que se cumple (más el tiempo extra).</param>
     /// <param name="triggerTag">Los puntos del tag disparo (null si no existe).</param>
     /// <param name="kind">Tipo de gráfica; en X-Y el primer tag es el eje X.</param>
+    /// <param name="chart">Gráfica a alimentar (la de un panel que ya existe); null = una nueva.</param>
     public LiveTrendViewModel(Func<IReadOnlyList<(string Name, TrendSource? Tag)>> tags, TrendTrigger? trigger = null, Func<TrendSource?>? triggerTag = null,
-        ChartKind kind = ChartKind.Trend)
+        ChartKind kind = ChartKind.Trend, ChartViewModel? chart = null)
     {
         _tags = tags;
         _trigger = trigger;
         _triggerTag = triggerTag;
         _kind = kind;
+        Chart = chart ?? new ChartViewModel { EmptyText = "Aún no hay valores de estos tags" };
         Chart.Kind = kind;
-        Chart.ZoomChanged += (_, _) => Paused = Chart.IsZoomed;
-        // Marcar o desmarcar tags cambia las curvas.
-        Chart.PropertyChanged += (_, e) =>
-        {
-            if (e.PropertyName == nameof(ChartViewModel.Series) && UsesCurves)
-                BuildCurves(FixedWindow?.To ?? DateTimeOffset.UtcNow);
-        };
+        Chart.Curves = [];
+        Chart.Caption = "";
+        Chart.XLabel = "";
+        Chart.ZoomChanged += OnZoomChanged;
+        Chart.PropertyChanged += OnChartChanged;
+    }
+
+    private void OnZoomChanged(object? sender, EventArgs e) => Paused = Chart.IsZoomed;
+
+    // Marcar o desmarcar tags cambia las curvas.
+    private void OnChartChanged(object? sender, System.ComponentModel.PropertyChangedEventArgs e)
+    {
+        if (e.PropertyName == nameof(ChartViewModel.Series) && UsesCurves)
+            BuildCurves(FixedWindow?.To ?? DateTimeOffset.UtcNow);
+    }
+
+    /// <summary>Deja de seguir la gráfica (cuando otra la sustituye en el mismo panel).</summary>
+    public void Dispose()
+    {
+        Chart.ZoomChanged -= OnZoomChanged;
+        Chart.PropertyChanged -= OnChartChanged;
     }
 
     /// <summary>Ciclos y X-Y dibujan curvas calculadas, no las series en el tiempo.</summary>
@@ -91,7 +108,7 @@ public sealed partial class LiveTrendViewModel : ObservableObject
         new("1 h", TimeSpan.FromHours(1)),
     ];
 
-    public ChartViewModel Chart { get; } = new() { EmptyText = "Aún no hay valores de estos tags" };
+    public ChartViewModel Chart { get; }
 
     [ObservableProperty]
     public partial Choice<TimeSpan> Window { get; set; } = Windows[1];
@@ -107,7 +124,8 @@ public sealed partial class LiveTrendViewModel : ObservableObject
     public partial string Missing { get; private set; } = "";
 
     /// <summary>Vuelve a enlazar las series con los tags (al abrir y cuando el agente reconfigura o se reconecta).</summary>
-    public void RefreshTags()
+    /// <param name="selectFirst">Sin nada marcado aún, cuántos tags se marcan.</param>
+    public void RefreshTags(int selectFirst = int.MaxValue)
     {
         var tags = _tags();
         var now = FixedWindow?.To ?? DateTimeOffset.UtcNow;
@@ -128,8 +146,8 @@ public sealed partial class LiveTrendViewModel : ObservableObject
             Chart.XLabel = "s desde el disparo";
         }
         Chart.SetData(
-            plotted.Where(t => t.Tag is not null).Select(t => new ChartSeriesData(t.Name, Shown(t.Tag!), Step: true, t.Tag!.IsBoolean)),
-            from, now);
+            plotted.Where(t => t.Tag is not null).Select(t => new ChartSeriesData(t.Name, Shown(t.Tag!), t.Tag!.Step, t.Tag!.IsBoolean)),
+            from, now, selectFirst);
         var missing = tags.Where(t => t.Tag is null).Select(t => t.Name).ToList();
         if (_trigger is not null && _triggerSource is null)
             missing.Add($"{_trigger.Ref} (disparo)");
@@ -226,7 +244,7 @@ public sealed partial class LiveTrendViewModel : ObservableObject
         {
             var x = new ChartSeries(_xName, xTag.Points);
             var windows = _trigger is null
-                ? [(now - Window.Value, now)]
+                ? [FixedWindow ?? (now - Window.Value, now)]
                 : activations.Select(a => XYData.CycleWindow(a, before, hold, now)).ToList();
             foreach (var option in options)
             {

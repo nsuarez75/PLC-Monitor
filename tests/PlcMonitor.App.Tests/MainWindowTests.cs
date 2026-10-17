@@ -336,6 +336,19 @@ public class MainWindowTests
         Avalonia.Application.Current.RequestedThemeVariant = Avalonia.Styling.ThemeVariant.Dark;
         Capture(window, "csv-viewer-dark.png");
         Avalonia.Application.Current.RequestedThemeVariant = Avalonia.Styling.ThemeVariant.Light;
+        viewer.Chart.ResetZoomCommand.Execute(null);
+        viewer.Chart.AutoY = true;
+        viewer.Analysis.Kind = ChartKindChoice.For(PlcMonitor.App.Charts.ChartKind.Histogram);
+        viewer.Analysis.LowLimit = 15;
+        viewer.Analysis.HighLimit = 26;
+        viewer.Chart.Options.Single(o => o.Name == "presion").IsSelected = false;
+        window.UpdateLayout();
+        Capture(window, "csv-viewer-histogram.png");
+        viewer.Analysis.Kind = ChartKindChoice.For(PlcMonitor.App.Charts.ChartKind.XY);
+        viewer.Analysis.XTag = "presion";
+        viewer.Chart.Options.Single().IsSelected = true;
+        window.UpdateLayout();
+        Capture(window, "csv-viewer-xy.png");
         File.Delete(path);
     });
 

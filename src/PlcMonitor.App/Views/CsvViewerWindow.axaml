@@ -28,7 +28,7 @@
     <TextBlock DockPanel.Dock="Top" Text="{Binding Error}" Classes="error" TextWrapping="Wrap" Margin="0,0,0,10"
                IsVisible="{Binding Error, Converter={x:Static StringConverters.IsNotNullOrEmpty}}" />
     <Border Classes="card" Padding="16">
-      <v:ChartPanel DataContext="{Binding Chart}" />
+      <v:ChartAnalysisPanel DataContext="{Binding Analysis}" />
     </Border>
   </DockPanel>
 </Window>
