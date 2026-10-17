@@ -71,6 +71,59 @@ public sealed partial class LiveTrendViewModel : ObservableObject, IDisposable
         Chart.PropertyChanged -= OnChartChanged;
     }
 
+    // ---- Ciclo de referencia (solo en ciclos superpuestos) ----
+
+    /// <summary>Ciclo de referencia de cada tag (por nombre en la leyenda), con X = segundos desde el disparo.</summary>
+    public Dictionary<string, IReadOnlyList<XYPoint>> Reference { get; init; } = new(StringComparer.Ordinal);
+
+    /// <summary>Margen de la banda: en unidades del tag o, con <see cref="TolerancePercent"/>, % del rango de la referencia.</summary>
+    [ObservableProperty]
+    public partial decimal Tolerance { get; set; } = 5;
+
+    [ObservableProperty]
+    public partial bool TolerancePercent { get; set; } = true;
+
+    public bool CanUseReference => _kind == ChartKind.Cycles;
+
+    public bool HasReference => Reference.Count > 0;
+
+    /// <summary>La referencia o su tolerancia han cambiado (para guardarlas en la vista).</summary>
+    public event EventHandler? ReferenceChanged;
+
+    partial void OnToleranceChanged(decimal value) => OnReferenceSettingsChanged();
+
+    partial void OnTolerancePercentChanged(bool value) => OnReferenceSettingsChanged();
+
+    private void OnReferenceSettingsChanged()
+    {
+        if (!CanUseReference)
+            return;
+        BuildCurves(FixedWindow?.To ?? DateTimeOffset.UtcNow);
+        ReferenceChanged?.Invoke(this, EventArgs.Empty);
+    }
+
+    /// <summary>Fija como referencia el último ciclo de cada tag marcado.</summary>
+    [RelayCommand]
+    private void SetReference()
+    {
+        var latest = Chart.Curves.Where(c => c.Highlight && c.Points.Any(p => p.Y is not null)).ToList();
+        if (latest.Count == 0)
+            return;
+        foreach (var curve in latest)
+            Reference[curve.Name] = ReferenceCycles.Simplify(curve.Points);
+        OnPropertyChanged(nameof(HasReference));
+        OnReferenceSettingsChanged();
+    }
+
+    [RelayCommand]
+    private void ClearReference()
+    {
+        Reference.Clear();
+        Chart.Bands = [];
+        OnPropertyChanged(nameof(HasReference));
+        OnReferenceSettingsChanged();
+    }
+
     /// <summary>Ciclos y X-Y dibujan curvas calculadas, no las series en el tiempo.</summary>
     private bool UsesCurves => _kind is ChartKind.Cycles or ChartKind.XY;
 
@@ -232,17 +285,34 @@ public sealed partial class LiveTrendViewModel : ObservableObject, IDisposable
         var options = Chart.SelectedOptions.ToArray();
         if (_kind == ChartKind.Cycles)
         {
+            // Ciclos fuera de la banda de su referencia (por índice de activación: basta con que se salga un tag).
+            var outside = new bool[activations.Count];
+            var bands = new List<ReferenceBand>();
             foreach (var option in options)
             {
                 var series = new ChartSeries(option.Name, option.Points, option.Step);
+                var band = Reference.TryGetValue(option.Name, out var reference)
+                    ? new ReferenceBand(option.Name, option.ColorIndex, reference, ReferenceCycles.Tolerance(reference, (double)Tolerance, TolerancePercent), option.Step)
+                    : null;
+                if (band is not null)
+                    bands.Add(band);
                 for (var i = 0; i < activations.Count; i++)
                 {
                     var (from, to) = XYData.CycleWindow(activations[i], before, hold, now);
-                    curves.Add(new XYCurve(option.Name, XYData.Cycle(series, activations[i].On, from, to), option.ColorIndex,
-                        Highlight: i == activations.Count - 1, Step: option.Step, IsBoolean: option.IsBoolean));
+                    var points = XYData.Cycle(series, activations[i].On, from, to);
+                    var isOut = band is not null && !ReferenceCycles.IsInside(points, band, option.Step);
+                    outside[i] |= isOut;
+                    curves.Add(new XYCurve(option.Name, points, option.ColorIndex,
+                        Highlight: i == activations.Count - 1, Step: option.Step, IsBoolean: option.IsBoolean, IsOut: isOut));
                 }
             }
-            Chart.Caption = activations.Count switch { 0 => "", 1 => "1 ciclo", var n => $"{n} ciclos{(n == MaxCycles ? " (los últimos)" : "")}" };
+            Chart.Bands = bands;
+            var count = activations.Count switch { 0 => "", 1 => "1 ciclo", var n => $"{n} ciclos{(n == MaxCycles ? " (los últimos)" : "")}" };
+            var outCount = outside.Count(o => o);
+            Chart.CaptionAlarm = outside.Length > 0 && outside[^1];
+            Chart.Caption = bands.Count == 0 || count.Length == 0 ? count
+                : Chart.CaptionAlarm ? $"{count} · {outCount} fuera de tolerancia · ¡el último se sale!"
+                : $"{count} · {outCount} fuera de tolerancia";
         }
         else if (_xSource is { } xTag)
         {

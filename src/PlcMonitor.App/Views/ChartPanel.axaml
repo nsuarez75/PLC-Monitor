@@ -50,7 +50,7 @@
     </Grid>
     <Grid DockPanel.Dock="Bottom" ColumnDefinitions="*,Auto" ColumnSpacing="12" Margin="2,4,0,0">
       <TextBlock Classes="muted" FontSize="11" Text="{Binding Hint}" TextTrimming="CharacterEllipsis" />
-      <TextBlock Grid.Column="1" Classes="muted" FontSize="11" FontWeight="SemiBold" Text="{Binding Caption}" />
+      <TextBlock Grid.Column="1" Classes="muted" Classes.error="{Binding CaptionAlarm}" FontSize="11" FontWeight="SemiBold" Text="{Binding Caption}" />
     </Grid>
     <Panel>
       <c:TrendChart x:Name="Chart" MinHeight="220" IsVisible="{Binding IsTrend}"
@@ -62,7 +62,7 @@
                     Series="{Binding Series}" From="{Binding From}" To="{Binding To}"
                     Revision="{Binding Revision}" EmptyText="{Binding EmptyText}" />
       <c:XYChart MinHeight="220" IsVisible="{Binding IsXY}"
-                 Curves="{Binding Curves}" XLabel="{Binding XLabel}" ZeroLine="{Binding IsCycles}"
+                 Curves="{Binding Curves}" Bands="{Binding Bands}" XLabel="{Binding XLabel}" ZeroLine="{Binding IsCycles}"
                  YMin="{Binding YMin}" YMax="{Binding YMax}" Revision="{Binding Revision}" EmptyText="{Binding EmptyText}" />
       <c:HistogramChart MinHeight="220" IsVisible="{Binding IsHistogram}"
                         Series="{Binding Series}" From="{Binding From}" To="{Binding To}"

@@ -731,7 +731,20 @@ public sealed partial class TrendsViewModel : ObservableObject, IDisposable
         live.Chart.GaugeStyle = view.GaugeStyle;
         live.Chart.YMinInput = YMin;
         live.Chart.YMaxInput = YMax;
+        // Ciclo de referencia guardado con la vista; lo que se cambie en la gráfica se vuelve a guardar.
+        foreach (var (name, points) in view.ReferenceCycles ?? [])
+            live.Reference[name] = points.Where(p => p.Length == 2).Select(p => new XYPoint(p[0], p[1])).ToList();
+        live.Tolerance = (decimal)view.ReferenceTolerance;
+        live.TolerancePercent = view.ReferenceTolerancePercent;
         live.RefreshTags();
+        live.ReferenceChanged += (_, _) =>
+        {
+            view.ReferenceCycles = live.Reference.Count == 0 ? null
+                : live.Reference.ToDictionary(r => r.Key, r => r.Value.Where(p => p.Y is not null).Select(p => new[] { p.X, p.Y!.Value }).ToList());
+            view.ReferenceTolerance = (double)live.Tolerance;
+            view.ReferenceTolerancePercent = live.TolerancePercent;
+            Persist();
+        };
         Live = live;
     }
 

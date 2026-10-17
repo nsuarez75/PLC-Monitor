@@ -7,7 +7,9 @@ public readonly record struct XYPoint(double X, double? Y);
 /// Curva de una gráfica con eje X numérico (ciclos superpuestos y X-Y). Las curvas de un mismo tag comparten color; la
 /// resaltada (<see cref="Highlight"/>, el último ciclo) se dibuja opaca y encima, las demás tenues.
 /// </summary>
-public sealed record XYCurve(string Name, IReadOnlyList<XYPoint> Points, int ColorIndex, bool Highlight = true, bool Step = false, bool IsBoolean = false);
+/// <param name="IsOut">Se sale de la banda de tolerancia de su referencia: se dibuja en rojo.</param>
+public sealed record XYCurve(string Name, IReadOnlyList<XYPoint> Points, int ColorIndex, bool Highlight = true, bool Step = false, bool IsBoolean = false,
+    bool IsOut = false);
 
 /// <summary>Activación del disparo: cuándo empezó a cumplirse y cuándo dejó de hacerlo (null = sigue).</summary>
 public readonly record struct TriggerActivation(DateTimeOffset On, DateTimeOffset? Off);

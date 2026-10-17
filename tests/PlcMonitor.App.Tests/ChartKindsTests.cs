@@ -510,6 +510,96 @@ public sealed class ChartKindsTests : IDisposable
     });
 
     [Fact]
+    public void Reference_band_tolerance_and_checks()
+    {
+        XYPoint[] reference = [new(0, 0), new(1, 10), new(2, 20), new(3, 0)];
+        ReferenceCycles.Tolerance(reference, 2, percent: false).ShouldBe(2);
+        ReferenceCycles.Tolerance(reference, 5, percent: true).ShouldBe(1); // 5 % de un rango de 20
+
+        ReferenceCycles.ValueAt(reference, 1.5, step: true).ShouldBe(10);
+        ReferenceCycles.ValueAt(reference, 1.5, step: false).ShouldBe(15);
+        ReferenceCycles.ValueAt(reference, -1, step: true).ShouldBeNull();
+
+        var band = new ReferenceBand("v", 0, reference, Tolerance: 1, Step: true);
+        ReferenceCycles.IsInside([new(0, 0.5), new(1, 10.8), new(2, 19.2), new(3, 0)], band, cycleStep: true).ShouldBeTrue();
+        ReferenceCycles.IsInside([new(0, 0), new(1, 12), new(2, 20), new(3, 0)], band, cycleStep: true).ShouldBeFalse();
+        // Un escalón de la referencia que el ciclo no sigue (el ciclo no tiene punto en x = 2) también cuenta.
+        ReferenceCycles.IsInside([new(0, 0), new(1, 10), new(2.9, 20)], band, cycleStep: true).ShouldBeFalse();
+        // Sin tramo común no se considera fuera.
+        ReferenceCycles.IsInside([new(10, 99), new(11, 99)], band, cycleStep: true).ShouldBeTrue();
+
+        var long_ = Enumerable.Range(0, 10_000).Select(i => new XYPoint(i * 0.01, i == 5000 ? 999 : Math.Sin(i / 100.0))).ToList();
+        var simple = ReferenceCycles.Simplify(long_);
+        simple.Count.ShouldBeLessThanOrEqualTo(ReferenceCycles.MaxStoredPoints);
+        simple.ShouldContain(p => p.Y == 999); // conserva el pico
+        simple.Select(p => p.X).ShouldBeInOrder();
+    }
+
+    [Fact]
+    public void Cycles_out_of_the_reference_band_are_flagged_and_the_reference_is_saved()
+    {
+        // Cuatro ciclos de 10 s; el cuarto empuja 3 veces más fuerte.
+        var path = Path.Combine(_dir, "prensa.csv");
+        var start = new DateTimeOffset(2026, 10, 17, 8, 0, 0, TimeSpan.Zero);
+        var csv = new System.Text.StringBuilder("device,tag,timestamp,value,quality\n");
+        for (var cycle = 0; cycle < 4; cycle++)
+        {
+            for (var s = 0; s < 20; s++)
+            {
+                var t = start.AddSeconds((cycle * 20) + s).UtcDateTime.ToString("yyyy-MM-ddTHH:mm:ss.fffZ", System.Globalization.CultureInfo.InvariantCulture);
+                csv.Append(System.Globalization.CultureInfo.InvariantCulture, $"prensa,ciclo,{t},{(s < 10 ? "true" : "false")},Good\n");
+                csv.Append(System.Globalization.CultureInfo.InvariantCulture, $"prensa,fuerza,{t},{(s < 10 ? s * (cycle == 3 ? 3 : 1) : 0)},Good\n");
+            }
+        }
+        File.WriteAllText(path, csv.ToString());
+        var trendsPath = Path.Combine(_dir, "trends.json");
+        var main = MainWindowTests.ViewModelWithData(Path.Combine(_dir, "app.json"));
+        ((FakeDialogs)main.Dialogs).OpenPath = path;
+        using var trends = new TrendsViewModel(main, trendsPath);
+        trends.NewCommand.Execute(null);
+        trends.Kind = ChartKindChoice.For(ChartKind.Cycles);
+        trends.DataSource = TrendsViewModel.DataSources.Single(d => d.Value == TrendDataSource.Csv);
+        trends.ChooseCsvCommand.Execute(null);
+        trends.AddTagCommand.Execute(trends.Available.Single(c => c.Tag == "fuerza"));
+        trends.TriggerEnabled = true;
+        trends.TriggerTag = trends.TriggerChoices.Single(c => c.Tag == "ciclo");
+        trends.OpenCommand.Execute(null);
+        var live = trends.Live.ShouldNotBeNull();
+        (live.CanUseReference, live.HasReference).ShouldBe((true, false));
+        live.Chart.Caption.ShouldBe("4 ciclos");
+
+        // La referencia es el último ciclo (el fuerte): los tres normales quedan fuera.
+        live.SetReferenceCommand.Execute(null);
+        live.HasReference.ShouldBeTrue();
+        live.Chart.Bands.ShouldHaveSingleItem().Name.ShouldBe("prensa / fuerza");
+        live.Chart.Curves.Select(c => c.IsOut).ShouldBe([true, true, true, false]);
+        live.Chart.Caption.ShouldBe("4 ciclos · 3 fuera de tolerancia");
+        live.Chart.CaptionAlarm.ShouldBeFalse();
+
+        // Con un margen enorme no se sale ninguno; en unidades, 1 de margen: fuera otra vez.
+        live.Tolerance = 100;
+        live.Chart.Curves.ShouldAllBe(c => !c.IsOut);
+        live.TolerancePercent = false;
+        live.Tolerance = 1;
+        live.Chart.Curves.Count(c => c.IsOut).ShouldBe(3);
+
+        // Se guarda con la vista y vuelve al reabrirla.
+        var saved = TrendViewStore.Load(trendsPath).Single();
+        saved.ReferenceCycles.ShouldNotBeNull().Keys.ShouldBe(["prensa / fuerza"]);
+        (saved.ReferenceTolerance, saved.ReferenceTolerancePercent).ShouldBe((1, false));
+        trends.EditCommand.Execute(null);
+        trends.OpenCommand.Execute(null);
+        var reopened = trends.Live.ShouldNotBeNull();
+        (reopened.HasReference, reopened.Tolerance, reopened.TolerancePercent).ShouldBe((true, 1m, false));
+        reopened.Chart.Curves.Count(c => c.IsOut).ShouldBe(3);
+
+        reopened.ClearReferenceCommand.Execute(null);
+        reopened.Chart.Bands.ShouldBeEmpty();
+        reopened.Chart.Curves.ShouldAllBe(c => !c.IsOut);
+        TrendViewStore.Load(trendsPath).Single().ReferenceCycles.ShouldBeNull();
+    }
+
+    [Fact]
     public Task The_new_charts_are_drawn() => HeadlessApp.RunAsync(() =>
     {
         Avalonia.Application.Current!.RequestedThemeVariant = Avalonia.Styling.ThemeVariant.Light;
@@ -530,6 +620,13 @@ public sealed class ChartKindsTests : IDisposable
             new XYCurve("posición", Enumerable.Range(-20, 120).Select(k => new XYPoint(k / 10.0, k < 0 ? 0 : k * (0.3 + (i * 0.01)))).ToList(), 1, Highlight: i == 7),
         }).ToList();
         var drawn = Show(new ChartPanel { DataContext = cycles }, "chart-cycles.png");
+        // Con referencia y banda: los ciclos que se salen, en rojo.
+        var reference = cycles.Curves.First(c => c.Name == "fuerza").Points;
+        cycles.Bands = [new ReferenceBand("fuerza", 0, reference, Tolerance: 4, Step: false)];
+        cycles.Curves = cycles.Curves.Select(c => c.Name == "fuerza" ? c with { IsOut = !ReferenceCycles.IsInside(c.Points, cycles.Bands[0], false) } : c).ToList();
+        cycles.Caption = "8 ciclos · 5 fuera de tolerancia · ¡el último se sale!";
+        cycles.CaptionAlarm = true;
+        Show(new ChartPanel { DataContext = cycles }, "chart-cycles-reference.png");
         drawn.OfType<XYChart>().Single().IsVisible.ShouldBeTrue();
         drawn.OfType<TrendChart>().Single().IsVisible.ShouldBeFalse();
 
