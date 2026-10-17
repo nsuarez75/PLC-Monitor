@@ -5,6 +5,7 @@ using Grpc.Core;
 using PlcMonitor.Abstractions;
 using PlcMonitor.Core;
 using PlcMonitor.Engine;
+using PlcMonitor.Engine.Configuration;
 using Api = PlcMonitor.Agent.Contracts;
 
 namespace PlcMonitor.Agent;
@@ -164,18 +165,26 @@ public sealed class AgentGrpcService(EngineHost host, DriverRegistry registry, I
     public override Task<Api.Configuration> GetConfiguration(Empty request, ServerCallContext context)
     {
         var pb = new Api.Configuration();
-        pb.Devices.AddRange(Engine.SnapshotConfiguration().Devices.Select(ProtoMapper.ToProto));
+        pb.Devices.AddRange(Engine.SnapshotConfiguration().Devices.Select(ToMaskedProto));
         return Task.FromResult(pb);
     }
 
     public override Task<Api.DeviceConfig> GetDeviceConfig(Api.DeviceRequest request, ServerCallContext context) =>
-        Task.FromResult(ProtoMapper.ToProto(Guard(() => Engine.GetDeviceConfiguration(request.Device))));
+        Task.FromResult(ToMaskedProto(Guard(() => Engine.GetDeviceConfiguration(request.Device))));
+
+    /// <summary>Las contraseñas no salen del agente: el cliente ve <see cref="ConfigSecrets.Masked"/>.</summary>
+    private static Api.DeviceConfig ToMaskedProto(DeviceConfiguration device)
+    {
+        ConfigSecrets.Mask(device);
+        return ProtoMapper.ToProto(device);
+    }
 
     public override async Task<Api.Device> PutDevice(Api.PutDeviceRequest request, ServerCallContext context)
     {
         if (request.Device is null)
             throw new RpcException(new Status(StatusCode.InvalidArgument, "Falta el dispositivo."));
         var device = Guard(() => ProtoMapper.FromProto(request.Device));
+        ConfigSecrets.Restore(device, FindConfiguration(string.IsNullOrWhiteSpace(request.OriginalName) ? device.Name : request.OriginalName));
         var status = await Guard(() => Engine.PutDeviceAsync(device, string.IsNullOrWhiteSpace(request.OriginalName) ? null : request.OriginalName));
         if (request.Persist)
             await host.SaveConfigurationAsync(context.CancellationToken);
@@ -218,6 +227,9 @@ public sealed class AgentGrpcService(EngineHost host, DriverRegistry registry, I
     private Api.Device ToProto(DeviceStatus status) => ProtoMapper.ToProto(status, Engine.GetTags(status.Device).Count);
 
     /// <summary>Traduce las excepciones del motor a códigos gRPC.</summary>
+    private DeviceConfiguration? FindConfiguration(string name) =>
+        Engine.SnapshotConfiguration().Devices.FirstOrDefault(d => string.Equals(d.Name, name.Trim(), StringComparison.OrdinalIgnoreCase));
+
     private static T Guard<T>(Func<T> action)
     {
         try

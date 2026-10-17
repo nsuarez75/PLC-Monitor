@@ -40,9 +40,9 @@ internal static class AgentScripts
         systemctl stop {{LinuxService}} 2>/dev/null || true
         mkdir -p "$D"
         [ -s "$A" ] || { echo "No llegó el ejecutable del agente" >&2; exit 3; }
-        # Se conserva la configuración del equipo (agent.json y la seguridad) y el histórico; lo demás (incluidos los
-        # ficheros de las versiones en varios ficheros) se sustituye por el ejecutable único.
-        find "$D" -mindepth 1 -maxdepth 1 ! -name agent.json ! -name agent.settings.json ! -name agent.pfx ! -name history -exec rm -rf {} +
+        # Se conserva la configuración del equipo (agent.json, la clave de sus contraseñas y la seguridad) y el histórico; lo
+        # demás (incluidos los ficheros de las versiones en varios ficheros) se sustituye por el ejecutable único.
+        find "$D" -mindepth 1 -maxdepth 1 ! -name agent.json ! -name agent.key ! -name agent.settings.json ! -name agent.pfx ! -name history -exec rm -rf {} +
         install -m 0755 "$A" "$D/plcmon-agent"
         rm -f "$A"
         {{(security is null ? "" : $"""
@@ -50,7 +50,7 @@ internal static class AgentScripts
         echo '{Convert.ToBase64String(security.Pfx)}' | base64 -d > "$D/agent.pfx"
         """)}}
         chown -R plcmon:plcmon "$D"
-        chmod 600 "$D"/agent.settings.json "$D"/agent.pfx 2>/dev/null || true
+        chmod 600 "$D"/agent.json "$D"/agent.key "$D"/agent.settings.json "$D"/agent.pfx 2>/dev/null || true
         cat > /etc/systemd/system/{{LinuxService}}.service <<'UNIT'
         [Unit]
         Description=PLC-Monitor Agent
@@ -95,7 +95,10 @@ internal static class AgentScripts
         systemctl disable --now {{LinuxService}} 2>/dev/null || true
         rm -f /etc/systemd/system/{{LinuxService}}.service
         systemctl daemon-reload
-        {{(keepConfiguration ? """[ -f "$D/agent.json" ] && cp "$D/agent.json" /opt/plc-monitor/agent.json.backup && echo "Configuración guardada en /opt/plc-monitor/agent.json.backup" || true""" : "")}}
+        {{(keepConfiguration ? """
+            [ -f "$D/agent.json" ] && cp -p "$D/agent.json" /opt/plc-monitor/agent.json.backup && echo "Configuración guardada en /opt/plc-monitor/agent.json.backup" || true
+            [ -f "$D/agent.key" ] && cp -p "$D/agent.key" /opt/plc-monitor/agent.key.backup && echo "Clave de las contraseñas guardada en /opt/plc-monitor/agent.key.backup" || true
+            """ : "")}}
         rm -rf "$D"
         if command -v ufw >/dev/null 2>&1 && ufw status 2>/dev/null | grep -q 'Status: active'; then ufw delete allow {{port}}/tcp >/dev/null 2>&1 || true; fi
         if command -v firewall-cmd >/dev/null 2>&1 && firewall-cmd --state >/dev/null 2>&1; then firewall-cmd --permanent --remove-port={{port}}/tcp >/dev/null 2>&1 && firewall-cmd --reload >/dev/null || true; fi
@@ -124,7 +127,7 @@ internal static class AgentScripts
         New-Item -ItemType Directory -Force -Path $D | Out-Null
         if (-not (Test-Path $A)) { throw 'No llegó el ejecutable del agente' }
         # Se conserva la configuración del equipo, el histórico y los logs; lo demás se sustituye por el ejecutable único.
-        Get-ChildItem -Path $D -Force | Where-Object { $_.Name -notin 'agent.json', 'agent.settings.json', 'agent.pfx', 'history', 'logs' } | Remove-Item -Recurse -Force
+        Get-ChildItem -Path $D -Force | Where-Object { $_.Name -notin 'agent.json', 'agent.key', 'agent.settings.json', 'agent.pfx', 'history', 'logs' } | Remove-Item -Recurse -Force
         Move-Item -Path $A -Destination (Join-Path $D 'plcmon-agent.exe') -Force
         {{(security is null ? "" : $"""
         [IO.File]::WriteAllBytes((Join-Path $D 'agent.settings.json'), [Convert]::FromBase64String('{Convert.ToBase64String(Encoding.UTF8.GetBytes(security.SettingsJson))}'))
@@ -154,7 +157,11 @@ internal static class AgentScripts
           sc.exe delete {{WindowsService}} | Out-Null
         }
         Get-NetFirewallRule -DisplayName 'PLC-Monitor Agent' -ErrorAction SilentlyContinue | Remove-NetFirewallRule
-        {{(keepConfiguration ? """if (Test-Path "$D\agent.json") { Copy-Item "$D\agent.json" "$env:ProgramData\PLC-Monitor-agent.json.backup" -Force; "Configuración guardada en $env:ProgramData\PLC-Monitor-agent.json.backup" }""" : "")}}
+        {{(keepConfiguration ? """
+            if (Test-Path "$D\agent.json") { Copy-Item "$D\agent.json" "$env:ProgramData\PLC-Monitor-agent.json.backup" -Force; "Configuración guardada en $env:ProgramData\PLC-Monitor-agent.json.backup" }
+            if (Test-Path "$D\agent.key") { Copy-Item "$D\agent.key" "$env:ProgramData\PLC-Monitor-agent.key.backup" -Force; "Clave de las contraseñas guardada en $env:ProgramData\PLC-Monitor-agent.key.backup" }
+            foreach ($f in "$env:ProgramData\PLC-Monitor-agent.json.backup", "$env:ProgramData\PLC-Monitor-agent.key.backup") { if (Test-Path $f) { icacls $f /inheritance:r /grant:r '*S-1-5-18:F' '*S-1-5-32-544:F' | Out-Null } }
+            """ : "")}}
         if (Test-Path $D) { Remove-Item -Recurse -Force $D }
         'desinstalado'
         """;
