@@ -206,7 +206,7 @@ public sealed partial class LiveTrendViewModel : ObservableObject, IDisposable
             : [];
         TriggerActive = spans.Count > 0 && (spans[^1].To is not { } end || end > now);
         foreach (var (tag, shown) in _filtered)
-            TriggerFilter.Apply(tag.Points, spans, now, shown);
+            TriggerFilter.Apply(tag.Points, spans, now, shown, includeStart: _kind != ChartKind.Histogram);
     }
 
     /// <summary>Activaciones del disparo en lo recibido (vacío si no hay disparo o no se puede evaluar).</summary>

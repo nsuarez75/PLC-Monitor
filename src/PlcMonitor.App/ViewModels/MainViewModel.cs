@@ -56,6 +56,11 @@ public sealed partial class MainViewModel : ObservableObject, IAgentContext, IAs
         RecentAgents = [.. settings.RecentAgents];
         Browse = new BrowseViewModel(this, () => SelectedDevice);
         History = new HistoryViewModel(this, () => SelectedDevice);
+        History.OpenInTrendsRequested += (_, view) =>
+        {
+            OpenTrends();
+            _ = Trends!.AddAndOpenAsync(view);
+        };
     }
 
     public AgentService.AgentServiceClient? Client { get; private set; }

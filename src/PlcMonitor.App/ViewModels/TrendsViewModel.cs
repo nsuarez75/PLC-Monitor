@@ -232,7 +232,7 @@ public sealed partial class TrendsViewModel : ObservableObject, IDisposable
 
     [ObservableProperty]
     [NotifyPropertyChangedFor(nameof(IsCustomRange))]
-    public partial Choice<int> HistoryRange { get; set; } = TrendHistory.Ranges[1];
+    public partial Choice<int> HistoryRange { get; set; } = TrendHistory.Ranges.First(r => r.Value == 480);
 
     /// <summary>Periodo con fechas concretas (desde/hasta).</summary>
     public bool IsCustomRange => ShowHistoryRange && HistoryRange.Value == 0;
@@ -407,7 +407,7 @@ public sealed partial class TrendsViewModel : ObservableObject, IDisposable
         DataSource = DataSources.FirstOrDefault(d => d.Value == view?.DataSource) ?? DataSources[0];
         HistoryFromText = view?.HistoryFrom is { } historyFrom ? TrendHistory.Format(historyFrom) : "";
         HistoryToText = view?.HistoryTo is { } historyTo ? TrendHistory.Format(historyTo) : "";
-        HistoryRange = TrendHistory.Ranges.FirstOrDefault(r => r.Value == view?.HistoryMinutes) ?? TrendHistory.Ranges[1];
+        HistoryRange = TrendHistory.Ranges.FirstOrDefault(r => r.Value == view?.HistoryMinutes) ?? TrendHistory.Ranges.First(r => r.Value == 480);
         LowLimit = view?.LowLimit is { } low ? (decimal)low : null;
         HighLimit = view?.HighLimit is { } high ? (decimal)high : null;
         GaugeStyle = GaugeStyles.FirstOrDefault(g => g.Value == view?.GaugeStyle) ?? GaugeStyles[0];
@@ -478,6 +478,19 @@ public sealed partial class TrendsViewModel : ObservableObject, IDisposable
         }
         Note = UsesCsv ? (_csv is null ? "Elige un fichero CSV exportado del histórico para ver sus tags." : "")
             : _main.IsConnected ? "" : "Conéctate al agente para ver sus tags y añadirlos.";
+    }
+
+    /// <summary>Añade una vista ya hecha (p. ej. desde la pestaña Histórico de un dispositivo), la selecciona y la abre.</summary>
+    public async Task AddAndOpenAsync(TrendView view)
+    {
+        view.Agent = _main.AgentKey;
+        _all.Add(view);
+        var item = new TrendViewItem(view);
+        Views.Add(item);
+        OnPropertyChanged(nameof(HasViews));
+        Selected = item;
+        Persist();
+        await OpenCommand.ExecuteAsync(null);
     }
 
     [RelayCommand]
@@ -630,11 +643,11 @@ public sealed partial class TrendsViewModel : ObservableObject, IDisposable
             .Select(r => (r.Ref, r.Tag!.IsBoolean))
             .ToList();
         Dictionary<TrendTagRef, TrendSource> sources;
-        var truncated = false;
+        TimeSpan? aggregated = null;
         IsLoading = true;
         try
         {
-            (sources, truncated) = refs.Count == 0 ? ([], false) : await TrendHistory.LoadAsync(client, refs, from, to);
+            (sources, aggregated) = refs.Count == 0 ? ([], null) : await TrendHistory.LoadAsync(client, refs, from, to);
         }
         catch (Grpc.Core.RpcException ex)
         {
@@ -653,7 +666,8 @@ public sealed partial class TrendsViewModel : ObservableObject, IDisposable
             view.Kind)
         {
             FixedWindow = (from, to),
-            HistoryText = $"Histórico {TrendHistory.Describe(view)} · {points} puntos" + (truncated ? $" · recortado a {TrendHistory.MaxPoints} por tag" : ""),
+            HistoryText = $"Histórico {TrendHistory.Describe(view)} · {points} puntos" +
+                (aggregated is { } every ? $" · con muchos puntos: mín/máx cada {StateTimeline.FormatDuration(every)}" : ""),
         };
         live.Chart.EmptyText = view.Tags.Count == 0 ? "Esta vista no tiene tags: edítala y añade alguno"
             : refs.Count == 0 ? "Ningún tag de la vista se historiza: actívalo en la configuración del tag"

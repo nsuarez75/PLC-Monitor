@@ -390,68 +390,51 @@ public sealed class ChartKindsTests : IDisposable
     }
 
     [Fact]
-    public void Analysis_switches_kinds_over_the_same_data()
+    public void Recorded_data_draws_cycles_xy_and_histograms_over_a_fixed_window()
     {
-        // Prensa: «ciclo» activo de 10 a 20 s y de 60 a 70 s; fuerza sube con la posición durante cada ciclo.
-        var clock = new List<ChartPoint> { P(0, 0), P(10, 1), P(20, 0), P(60, 1), P(70, 0) };
-        var position = Enumerable.Range(0, 100).Select(i => P(i, i % 50 < 10 ? 0 : i % 50 - 10)).ToList();
-        var force = Enumerable.Range(0, 100).Select(i => P(i, 2 * (i % 50))).ToList();
-        using var analysis = new ChartAnalysisViewModel("Sin datos");
-        analysis.SetData(
-        [
-            new ChartSeriesData("ciclo", clock, IsBoolean: true),
-            new ChartSeriesData("posicion", position),
-            new ChartSeriesData("fuerza", force),
-        ], At(0), At(100));
-        ChartAnalysisViewModel.Kinds.ShouldNotContain(k => k.Value == ChartKind.Gauges);
-        analysis.Names.ShouldBe(["ciclo", "posicion", "fuerza"]);
-        analysis.Chart.Kind.ShouldBe(ChartKind.Trend);
-        analysis.Chart.Series.Count.ShouldBe(3);
-        analysis.Chart.Options[0].IsSelected = false; // lo desmarcado se conserva al cambiar de tipo
+        // Prensa: «ciclo» activo de 10 a 20 s y de 60 a 70 s; fuerza sube con la posición.
+        var sources = new Dictionary<string, TrendSource>
+        {
+            ["ciclo"] = new([P(0, 0), P(10, 1), P(20, 0), P(60, 1), P(70, 0)], IsBoolean: true),
+            ["posicion"] = new(Enumerable.Range(0, 100).Select(i => P(i, i % 50 < 10 ? 0 : (i % 50) - 10)).ToList(), false),
+            ["fuerza"] = new(Enumerable.Range(0, 100).Select(i => P(i, 2 * (i % 50))).ToList(), false),
+        };
+        var trigger = new TrendTrigger { Tag = "ciclo", Value = "true", BeforeSeconds = 2 };
+        LiveTrendViewModel Open(ChartKind kind, string[] names, TrendTrigger? t)
+        {
+            var live = new LiveTrendViewModel(() => names.Select(n => (n, sources.GetValueOrDefault(n))).ToArray(), t,
+                t is null ? null : () => sources["ciclo"], kind) { FixedWindow = (At(0), At(100)) };
+            live.RefreshTags();
+            return live;
+        }
 
-        analysis.Kind = ChartKindChoice.For(ChartKind.Cycles);
-        analysis.Note.ShouldContain("necesitan un disparo");
-        analysis.Chart.Curves.ShouldBeEmpty();
-        analysis.TriggerEnabled = true;
-        analysis.Note.ShouldContain("Disparo incompleto");
-        analysis.TriggerTag = "ciclo";
-        analysis.TriggerValue.ShouldBe("true");
-        analysis.TriggerBeforeSeconds = 2;
-        analysis.Note.ShouldBeEmpty();
-        analysis.Chart.Caption.ShouldBe("2 ciclos");
-        analysis.Chart.Curves.Count.ShouldBe(4); // 2 tags × 2 ciclos
-        analysis.Chart.Curves.ShouldAllBe(c => c.Points[0].X == -2);
-        analysis.Chart.Options.Single(o => o.Name == "ciclo").IsSelected.ShouldBeFalse();
+        var cycles = Open(ChartKind.Cycles, ["posicion", "fuerza"], trigger);
+        (cycles.IsLive, cycles.UsesWindow, cycles.ShowTriggerState).ShouldBe((false, false, false));
+        cycles.Chart.Caption.ShouldBe("2 ciclos");
+        cycles.Chart.Curves.Count.ShouldBe(4);
+        cycles.Chart.Curves.ShouldAllBe(c => c.Points[0].X == -2);
+        cycles.Refresh(At(500)); // con ventana fija no cambia nada
+        cycles.Chart.Curves.Count.ShouldBe(4);
 
-        analysis.Kind = ChartKindChoice.For(ChartKind.XY);
-        analysis.XTag.ShouldBe("ciclo");
-        analysis.XTag = "posicion";
-        analysis.Chart.XLabel.ShouldBe("X: posicion");
-        analysis.Chart.Options.Select(o => o.Name).ShouldBe(["ciclo", "fuerza"]);
-        analysis.Chart.Curves.Where(c => c.Name == "fuerza").Count().ShouldBe(2); // con disparo, una curva por ciclo
+        // X-Y sin disparo: una curva con todo el periodo (no la ventana en vivo).
+        var xy = Open(ChartKind.XY, ["posicion", "fuerza"], null);
+        xy.Chart.XLabel.ShouldBe("X: posicion");
+        xy.Chart.Curves.Single().Points.Count(p => p.Y is not null).ShouldBe(100);
 
-        // Sin disparo, una sola curva con todo el periodo de los datos (no la ventana en vivo).
-        analysis.TriggerEnabled = false;
-        var whole = analysis.Chart.Curves.Single(c => c.Name == "fuerza");
-        whole.Points.Count(p => p.Y is not null).ShouldBe(100);
-        analysis.TriggerEnabled = true;
+        // Histograma con disparo: solo muestras de verdad, sin el valor que se repite al empezar cada tramo.
+        var histogram = Open(ChartKind.Histogram, ["fuerza"], trigger);
+        var values = histogram.Chart.Series.Single().Points.Where(p => p.Value is not null).ToList();
+        values.Select(p => p.Time).ShouldBe(Enumerable.Range(8, 12).Concat(Enumerable.Range(58, 12)).Select(i => At(i)));
+        var trend = Open(ChartKind.Trend, ["fuerza"], trigger);
+        trend.Chart.Series.Single().Points.Count(p => p.Value is not null).ShouldBe(24); // en la tendencia, los mismos (caen en segundos exactos)
+    }
 
-        analysis.Kind = ChartKindChoice.For(ChartKind.Histogram);
-        analysis.LowLimit = 0;
-        analysis.HighLimit = 100;
-        (analysis.Chart.LowLimit, analysis.Chart.HighLimit).ShouldBe((0, 100));
-
-        analysis.Kind = ChartKindChoice.For(ChartKind.Bars);
-        analysis.CanTrigger.ShouldBeFalse();
-        analysis.Chart.Kind.ShouldBe(ChartKind.Bars);
-        analysis.Chart.Options.Single(o => o.Name == "fuerza").Points.ShouldNotBeEmpty();
-
-        analysis.Kind = ChartKindChoice.For(ChartKind.Trend);
-        analysis.TriggerEnabled = false;
-        analysis.Chart.Options.Single(o => o.Name == "fuerza").Points.Count.ShouldBe(100);
-
-        analysis.SetData([]);
-        analysis.Chart.Options.ShouldBeEmpty();
+    [Fact]
+    public void Aggregated_history_keeps_minimum_and_maximum()
+    {
+        var every = TimeSpan.FromMinutes(1);
+        TrendHistory.MinMax([P(0, 1), P(60, 5), P(120, null)], [P(0, 9), P(60, 5), P(120, null)], every)
+            .ShouldBe([P(0, 1), P(30, 9), P(60, 5), P(120, null)]);
     }
 
     [Fact]

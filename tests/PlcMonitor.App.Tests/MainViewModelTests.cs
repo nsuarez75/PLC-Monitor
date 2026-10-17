@@ -374,7 +374,7 @@ public sealed class MainViewModelTests : IDisposable
         historyTrends.Tags.Add(new("plc1", "otro"));
         historyTrends.Kind = ChartKindChoice.For(PlcMonitor.App.Charts.ChartKind.Histogram);
         historyTrends.DataSource = TrendsViewModel.DataSources[1];
-        historyTrends.HistoryRange = TrendHistory.Ranges[0];
+        historyTrends.HistoryRange = TrendHistory.Ranges.Single(r => r.Value == 60);
         await historyTrends.OpenCommand.ExecuteAsync(null);
         historyTrends.KindError.ShouldBeEmpty();
         var fromHistory = historyTrends.Live.ShouldNotBeNull();
@@ -383,6 +383,17 @@ public sealed class MainViewModelTests : IDisposable
         fromHistory.Missing.ShouldBe("Sin histórico en el agente: plc1 / otro");
         fromHistory.Chart.Series.Single().Points.Where(p => p.Value is not null).Select(p => p.Value).ShouldBe([5, 50]);
         (fromHistory.Chart.To - fromHistory.Chart.From).ShouldBe(TimeSpan.FromHours(1));
+
+        // Desde la pestaña Histórico: «Abrir en Tendencias» crea la vista con los tags marcados y el periodo.
+        vm.History.Range = HistoryViewModel.Ranges.Single(r => r.Text == "Última hora");
+        vm.History.OpenInTrendsCommand.Execute(null);
+        await Wait.UntilAsync(() => vm.Trends?.Live is not null, "vista abierta en Tendencias");
+        var opened = vm.Trends!;
+        opened.Selected!.Name.ShouldBe("plc1 · última hora");
+        opened.Selected.View.Tags.ShouldBe([new("plc1", "velocidad")]);
+        (opened.Selected.View.DataSource, opened.Selected.View.HistoryMinutes).ShouldBe((PlcMonitor.App.Charts.TrendDataSource.History, 60));
+        opened.Live!.Chart.Series.Single().Points.Where(p => p.Value is not null).Select(p => p.Value).ShouldBe([5, 50]);
+        vm.CloseTrendsCommand.Execute(null);
 
         var csv = Path.Combine(agent.Directory, "export.csv");
         _dialogs.SavePath = csv;

@@ -291,6 +291,13 @@
                           <TextBlock Text="CSV" />
                         </StackPanel>
                       </Button>
+                      <Button Classes="secondary" Command="{Binding OpenInTrendsCommand}"
+                              ToolTip.Tip="Crear una vista de Tendencias con estos tags y este periodo (histograma, ciclos, X-Y, cronograma…)">
+                        <StackPanel Orientation="Horizontal" Spacing="6">
+                          <c:Icon Kind="pulse" />
+                          <TextBlock Text="Abrir en Tendencias" />
+                        </StackPanel>
+                      </Button>
                     </StackPanel>
                   </StackPanel>
                 </Border>
@@ -302,7 +309,7 @@
 
                 <Panel>
                 <Border Classes="card" Padding="16" IsVisible="{Binding !ShowTable}">
-                  <v:ChartAnalysisPanel DataContext="{Binding Analysis}" MinHeight="320" />
+                  <v:ChartPanel DataContext="{Binding Chart}" MinHeight="320" />
                 </Border>
 
                 <Border Classes="card" ClipToBounds="True" IsVisible="{Binding ShowTable}">

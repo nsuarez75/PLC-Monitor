@@ -17,6 +17,7 @@ public static class TrendHistory
     /// <summary>Periodos en minutos hacia atrás; 0 = fechas fijas.</summary>
     public static IReadOnlyList<Choice<int>> Ranges { get; } =
     [
+        new("Últimos 15 min", 15),
         new("Última hora", 60),
         new("Últimas 8 h", 480),
         new("Últimas 24 h", 1440),
@@ -52,15 +53,20 @@ public static class TrendHistory
         ? (Ranges.FirstOrDefault(r => r.Value == view.HistoryMinutes)?.Text ?? $"últimos {view.HistoryMinutes} min").ToLowerInvariant()
         : $"del {Format(view.HistoryFrom.Value)} al {Format(view.HistoryTo.Value)}";
 
+    /// <summary>Intervalos en que se agrega un tag con demasiados puntos (mínimo y máximo de cada uno).</summary>
+    public const int AggregatedBuckets = 10_000;
+
     /// <summary>
-    /// Puntos en bruto de los tags en [from, to], una consulta por dispositivo. <paramref name="truncated"/>: algún tag
-    /// tenía más de <see cref="MaxPoints"/>.
+    /// Puntos en bruto de los tags en [from, to], una consulta por dispositivo. Un tag con más de <see cref="MaxPoints"/>
+    /// se vuelve a pedir agregado (el agente recorta por el final: se perdería lo más reciente): mínimo y máximo de cada
+    /// uno de <see cref="AggregatedBuckets"/> intervalos, que cubren todo el periodo y conservan los picos.
+    /// <c>AggregatedEvery</c>: el intervalo si algún tag se ha agregado.
     /// </summary>
-    public static async Task<(Dictionary<TrendTagRef, TrendSource> Sources, bool Truncated)> LoadAsync(AgentService.AgentServiceClient client,
+    public static async Task<(Dictionary<TrendTagRef, TrendSource> Sources, TimeSpan? AggregatedEvery)> LoadAsync(AgentService.AgentServiceClient client,
         IEnumerable<(TrendTagRef Ref, bool IsBoolean)> tags, DateTimeOffset from, DateTimeOffset to, CancellationToken cancellationToken = default)
     {
         var sources = new Dictionary<TrendTagRef, TrendSource>();
-        var truncated = false;
+        TimeSpan? aggregated = null;
         foreach (var device in tags.DistinctBy(t => t.Ref).GroupBy(t => t.Ref.Device))
         {
             var types = device.ToDictionary(t => t.Ref.Tag, t => t.IsBoolean, StringComparer.Ordinal);
@@ -73,15 +79,64 @@ public static class TrendHistory
             };
             request.Tags.AddRange(types.Keys);
             var reply = await client.QueryHistoryAsync(request, cancellationToken: cancellationToken);
+            var truncated = new List<string>();
             foreach (var series in reply.Series)
             {
-                truncated |= series.Truncated;
-                var points = series.Points
-                    .Select(p => new ChartPoint(p.Timestamp.ToDateTimeOffset(), p.HasNumber && p.Quality is Quality.Good or Quality.Uncertain ? p.Number : null))
-                    .ToList();
-                sources[new TrendTagRef(device.Key, series.Tag)] = new TrendSource(points, types.GetValueOrDefault(series.Tag));
+                if (series.Truncated)
+                    truncated.Add(series.Tag);
+                sources[new TrendTagRef(device.Key, series.Tag)] = new TrendSource(Points(series), types.GetValueOrDefault(series.Tag));
+            }
+            if (truncated.Count == 0)
+                continue;
+
+            var every = TimeSpan.FromMilliseconds(Math.Max(1000, Math.Ceiling((to - from).TotalMilliseconds / AggregatedBuckets)));
+            aggregated = every;
+            var lows = await QueryAggregateAsync(client, device.Key, truncated, from, to, every, HistoryAggregate.Min, cancellationToken);
+            var highs = await QueryAggregateAsync(client, device.Key, truncated, from, to, every, HistoryAggregate.Max, cancellationToken);
+            foreach (var tag in truncated)
+            {
+                sources[new TrendTagRef(device.Key, tag)] =
+                    new TrendSource(MinMax(lows.GetValueOrDefault(tag, []), highs.GetValueOrDefault(tag, []), every), types.GetValueOrDefault(tag), Step: false);
             }
         }
-        return (sources, truncated);
+        return (sources, aggregated);
     }
+
+    /// <summary>
+    /// Une el mínimo y el máximo de cada intervalo en una serie: el mínimo al principio del intervalo y el máximo a la
+    /// mitad, para que la línea recorra los dos.
+    /// </summary>
+    public static List<ChartPoint> MinMax(IReadOnlyList<ChartPoint> lows, IReadOnlyList<ChartPoint> highs, TimeSpan every)
+    {
+        var maxima = highs.Where(p => p.Value is not null).ToDictionary(p => p.Time, p => p.Value);
+        var points = new List<ChartPoint>(lows.Count * 2);
+        foreach (var low in lows)
+        {
+            points.Add(low);
+            if (maxima.TryGetValue(low.Time, out var high) && high != low.Value)
+                points.Add(new ChartPoint(low.Time + (every / 2), high));
+        }
+        return points;
+    }
+
+    private static async Task<Dictionary<string, List<ChartPoint>>> QueryAggregateAsync(AgentService.AgentServiceClient client, string device,
+        IReadOnlyList<string> tags, DateTimeOffset from, DateTimeOffset to, TimeSpan every, HistoryAggregate aggregate, CancellationToken cancellationToken)
+    {
+        var request = new HistoryRequest
+        {
+            Device = device,
+            From = Timestamp.FromDateTimeOffset(from),
+            To = Timestamp.FromDateTimeOffset(to),
+            IntervalMs = (int)every.TotalMilliseconds,
+            Aggregate = aggregate,
+            MaxPoints = AggregatedBuckets + 1,
+        };
+        request.Tags.AddRange(tags);
+        var reply = await client.QueryHistoryAsync(request, cancellationToken: cancellationToken);
+        return reply.Series.ToDictionary(s => s.Tag, Points, StringComparer.Ordinal);
+    }
+
+    private static List<ChartPoint> Points(HistorySeries series) => series.Points
+        .Select(p => new ChartPoint(p.Timestamp.ToDateTimeOffset(), p.HasNumber && p.Quality is Quality.Good or Quality.Uncertain ? p.Number : null))
+        .ToList();
 }
