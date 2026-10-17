@@ -23,12 +23,36 @@ public sealed partial class TrendViewItem(TrendView view) : ObservableObject
         Description = Describe(View);
     }
 
-    private static string Describe(TrendView view) => view.Tags.Count switch
+    private static string Describe(TrendView view)
     {
-        0 => "sin tags",
-        1 => $"1 tag · {view.WindowMinutes} min{(view.Trigger is null ? "" : " · disparo")}",
-        var n => $"{n} tags · {view.WindowMinutes} min{(view.Trigger is null ? "" : " · disparo")}",
-    };
+        var kind = view.Kind == ChartKind.Trend ? "" : $"{ChartKindChoice.For(view.Kind).Short} · ";
+        return kind + view.Tags.Count switch
+        {
+            0 => "sin tags",
+            1 => $"1 tag · {view.WindowMinutes} min{(view.Trigger is null ? "" : " · disparo")}",
+            var n => $"{n} tags · {view.WindowMinutes} min{(view.Trigger is null ? "" : " · disparo")}",
+        };
+    }
+}
+
+/// <summary>Tipo de gráfica que se puede elegir para una vista, con su explicación.</summary>
+public sealed record ChartKindChoice(ChartKind Value, string Text, string Short, string Description)
+{
+    public static IReadOnlyList<ChartKindChoice> All { get; } =
+    [
+        new(ChartKind.Trend, "Tendencia (valor / tiempo)", "Tendencia",
+            "La gráfica de siempre: el valor de cada tag a lo largo del tiempo, con zoom arrastrando y los valores al pasar el ratón."),
+        new(ChartKind.Cycles, "Ciclos superpuestos", "Ciclos",
+            "Cada vez que salta el disparo se dibuja un ciclo que empieza en 0, encima de los anteriores (como la persistencia de un osciloscopio): el último resaltado y los demás tenues. Sirve para comparar ciclos de máquina y ver el que se sale. Necesita un disparo."),
+        new(ChartKind.XY, "X-Y (un tag contra otro)", "X-Y",
+            "Un tag frente a otro en vez de frente al tiempo, p. ej. fuerza contra posición en una prensa o presión contra caudal. El primer tag de la vista es el eje X y los demás, el Y. Con disparo, una curva por ciclo."),
+        new(ChartKind.States, "Cronograma de estados", "Estados",
+            "Una franja por tag con un color por estado (marcha/paro/alarma, paso de secuencia…), la duración de cada tramo al pasar el ratón y el porcentaje de tiempo en cada estado. Pensado para booleanos y enteros de estado."),
+    ];
+
+    public static ChartKindChoice For(ChartKind kind) => All.FirstOrDefault(k => k.Value == kind) ?? All[0];
+
+    public override string ToString() => Text;
 }
 
 /// <summary>Tag del agente que se puede añadir a una vista.</summary>
@@ -54,6 +78,7 @@ public sealed partial class TrendsViewModel : ObservableObject, IDisposable
         _main = main ?? throw new ArgumentNullException(nameof(main));
         _path = path;
         _all = TrendViewStore.Load(path);
+        Tags.CollectionChanged += (_, _) => OnPropertyChanged(nameof(XAxisText));
         foreach (var view in _all.Where(v => v.Agent == main.AgentKey))
             Views.Add(new TrendViewItem(view));
         _main.TagsChanged += OnTagsChanged;
@@ -77,6 +102,19 @@ public sealed partial class TrendsViewModel : ObservableObject, IDisposable
     public bool HasViews => Views.Count > 0;
 
     // ---- Formulario de la vista seleccionada (se aplica con Guardar o al abrir) ----
+
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(IsXYKind))]
+    public partial ChartKindChoice Kind { get; set; } = ChartKindChoice.All[0];
+
+    /// <summary>X-Y: el primer tag es el eje X.</summary>
+    public bool IsXYKind => Kind.Value == ChartKind.XY;
+
+    public string XAxisText => Tags.Count > 0 ? $"Eje X: {Tags[0]}" : "Eje X: el primer tag que añadas";
+
+    /// <summary>Lo que le falta a la vista para el tipo elegido (disparo, tags).</summary>
+    [ObservableProperty]
+    public partial string KindError { get; private set; } = "";
 
     [ObservableProperty]
     [NotifyCanExecuteChangedFor(nameof(SaveCommand), nameof(OpenCommand))]
@@ -166,6 +204,8 @@ public sealed partial class TrendsViewModel : ObservableObject, IDisposable
     private void LoadForm(TrendView? view)
     {
         Name = view?.Name ?? "";
+        Kind = ChartKindChoice.For(view?.Kind ?? ChartKind.Trend);
+        KindError = "";
         Window = LiveTrendViewModel.Windows.FirstOrDefault(w => (int)w.Value.TotalMinutes == view?.WindowMinutes) ?? LiveTrendViewModel.Windows[1];
         AutoY = view?.AutoY ?? true;
         YMin = view?.YMin is { } min ? (decimal)min : null;
@@ -255,6 +295,16 @@ public sealed partial class TrendsViewModel : ObservableObject, IDisposable
         Available.Remove(choice);
     }
 
+    /// <summary>X-Y: pone el tag el primero (eje X).</summary>
+    [RelayCommand]
+    private void MakeXAxis(TrendTagRef? tag)
+    {
+        if (tag is null || Tags.IndexOf(tag) <= 0)
+            return;
+        Tags.Remove(tag);
+        Tags.Insert(0, tag);
+    }
+
     [RelayCommand]
     private void RemoveTag(TrendTagRef? tag)
     {
@@ -266,14 +316,23 @@ public sealed partial class TrendsViewModel : ObservableObject, IDisposable
 
     private bool CanSave() => Selected is not null && !string.IsNullOrWhiteSpace(Name);
 
-    /// <summary>El disparo está completo (tag y, si no es booleano, un número); si no, se explica en <see cref="TriggerError"/>.</summary>
+    /// <summary>
+    /// La vista se puede abrir: el disparo está completo (tag y, si no es booleano, un número) y el tipo tiene lo que
+    /// necesita; si no, se explica en <see cref="TriggerError"/> o <see cref="KindError"/>.
+    /// </summary>
     private bool CheckTrigger()
     {
+        KindError = Kind.Value switch
+        {
+            ChartKind.Cycles when !TriggerEnabled => "Los ciclos superpuestos necesitan un disparo: actívalo abajo.",
+            ChartKind.XY when Tags.Count < 2 => "La gráfica X-Y necesita al menos dos tags: el primero es el eje X.",
+            _ => "",
+        };
         TriggerError = !TriggerEnabled ? ""
             : TriggerTag is null ? "Elige el tag de disparo."
             : IsValueTrigger && !TriggerFilter.TryParseTarget(TriggerValue, out _) ? "El valor del disparo debe ser un número."
             : "";
-        return TriggerError.Length == 0;
+        return TriggerError.Length == 0 && KindError.Length == 0;
     }
 
     [ObservableProperty]
@@ -300,12 +359,14 @@ public sealed partial class TrendsViewModel : ObservableObject, IDisposable
         var live = new LiveTrendViewModel(
             () => view.Tags.Select(t => (t.ToString(), _main.FindTag(t.Device, t.Tag))).ToArray(),
             trigger,
-            trigger is null ? null : () => _main.FindTag(trigger.Device, trigger.Tag))
+            trigger is null ? null : () => _main.FindTag(trigger.Device, trigger.Tag),
+            view.Kind)
         {
             Window = Window,
         };
         live.Chart.EmptyText = view.Tags.Count == 0 ? "Esta vista no tiene tags: edítala y añade alguno"
             : trigger is not null ? "Esperando el disparo"
+            : view.Kind == ChartKind.XY ? "Aún no hay valores de los dos ejes"
             : "Aún no hay valores de estos tags";
         live.Chart.AutoY = view.AutoY;
         live.Chart.YMinInput = YMin;
@@ -343,6 +404,7 @@ public sealed partial class TrendsViewModel : ObservableObject, IDisposable
     {
         var view = item.View;
         view.Name = Name.Trim();
+        view.Kind = Kind.Value;
         view.WindowMinutes = (int)Window.Value.TotalMinutes;
         view.AutoY = AutoY;
         view.YMin = YMin is { } min ? (double)min : null;

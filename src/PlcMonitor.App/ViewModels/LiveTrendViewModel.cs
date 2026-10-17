@@ -15,18 +15,40 @@ public sealed partial class LiveTrendViewModel : ObservableObject
     private readonly TrendTrigger? _trigger;
     private readonly Func<TagViewModel?>? _triggerTag;
     private readonly List<(TagViewModel Source, List<ChartPoint> Shown)> _filtered = [];
+    private readonly ChartKind _kind;
     private TagViewModel? _triggerSource;
+    private TagViewModel? _xSource;
+    private string _xName = "";
+
+    /// <summary>Ciclos superpuestos que se dibujan como mucho (los más recientes).</summary>
+    public const int MaxCycles = 20;
 
     /// <param name="tags">Tags a dibujar con su nombre en la leyenda; null si el tag ya no existe en el agente.</param>
     /// <param name="trigger">Tendencia de disparo: solo se ven los tramos en que se cumple (más el tiempo extra).</param>
     /// <param name="triggerTag">El tag disparo en el agente conectado (null si no existe).</param>
-    public LiveTrendViewModel(Func<IReadOnlyList<(string Name, TagViewModel? Tag)>> tags, TrendTrigger? trigger = null, Func<TagViewModel?>? triggerTag = null)
+    /// <param name="kind">Tipo de gráfica; en X-Y el primer tag es el eje X.</param>
+    public LiveTrendViewModel(Func<IReadOnlyList<(string Name, TagViewModel? Tag)>> tags, TrendTrigger? trigger = null, Func<TagViewModel?>? triggerTag = null,
+        ChartKind kind = ChartKind.Trend)
     {
         _tags = tags;
         _trigger = trigger;
         _triggerTag = triggerTag;
+        _kind = kind;
+        Chart.Kind = kind;
         Chart.ZoomChanged += (_, _) => Paused = Chart.IsZoomed;
+        // Marcar o desmarcar tags cambia las curvas.
+        Chart.PropertyChanged += (_, e) =>
+        {
+            if (e.PropertyName == nameof(ChartViewModel.Series) && UsesCurves)
+                BuildCurves(DateTimeOffset.UtcNow);
+        };
     }
+
+    /// <summary>Ciclos y X-Y dibujan curvas calculadas, no las series en el tiempo.</summary>
+    private bool UsesCurves => _kind is ChartKind.Cycles or ChartKind.XY;
+
+    /// <summary>La ventana de tiempo cuenta (los ciclos usan todo lo recibido, la última hora).</summary>
+    public bool UsesWindow => _kind != ChartKind.Cycles;
 
     /// <summary>Es una tendencia de disparo.</summary>
     public bool IsTriggered => _trigger is not null;
@@ -70,8 +92,20 @@ public sealed partial class LiveTrendViewModel : ObservableObject
         var now = DateTimeOffset.UtcNow;
         _filtered.Clear();
         _triggerSource = _triggerTag?.Invoke();
+        // X-Y: el primer tag es el eje X; en la gráfica se marcan los demás.
+        var plotted = tags;
+        if (_kind == ChartKind.XY && tags.Count > 0)
+        {
+            (_xName, _xSource) = tags[0];
+            plotted = tags.Skip(1).ToArray();
+            Chart.XLabel = $"X: {_xName}";
+        }
+        else if (_kind == ChartKind.Cycles)
+        {
+            Chart.XLabel = "s desde el disparo";
+        }
         Chart.SetData(
-            tags.Where(t => t.Tag is not null).Select(t => new ChartSeriesData(t.Name, Shown(t.Tag!), Step: true, t.Tag!.IsBoolean)),
+            plotted.Where(t => t.Tag is not null).Select(t => new ChartSeriesData(t.Name, Shown(t.Tag!), Step: true, t.Tag!.IsBoolean)),
             now - Window.Value, now);
         var missing = tags.Where(t => t.Tag is null).Select(t => t.Name).ToList();
         if (_trigger is not null && _triggerSource is null)
@@ -85,14 +119,21 @@ public sealed partial class LiveTrendViewModel : ObservableObject
     {
         Refilter(now);
         if (!Paused)
+        {
             Chart.SetWindow(now - Window.Value, now);
+            if (UsesCurves)
+                BuildCurves(now);
+        }
         Chart.Touch();
     }
 
-    /// <summary>Puntos que dibuja la gráfica: los del tag o, con disparo, una copia con solo los tramos activos.</summary>
+    /// <summary>
+    /// Puntos que dibuja la gráfica: los del tag o, con disparo, una copia con solo los tramos activos (ciclos y X-Y
+    /// recortan ellos mismos por activación).
+    /// </summary>
     private List<ChartPoint> Shown(TagViewModel tag)
     {
-        if (_trigger is null)
+        if (_trigger is null || UsesCurves)
             return tag.TrendPoints;
         var shown = new List<ChartPoint>();
         _filtered.Add((tag, shown));
@@ -110,6 +151,58 @@ public sealed partial class LiveTrendViewModel : ObservableObject
         TriggerActive = spans.Count > 0 && (spans[^1].To is not { } end || end > now);
         foreach (var (tag, shown) in _filtered)
             TriggerFilter.Apply(tag.TrendPoints, spans, now, shown);
+    }
+
+    /// <summary>Activaciones del disparo en lo recibido (vacío si no hay disparo o no se puede evaluar).</summary>
+    private List<TriggerActivation> Activations()
+    {
+        if (_trigger is null || _triggerSource is not { } source || !TriggerFilter.TryParseTarget(_trigger.Value, out var target))
+            return [];
+        return XYData.Activations(source.TrendPoints, v => TriggerFilter.IsMet(v, _trigger.Condition, target));
+    }
+
+    /// <summary>
+    /// Curvas de ciclos (cada activación alineada en 0) o de X-Y (con disparo, una por activación; sin él, la ventana).
+    /// La más reciente de cada tag va resaltada.
+    /// </summary>
+    private void BuildCurves(DateTimeOffset now)
+    {
+        var before = TimeSpan.FromSeconds(Math.Max(0, _trigger?.BeforeSeconds ?? 0));
+        var hold = TimeSpan.FromSeconds(Math.Max(0, _trigger?.HoldSeconds ?? 0));
+        var activations = Activations();
+        if (activations.Count > MaxCycles)
+            activations = activations[^MaxCycles..];
+        var curves = new List<XYCurve>();
+        var options = Chart.SelectedOptions.ToArray();
+        if (_kind == ChartKind.Cycles)
+        {
+            foreach (var option in options)
+            {
+                var series = new ChartSeries(option.Name, option.Points, option.Step);
+                for (var i = 0; i < activations.Count; i++)
+                {
+                    var (from, to) = XYData.CycleWindow(activations[i], before, hold, now);
+                    curves.Add(new XYCurve(option.Name, XYData.Cycle(series, activations[i].On, from, to), option.ColorIndex,
+                        Highlight: i == activations.Count - 1, Step: option.Step, IsBoolean: option.IsBoolean));
+                }
+            }
+            Chart.Caption = activations.Count switch { 0 => "", 1 => "1 ciclo", var n => $"{n} ciclos{(n == MaxCycles ? " (los últimos)" : "")}" };
+        }
+        else if (_xSource is { } xTag)
+        {
+            var x = new ChartSeries(_xName, xTag.TrendPoints);
+            var windows = _trigger is null
+                ? [(now - Window.Value, now)]
+                : activations.Select(a => XYData.CycleWindow(a, before, hold, now)).ToList();
+            foreach (var option in options)
+            {
+                var y = new ChartSeries(option.Name, option.Points, option.Step);
+                for (var i = 0; i < windows.Count; i++)
+                    curves.Add(new XYCurve(option.Name, XYData.Pairs(x, y, windows[i].Item1, windows[i].Item2), option.ColorIndex, Highlight: i == windows.Count - 1));
+            }
+            Chart.Caption = _trigger is null ? "" : activations.Count switch { 0 => "", 1 => "1 ciclo", var n => $"{n} ciclos" };
+        }
+        Chart.Curves = curves;
     }
 
     partial void OnWindowChanged(Choice<TimeSpan> value) => Refresh(DateTimeOffset.UtcNow);

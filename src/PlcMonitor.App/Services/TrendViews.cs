@@ -23,6 +23,10 @@ public sealed class TrendView
 
     public List<TrendTagRef> Tags { get; set; } = [];
 
+    /// <summary>Tipo de gráfica (las vistas guardadas antes de haber tipos son tendencias).</summary>
+    [JsonConverter(typeof(JsonStringEnumConverter<PlcMonitor.App.Charts.ChartKind>))]
+    public PlcMonitor.App.Charts.ChartKind Kind { get; set; }
+
     public int WindowMinutes { get; set; } = 5;
 
     public bool AutoY { get; set; } = true;

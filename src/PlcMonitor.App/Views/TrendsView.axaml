@@ -66,13 +66,31 @@
             <Border Classes="card" Padding="20">
               <StackPanel Spacing="12">
                 <TextBlock Text="VISTA" Classes="caption" />
-                <Grid ColumnDefinitions="170,*" RowDefinitions="Auto,Auto,Auto" RowSpacing="10" ColumnSpacing="16">
+                <Grid ColumnDefinitions="170,*" RowDefinitions="Auto,Auto,Auto,Auto,Auto" RowSpacing="10" ColumnSpacing="16">
                   <TextBlock Text="Nombre" VerticalAlignment="Center" FontWeight="Medium" />
                   <TextBox Grid.Column="1" Text="{Binding Name}" PlaceholderText="Presión línea 3" />
-                  <TextBlock Grid.Row="1" Text="Ventana" VerticalAlignment="Center" FontWeight="Medium" />
-                  <ComboBox Grid.Row="1" Grid.Column="1" ItemsSource="{x:Static vm:LiveTrendViewModel.Windows}" SelectedItem="{Binding Window}" MinWidth="110" />
-                  <TextBlock Grid.Row="2" Text="Eje Y" VerticalAlignment="Center" FontWeight="Medium" />
-                  <StackPanel Grid.Row="2" Grid.Column="1" Orientation="Horizontal" Spacing="8">
+                  <TextBlock Grid.Row="1" Text="Tipo de gráfica" VerticalAlignment="Center" FontWeight="Medium" />
+                  <ComboBox Grid.Row="1" Grid.Column="1" ItemsSource="{x:Static vm:ChartKindChoice.All}" SelectedItem="{Binding Kind}" MinWidth="280" MaxWidth="560">
+                    <ComboBox.ItemTemplate>
+                      <DataTemplate x:DataType="vm:ChartKindChoice">
+                        <StackPanel Spacing="2" Margin="0,2">
+                          <TextBlock Text="{Binding Text}" FontWeight="Medium" />
+                          <TextBlock Text="{Binding Description}" Classes="muted" FontSize="11.5" TextWrapping="Wrap" MaxWidth="520" />
+                        </StackPanel>
+                      </DataTemplate>
+                    </ComboBox.ItemTemplate>
+                    <!-- Cerrado, solo el nombre: la explicación va debajo. -->
+                    <ComboBox.SelectionBoxItemTemplate>
+                      <DataTemplate x:DataType="vm:ChartKindChoice">
+                        <TextBlock Text="{Binding Text}" />
+                      </DataTemplate>
+                    </ComboBox.SelectionBoxItemTemplate>
+                  </ComboBox>
+                  <TextBlock Grid.Row="2" Grid.Column="1" Text="{Binding Kind.Description}" Classes="muted" FontSize="11.5" TextWrapping="Wrap" />
+                  <TextBlock Grid.Row="3" Text="Ventana" VerticalAlignment="Center" FontWeight="Medium" />
+                  <ComboBox Grid.Row="3" Grid.Column="1" ItemsSource="{x:Static vm:LiveTrendViewModel.Windows}" SelectedItem="{Binding Window}" MinWidth="110" />
+                  <TextBlock Grid.Row="4" Text="Eje Y" VerticalAlignment="Center" FontWeight="Medium" />
+                  <StackPanel Grid.Row="4" Grid.Column="1" Orientation="Horizontal" Spacing="8">
                     <CheckBox Content="Automático" IsChecked="{Binding AutoY}" />
                     <TextBlock Text="mín" Classes="muted" VerticalAlignment="Center" IsVisible="{Binding IsManualY}" Margin="8,0,0,0" />
                     <NumericUpDown Value="{Binding YMin}" Width="130" IsVisible="{Binding IsManualY}" />
@@ -80,6 +98,8 @@
                     <NumericUpDown Value="{Binding YMax}" Width="130" IsVisible="{Binding IsManualY}" />
                   </StackPanel>
                 </Grid>
+                <TextBlock Text="{Binding KindError}" Classes="error" TextWrapping="Wrap"
+                           IsVisible="{Binding KindError, Converter={x:Static StringConverters.IsNotNullOrEmpty}}" />
               </StackPanel>
             </Border>
 
@@ -126,14 +146,18 @@
               <Grid ColumnDefinitions="*,*" ColumnSpacing="20">
                 <StackPanel Spacing="10">
                   <TextBlock Text="TAGS DE LA VISTA" Classes="caption" />
+                  <TextBlock Text="{Binding XAxisText}" FontWeight="Medium" IsVisible="{Binding IsXYKind}" TextWrapping="Wrap" />
                   <TextBlock Classes="muted" Text="Ninguno todavía: añádelos de la lista de la derecha."
                              IsVisible="{Binding !Tags.Count}" TextWrapping="Wrap" />
                   <ItemsControl ItemsSource="{Binding Tags}">
                     <ItemsControl.ItemTemplate>
                       <DataTemplate x:DataType="svc:TrendTagRef">
-                        <Grid ColumnDefinitions="*,Auto" Margin="0,0,0,4">
+                        <Grid ColumnDefinitions="*,Auto,Auto" Margin="0,0,0,4">
                           <TextBlock Text="{Binding}" VerticalAlignment="Center" TextTrimming="CharacterEllipsis" />
-                          <Button Grid.Column="1" Classes="ghost danger" ToolTip.Tip="Quitar de la vista"
+                          <Button Grid.Column="1" Classes="ghost" ToolTip.Tip="Usar como eje X" Content="Eje X" FontSize="11.5"
+                                  IsVisible="{Binding $parent[UserControl].((vm:TrendsViewModel)DataContext).IsXYKind}"
+                                  Command="{Binding $parent[UserControl].((vm:TrendsViewModel)DataContext).MakeXAxisCommand}" CommandParameter="{Binding}" />
+                          <Button Grid.Column="2" Classes="ghost danger" ToolTip.Tip="Quitar de la vista"
                                   Command="{Binding $parent[UserControl].((vm:TrendsViewModel)DataContext).RemoveTagCommand}" CommandParameter="{Binding}">
                             <c:Icon Kind="x" Width="14" Height="14" />
                           </Button>
@@ -204,8 +228,8 @@
                   <TextBlock Text="Editar vista" />
                 </StackPanel>
               </Button>
-              <TextBlock Text="Ventana" Classes="muted" VerticalAlignment="Center" Margin="8,0,0,0" />
-              <ComboBox ItemsSource="{x:Static vm:LiveTrendViewModel.Windows}" SelectedItem="{Binding Window}" MinWidth="110" />
+              <TextBlock Text="Ventana" Classes="muted" VerticalAlignment="Center" Margin="8,0,0,0" IsVisible="{Binding UsesWindow}" />
+              <ComboBox ItemsSource="{x:Static vm:LiveTrendViewModel.Windows}" SelectedItem="{Binding Window}" MinWidth="110" IsVisible="{Binding UsesWindow}" />
               <Button Classes="secondary" Command="{Binding TogglePauseCommand}">
                 <StackPanel Orientation="Horizontal" Spacing="6">
                   <c:Icon Kind="pause" IsVisible="{Binding !Paused}" />

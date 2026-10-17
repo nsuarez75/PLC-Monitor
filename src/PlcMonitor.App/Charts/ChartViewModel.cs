@@ -81,6 +81,45 @@ public sealed partial class ChartViewModel : ObservableObject
 
     public bool HasOptions => Options.Count > 0;
 
+    /// <summary>Tipo de gráfica: la tendencia y el cronograma usan <see cref="Series"/>; ciclos y X-Y, <see cref="Curves"/>.</summary>
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(IsTrend), nameof(IsStates), nameof(IsXY), nameof(IsCycles), nameof(HasYAxis), nameof(Hint))]
+    public partial ChartKind Kind { get; set; } = ChartKind.Trend;
+
+    public bool IsTrend => Kind == ChartKind.Trend;
+
+    public bool IsStates => Kind == ChartKind.States;
+
+    public bool IsCycles => Kind == ChartKind.Cycles;
+
+    /// <summary>Gráfica con eje X numérico (ciclos superpuestos o X-Y).</summary>
+    public bool IsXY => Kind is ChartKind.Cycles or ChartKind.XY;
+
+    public bool HasYAxis => Kind != ChartKind.States;
+
+    /// <summary>Curvas de los ciclos superpuestos o de la X-Y (las calcula quien alimenta la gráfica).</summary>
+    [ObservableProperty]
+    public partial IReadOnlyList<XYCurve> Curves { get; set; } = [];
+
+    /// <summary>Texto del eje X de las gráficas X-Y y de ciclos.</summary>
+    [ObservableProperty]
+    public partial string XLabel { get; set; } = "";
+
+    /// <summary>Resumen junto a la ayuda (p. ej. cuántos ciclos se ven).</summary>
+    [ObservableProperty]
+    public partial string Caption { get; set; } = "";
+
+    public string Hint => Kind switch
+    {
+        ChartKind.Cycles => "Cada ciclo empieza en 0 (el disparo); el último va resaltado y los anteriores, tenues.",
+        ChartKind.XY => "Pasa el ratón para ver las coordenadas; el punto marca el valor más reciente.",
+        ChartKind.States => "Arrastra para ampliar un tramo; pasa el ratón por una franja para ver el estado y cuánto duró.",
+        _ => "Arrastra sobre la gráfica para ampliar un tramo; pasa el ratón para ver los valores.",
+    };
+
+    /// <summary>Tags marcados, con sus puntos.</summary>
+    internal IEnumerable<ChartSeriesOption> SelectedOptions => Options.Where(o => o.IsSelected);
+
     /// <summary>El usuario ha hecho zoom o lo ha quitado (la tendencia en vivo se pausa con el zoom).</summary>
     public event EventHandler? ZoomChanged;
 

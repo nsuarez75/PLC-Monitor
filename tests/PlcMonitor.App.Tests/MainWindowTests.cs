@@ -351,7 +351,7 @@ public class MainWindowTests
     }
 
     /// <summary>Si PLCMON_UI_CAPTURE_DIR está definida, guarda una captura para revisarla.</summary>
-    private static void Capture(Window window, string file)
+    internal static void Capture(Window window, string file)
     {
         if (Environment.GetEnvironmentVariable("PLCMON_UI_CAPTURE_DIR") is not { Length: > 0 } dir)
             return;

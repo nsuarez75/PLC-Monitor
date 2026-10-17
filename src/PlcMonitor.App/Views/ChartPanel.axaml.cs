@@ -11,5 +11,6 @@ public sealed partial class ChartPanel : UserControl
     {
         AvaloniaXamlLoader.Load(this);
         this.FindControl<TrendChart>("Chart")!.ZoomRequested += (_, e) => (DataContext as ChartViewModel)?.Zoom(e.From, e.To);
+        this.FindControl<StateChart>("States")!.ZoomRequested += (_, e) => (DataContext as ChartViewModel)?.Zoom(e.From, e.To);
     }
 }
