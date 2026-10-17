@@ -10,7 +10,8 @@ using Api = PlcMonitor.Agent.Contracts;
 namespace PlcMonitor.Agent;
 
 /// <summary>Implementación de la API gRPC sobre el motor.</summary>
-public sealed class AgentGrpcService(EngineHost host, DriverRegistry registry, ILogger<AgentGrpcService> logger) : Api.AgentService.AgentServiceBase
+public sealed class AgentGrpcService(EngineHost host, DriverRegistry registry, IHostApplicationLifetime lifetime, ILogger<AgentGrpcService> logger)
+    : Api.AgentService.AgentServiceBase
 {
     private TagEngine Engine => host.Engine;
 
@@ -101,16 +102,20 @@ public sealed class AgentGrpcService(EngineHost host, DriverRegistry registry, I
             Guard(() => Engine.GetDevice(device));
         bool Wanted(string device) => devices is null || devices.Contains(device);
 
+        // La suscripción termina cuando el cliente la cierra o cuando el agente empieza a pararse (si no, el host esperaría
+        // a que el cliente se fuera y la parada se alargaría hasta su tiempo máximo).
+        using var stopping = CancellationTokenSource.CreateLinkedTokenSource(context.CancellationToken, lifetime.ApplicationStopping);
+        var token = stopping.Token;
         using var subscription = Engine.Subscribe();
         var snapshot = new Api.Snapshot();
         var tagCounts = subscription.InitialTags.CountBy(t => t.Definition.Key.Device).ToDictionary(StringComparer.OrdinalIgnoreCase);
         snapshot.Devices.AddRange(subscription.InitialDevices.Where(d => Wanted(d.Device)).Select(d => ProtoMapper.ToProto(d, tagCounts.GetValueOrDefault(d.Device))));
         snapshot.Tags.AddRange(subscription.InitialTags.Where(t => Wanted(t.Definition.Key.Device)).Select(ProtoMapper.ToProto));
-        await responseStream.WriteAsync(new Api.SubscribeEvent { Snapshot = snapshot }, context.CancellationToken);
+        await responseStream.WriteAsync(new Api.SubscribeEvent { Snapshot = snapshot }, token);
 
         try
         {
-            await foreach (var engineEvent in subscription.Events.ReadAllAsync(context.CancellationToken))
+            await foreach (var engineEvent in subscription.Events.ReadAllAsync(token))
             {
                 switch (engineEvent)
                 {
@@ -118,19 +123,19 @@ public sealed class AgentGrpcService(EngineHost host, DriverRegistry registry, I
                         var updates = new Api.TagUpdates();
                         updates.Updates.AddRange(changed.Updates.Where(u => Wanted(u.Key.Device)).Select(ProtoMapper.ToProto));
                         if (updates.Updates.Count > 0)
-                            await responseStream.WriteAsync(new Api.SubscribeEvent { TagUpdates = updates }, context.CancellationToken);
+                            await responseStream.WriteAsync(new Api.SubscribeEvent { TagUpdates = updates }, token);
                         break;
                     case DeviceStatusChanged status when Wanted(status.Status.Device):
-                        await responseStream.WriteAsync(new Api.SubscribeEvent { DeviceStatus = ToProto(status.Status) }, context.CancellationToken);
+                        await responseStream.WriteAsync(new Api.SubscribeEvent { DeviceStatus = ToProto(status.Status) }, token);
                         break;
                     case DeviceConfigured configured when Wanted(configured.Status.Device):
                         var pb = new Api.DeviceConfigured { Device = ProtoMapper.ToProto(configured.Status, configured.Tags.Count) };
                         pb.Tags.AddRange(configured.Tags.Select(ProtoMapper.ToProto));
-                        await responseStream.WriteAsync(new Api.SubscribeEvent { DeviceConfigured = pb }, context.CancellationToken);
+                        await responseStream.WriteAsync(new Api.SubscribeEvent { DeviceConfigured = pb }, token);
                         break;
                     case DeviceRemoved removed when Wanted(removed.Device):
                         await responseStream.WriteAsync(
-                            new Api.SubscribeEvent { DeviceRemoved = new Api.DeviceRemoved { Device = removed.Device } }, context.CancellationToken);
+                            new Api.SubscribeEvent { DeviceRemoved = new Api.DeviceRemoved { Device = removed.Device } }, token);
                         break;
                 }
             }
@@ -140,9 +145,9 @@ public sealed class AgentGrpcService(EngineHost host, DriverRegistry registry, I
             logger.LogWarning("Suscripción de {Peer} cerrada: {Message}", context.Peer, ex.Message);
             throw new RpcException(new Status(StatusCode.ResourceExhausted, ex.Message));
         }
-        catch (OperationCanceledException) when (context.CancellationToken.IsCancellationRequested)
+        catch (OperationCanceledException) when (context.CancellationToken.IsCancellationRequested || lifetime.ApplicationStopping.IsCancellationRequested)
         {
-            // El cliente cerró la suscripción.
+            // El cliente cerró la suscripción o el agente se está parando.
         }
     }
 

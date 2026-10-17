@@ -1,3 +1,4 @@
+using Microsoft.Extensions.DependencyInjection;
 using Google.Protobuf.WellKnownTypes;
 using Grpc.Core;
 using PlcMonitor.Agent.Contracts;
@@ -85,6 +86,30 @@ public class AgentApiTests
         update.Device.ShouldBe("plc1");
         update.Tag.ShouldBe("DB1.DBW0");
         update.Value.Text.ShouldBe("2");
+    }
+
+    [Fact]
+    public async Task Subscriptions_end_when_the_agent_starts_stopping()
+    {
+        // Si la suscripción siguiera abierta, el host esperaría al cliente y la parada se alargaría (systemd lo mataría).
+        await using var agent = new AgentFactory(Device("plc1", tags: [T("DB1.DBW0")]));
+        var client = agent.CreateGrpcClient();
+        using var cts = CancellationTokenSource.CreateLinkedTokenSource(Ct);
+        cts.CancelAfter(TimeSpan.FromSeconds(10));
+        using var call = client.Subscribe(new SubscribeRequest(), cancellationToken: cts.Token);
+        (await call.ResponseStream.MoveNext(cts.Token)).ShouldBeTrue(); // foto inicial
+
+        var lifetime = agent.Services.GetRequiredService<Microsoft.Extensions.Hosting.IHostApplicationLifetime>();
+        var stopped = Task.Delay(Timeout.Infinite, lifetime.ApplicationStopped).ContinueWith(_ => { }, TaskScheduler.Default);
+        var watch = System.Diagnostics.Stopwatch.StartNew();
+        lifetime.StopApplication();
+        while (await call.ResponseStream.MoveNext(cts.Token))
+        {
+        }
+        watch.Elapsed.ShouldBeLessThan(TimeSpan.FromSeconds(2));
+        call.GetStatus().StatusCode.ShouldBe(StatusCode.OK);
+        // Que la parada del host acabe antes de liberar el agente de prueba.
+        await stopped.WaitAsync(TimeSpan.FromSeconds(5), Ct);
     }
 
     [Fact]

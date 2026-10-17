@@ -36,6 +36,9 @@ if (!string.IsNullOrEmpty(builder.Configuration["Logging:File:Path"]) || Operati
     builder.Logging.AddProvider(new FileLoggerProvider(directory, retention));
 }
 builder.Services.AddSystemd();
+// Parada rápida: las suscripciones se cierran al empezar a parar (ApplicationStopping) y, si algo se resiste, el host
+// no espera más de 4 s (systemd en algunas distribuciones mata el servicio a los 5 s).
+builder.Services.Configure<HostOptions>(o => o.ShutdownTimeout = TimeSpan.FromSeconds(4));
 builder.WebHost.ConfigureKestrel(k => k.ConfigureEndpointDefaults(e => e.Protocols = HttpProtocols.Http2));
 
 builder.Services.Configure<AgentOptions>(builder.Configuration.GetSection("Agent"));

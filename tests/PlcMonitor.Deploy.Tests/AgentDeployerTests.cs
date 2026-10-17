@@ -86,6 +86,7 @@ public sealed class AgentDeployerTests : IDisposable
         script.ShouldContain(upload.Key);
         script.ShouldContain("useradd --system");
         script.ShouldContain("ExecStart=/opt/plc-monitor/agent/plcmon-agent");
+        script.ShouldContain("TimeoutStopSec=15"); // margen para parar ordenadamente aunque el sistema baje el valor por defecto
         script.ShouldContain("ufw allow 5311/tcp");
 
         var settings = Decode(script, "agent.settings.json");

@@ -67,6 +67,8 @@ internal static class AgentScripts
         Environment=DOTNET_BUNDLE_EXTRACT_BASE_DIR={{LinuxDir}}/.bundle
         Restart=on-failure
         RestartSec=5
+        # Margen para cerrar ordenadamente (volcar el historiador): algunos sistemas bajan el valor por defecto a 5 s.
+        TimeoutStopSec=15
         NoNewPrivileges=true
         ProtectSystem=strict
         ProtectHome=true
