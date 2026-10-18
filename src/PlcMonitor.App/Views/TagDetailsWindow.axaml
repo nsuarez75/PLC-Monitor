@@ -7,8 +7,27 @@
         Title="{Binding Tag.Name, StringFormat='Tag {0}'}"
         Width="640" SizeToContent="Height" MaxHeight="900" CanResize="False"
         WindowStartupLocation="CenterOwner" ShowInTaskbar="False">
+  <DockPanel>
+    <!-- Errores y botones fijos abajo: siempre a la vista aunque el contenido tenga que desplazarse -->
+    <StackPanel DockPanel.Dock="Bottom" Margin="24,12,24,20" Spacing="12">
+      <Border Classes="pill bad" CornerRadius="8" Padding="12,8" HorizontalAlignment="Stretch"
+              IsVisible="{Binding Errors, Converter={x:Static StringConverters.IsNotNullOrEmpty}}">
+        <TextBlock Text="{Binding Errors}" TextWrapping="Wrap" />
+      </Border>
+
+      <StackPanel Orientation="Horizontal" Spacing="8" HorizontalAlignment="Right">
+        <Button x:Name="CloseButton" Classes="secondary" Content="Cerrar" IsCancel="True" />
+        <Button Classes="accent" Command="{Binding SaveCommand}" IsDefault="True">
+          <StackPanel Orientation="Horizontal" Spacing="6">
+            <c:Icon Kind="save" />
+            <TextBlock Text="Guardar" />
+          </StackPanel>
+        </Button>
+      </StackPanel>
+    </StackPanel>
+
   <ScrollViewer>
-    <StackPanel Margin="24" Spacing="16">
+    <StackPanel Margin="24,24,24,4" Spacing="16">
 
       <!-- Cabecera y valor en vivo -->
       <Grid ColumnDefinitions="Auto,*" ColumnSpacing="14">
@@ -132,20 +151,7 @@
         </StackPanel>
       </Border>
 
-      <Border Classes="pill bad" CornerRadius="8" Padding="12,8" HorizontalAlignment="Stretch"
-              IsVisible="{Binding Errors, Converter={x:Static StringConverters.IsNotNullOrEmpty}}">
-        <TextBlock Text="{Binding Errors}" TextWrapping="Wrap" />
-      </Border>
-
-      <StackPanel Orientation="Horizontal" Spacing="8" HorizontalAlignment="Right">
-        <Button x:Name="CloseButton" Classes="secondary" Content="Cerrar" IsCancel="True" />
-        <Button Classes="accent" Command="{Binding SaveCommand}" IsDefault="True">
-          <StackPanel Orientation="Horizontal" Spacing="6">
-            <c:Icon Kind="save" />
-            <TextBlock Text="Guardar" />
-          </StackPanel>
-        </Button>
-      </StackPanel>
     </StackPanel>
   </ScrollViewer>
+  </DockPanel>
 </Window>

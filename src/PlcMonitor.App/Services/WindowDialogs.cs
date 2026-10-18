@@ -22,7 +22,12 @@ public sealed class WindowDialogs(Window owner) : IDialogs
         return file?.TryGetLocalPath();
     }
 
-    public Task ShowTagDetailsAsync(ViewModels.TagDetailsViewModel details) => new TagDetailsWindow { DataContext = details }.ShowDialog(owner);
+    public Task ShowTagDetailsAsync(ViewModels.TagDetailsViewModel details)
+    {
+        var window = new TagDetailsWindow { DataContext = details };
+        window.FitTo(owner);
+        return window.ShowDialog(owner);
+    }
 
     public async Task<string?> OpenFileAsync(string title, string extension)
     {
