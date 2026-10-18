@@ -10,7 +10,7 @@
     <NoWarn>$(NoWarn);CA1515;CA1848;CA1873;CA2007;CA1720</NoWarn>
     <Authors>PLC-Monitor</Authors>
     <Product>PLC-Monitor</Product>
-    <Version>1.6.0</Version>
+    <Version>1.6.1</Version>
     <InvariantGlobalization>true</InvariantGlobalization>
   </PropertyGroup>
 </Project>
