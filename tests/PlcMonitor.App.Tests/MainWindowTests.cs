@@ -195,6 +195,26 @@ public class MainWindowTests
     });
 
     [Fact]
+    public Task Tag_details_fit_a_short_screen_with_buttons_visible() => HeadlessApp.RunAsync(() =>
+    {
+        var vm = ViewModelWithData();
+        var tag = vm.Devices[0].Tags.Single(t => t.Name == "peso");
+        var config = new DeviceConfig { Name = "casa1200" };
+        var group = new ScanGroupConfig { Name = "rapido", IntervalMs = 250 };
+        group.Tags.Add(new TagConfig { Name = "peso", Address = "Viruta_Datos.Viruta.Peso", History = new HistoryConfig { Enabled = true } });
+        config.ScanGroups.Add(group);
+        var window = new TagDetailsWindow { DataContext = new TagDetailsViewModel(vm, tag, config), MaxHeight = 480 };
+        window.Show();
+        window.UpdateLayout();
+
+        window.Bounds.Height.ShouldBeLessThanOrEqualTo(480);
+        var save = window.GetVisualDescendants().OfType<Button>().Single(b => b.IsDefault);
+        var bottom = Avalonia.VisualExtensions.TranslatePoint(save, new Avalonia.Point(0, save.Bounds.Height), window)!.Value.Y;
+        bottom.ShouldBeLessThanOrEqualTo(window.Bounds.Height);
+        Capture(window, "tag-details-short.png");
+    });
+
+    [Fact]
     public Task History_tab_renders() => HeadlessApp.RunAsync(() =>
     {
         Avalonia.Application.Current!.RequestedThemeVariant = Avalonia.Styling.ThemeVariant.Light;

@@ -23,6 +23,21 @@ public sealed partial class TagDetailsWindow : Window
         Closed += (_, _) => trend.Stop();
     }
 
+    /// <summary>
+    /// Limita la altura al área útil de la pantalla del propietario (descontando la barra de título),
+    /// para que la ventana no se salga en pantallas pequeñas o con escalado; el contenido se desplaza.
+    /// </summary>
+    public void FitTo(Window owner)
+    {
+        if ((owner.Screens.ScreenFromWindow(owner) ?? owner.Screens.Primary) is not { } screen)
+            return;
+        var available = screen.WorkingArea.Height / screen.Scaling - TitleBarAllowance;
+        if (available > 0 && available < MaxHeight)
+            MaxHeight = available;
+    }
+
+    private const double TitleBarAllowance = 64;
+
     protected override void OnDataContextChanged(EventArgs e)
     {
         base.OnDataContextChanged(e);
