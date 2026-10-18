@@ -62,6 +62,32 @@ public class RealPlcTests
     }
 
     [Fact]
+    public async Task Symbolic_cancelled_reads_keep_the_connection()
+    {
+        // Al reconfigurar tags en caliente el agente cancela la lectura en curso: no debe darse por perdida la conexión.
+        var symbol = Env("PLCMON_IT_SYMBOL");
+        Assert.SkipWhen(symbol is null, "PLCMON_IT_SYMBOL no definida");
+        await using var conn = await ConnectSymbolicAsync();
+        (await conn.ReadAsync([symbol!], TestContext.Current.CancellationToken))[0].Quality.ShouldBe(QualityCode.Good);
+
+        for (var delayMs = 0; delayMs < 30; delayMs += 2)
+        {
+            using var cts = new CancellationTokenSource(TimeSpan.FromMilliseconds(delayMs));
+            try
+            {
+                await conn.ReadAsync([symbol!], cts.Token);
+            }
+            catch (OperationCanceledException)
+            {
+            }
+            conn.State.ShouldBe(ConnectionState.Connected, $"tras cancelar a los {delayMs} ms");
+        }
+
+        var values = await conn.ReadAsync([symbol!], TestContext.Current.CancellationToken);
+        values[0].Quality.ShouldBe(QualityCode.Good, values[0].ErrorDetail);
+    }
+
+    [Fact]
     public async Task Symbolic_poller_emits_initial_values()
     {
         var symbol = Env("PLCMON_IT_SYMBOL");
