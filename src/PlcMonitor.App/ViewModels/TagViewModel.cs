@@ -22,6 +22,8 @@ public sealed partial class TagViewModel : ObservableObject
         Group = $"{tag.Group} ({tag.IntervalMs} ms)";
         Writable = tag.Writable;
         Historized = tag.Historized;
+        Transform = tag.Transform;
+        Folder = tag.Folder;
         if (tag.Value is not null)
             Apply(tag.Value);
     }
@@ -38,6 +40,19 @@ public sealed partial class TagViewModel : ObservableObject
 
     /// <summary>El agente guarda este tag en el histórico.</summary>
     public bool Historized { get; }
+
+    /// <summary>Transformación con la que se muestra el valor; vacío = ninguna.</summary>
+    public string Transform { get; }
+
+    /// <summary>Grupo de visualización (carpeta plegable de la tabla); vacío = sin grupo.</summary>
+    public string Folder { get; }
+
+    /// <summary>Valor entero actual (booleanos como 0/1) para la transformación; null si no hay o no es entero.</summary>
+    private long? _integer;
+
+    /// <summary>Valor tal como se muestra: con transformación, «Marcha (1)»; si no, el mismo que <see cref="ValueText"/>.</summary>
+    [ObservableProperty]
+    public partial string DisplayText { get; private set; } = "";
 
     [ObservableProperty]
     [NotifyPropertyChangedFor(nameof(IsTrue), nameof(IsFalse))]
@@ -105,7 +120,22 @@ public sealed partial class TagViewModel : ObservableObject
         ValueText = value.Quality is Quality.Good or Quality.Uncertain ? value.Text : value.Error;
         DataType = value.DataType == Agent.Contracts.DataType.Unknown ? "" : value.DataType.ToString();
         Time = value.Timestamp?.ToDateTime().ToLocalTime().ToString("HH:mm:ss.fff", CultureInfo.InvariantCulture) ?? "";
+        _integer = value.Quality is not (Quality.Good or Quality.Uncertain) ? null : value.TypedCase switch
+        {
+            TagValue.TypedOneofCase.IntValue => value.IntValue,
+            TagValue.TypedOneofCase.UintValue when value.UintValue <= long.MaxValue => (long)value.UintValue,
+            TagValue.TypedOneofCase.BoolValue => value.BoolValue ? 1 : 0,
+            _ => null,
+        };
+        RefreshDisplay();
         AddTrendPoint(value);
+    }
+
+    /// <summary>Vuelve a calcular <see cref="DisplayText"/> (al recibir un valor o al cambiar las transformaciones del agente).</summary>
+    public void RefreshDisplay()
+    {
+        var entry = _integer is { } n && Transform.Length > 0 ? _context.FindTransform(Transform)?.Entries.FirstOrDefault(e => e.Value == n) : null;
+        DisplayText = entry is null ? ValueText : $"{entry.Text} ({ValueText})";
     }
 
     private void AddTrendPoint(TagValue value)

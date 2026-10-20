@@ -53,6 +53,11 @@ internal sealed class FakeDialogs : IDialogs
     public string? OpenPath { get; set; }
 
     public Task<string?> OpenFileAsync(string title, string extension) => Task.FromResult(OpenPath);
+
+    /// <summary>Texto que devuelve el diálogo de pedir texto (null = cancelar).</summary>
+    public string? PromptAnswer { get; set; }
+
+    public Task<string?> PromptAsync(string title, string message, string initial = "") => Task.FromResult(PromptAnswer);
 }
 
 /// <summary>Conecta con el agente en memoria sea cual sea la URL.</summary>

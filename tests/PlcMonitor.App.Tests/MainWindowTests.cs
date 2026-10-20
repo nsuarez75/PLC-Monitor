@@ -513,6 +513,78 @@ public class MainWindowTests
     }
 
     /// <summary>Si PLCMON_UI_CAPTURE_DIR está definida, guarda una captura para revisarla.</summary>
+    [Fact]
+    public Task Folders_transforms_and_their_panels_render() => HeadlessApp.RunAsync(async () =>
+    {
+        Avalonia.Application.Current!.RequestedThemeVariant = Avalonia.Styling.ThemeVariant.Light;
+        var vm = new MainViewModel(new GrpcAgentConnector(), new ImmediateDispatcher(), new FakeDialogs(), new AppSettings(), Path.GetTempFileName(),
+            Path.Combine(Path.GetTempPath(), $"plcmon-agents-{Guid.NewGuid():N}.json"));
+        var now = Timestamp.FromDateTime(DateTime.UtcNow);
+        var snapshot = new Snapshot();
+        snapshot.Devices.Add(new Device { Name = "casa1200", Driver = "s7-symbolic", Enabled = true, State = ConnectionState.Connected, Since = now, TagCount = 5 });
+        var estados = new PlcMonitor.Agent.Contracts.ValueTransform { Name = "Estado motor" };
+        estados.Entries.Add(new PlcMonitor.Agent.Contracts.TransformEntry { Value = 0, Text = "Parado" });
+        estados.Entries.Add(new PlcMonitor.Agent.Contracts.TransformEntry { Value = 1, Text = "Marcha" });
+        estados.Entries.Add(new PlcMonitor.Agent.Contracts.TransformEntry { Value = 2, Text = "Fallo" });
+        snapshot.Transforms.Add(estados);
+        Tag Folder(string name, string folder, string text, DataType type, string transform = "", long? number = null)
+        {
+            var tag = Tag(name, $"Linea.{name}", text, type, Quality.Good, now, false);
+            tag.Folder = folder;
+            tag.Transform = transform;
+            if (number is { } n)
+                tag.Value.IntValue = n;
+            return tag;
+        }
+        snapshot.Tags.Add(Folder("motor_cinta", "Cinta 1", "1", DataType.Int16, "Estado motor", 1));
+        snapshot.Tags.Add(Folder("velocidad_cinta", "Cinta 1", "1.25", DataType.Float));
+        snapshot.Tags.Add(Folder("temperatura", "Horno", "182.4", DataType.Float));
+        snapshot.Tags.Add(Folder("quemador", "Horno", "2", DataType.Int16, "Estado motor", 2));
+        snapshot.Tags.Add(Folder("contador", "", "4512", DataType.Int32));
+        vm.Apply(new SubscribeEvent { Snapshot = snapshot });
+        var window = new MainWindow { DataContext = vm };
+        window.Show();
+
+        var texts = window.GetVisualDescendants().OfType<TextBlock>().Select(t => t.Text).Where(t => t is not null).ToArray();
+        texts.ShouldContain("Cinta 1");
+        texts.ShouldContain("Sin grupo");
+        texts.ShouldContain("Marcha (1)");
+        texts.ShouldContain("Fallo (2)");
+        Capture(window, "tags-folders.png");
+        vm.Devices[0].Rows.OfType<TagFolderViewModel>().Single(f => f.Name == "Horno").ToggleCommand.Execute(null);
+        window.UpdateLayout();
+        Capture(window, "tags-folders-collapsed.png");
+        Avalonia.Application.Current.RequestedThemeVariant = Avalonia.Styling.ThemeVariant.Dark;
+        Capture(window, "tags-folders-dark.png");
+        Avalonia.Application.Current.RequestedThemeVariant = Avalonia.Styling.ThemeVariant.Light;
+
+        vm.IsConnected = true;
+        vm.OpenTransformsCommand.Execute(null);
+        window.UpdateLayout();
+        window.GetVisualDescendants().OfType<TextBlock>().Select(t => t.Text).ShouldContain("SE MUESTRA COMO");
+        vm.TransformsPanel!.Selected!.UsageText.ShouldBe("2 tags (casa1200/motor_cinta, casa1200/quemador)");
+        Capture(window, "transforms.png");
+        Avalonia.Application.Current.RequestedThemeVariant = Avalonia.Styling.ThemeVariant.Dark;
+        Capture(window, "transforms-dark.png");
+        Avalonia.Application.Current.RequestedThemeVariant = Avalonia.Styling.ThemeVariant.Light;
+        await vm.CloseTransformsCommand.ExecuteAsync(null);
+        vm.TransformsPanel.ShouldBeNull();
+
+        var tag = vm.Devices[0].Tags.Single(t => t.Name == "motor_cinta");
+        var config = new DeviceConfig { Name = "casa1200" };
+        var group = new ScanGroupConfig { Name = "rapido", IntervalMs = 250 };
+        group.Tags.Add(new TagConfig { Name = "motor_cinta", Address = "Linea.motor_cinta", Transform = "Estado motor", Folder = "Cinta 1" });
+        group.Tags.Add(new TagConfig { Name = "temperatura", Address = "Linea.temperatura", Folder = "Horno" });
+        config.ScanGroups.Add(group);
+        var details = new TagDetailsViewModel(vm, tag, config, transforms: ["Estado motor"]);
+        var detailsWindow = new TagDetailsWindow { DataContext = details };
+        detailsWindow.Show();
+        detailsWindow.GetVisualDescendants().OfType<TextBlock>().Select(t => t.Text).ShouldContain("Mostrar valor como");
+        detailsWindow.GetVisualDescendants().OfType<ScrollViewer>().First().Offset = new Avalonia.Vector(0, 420);
+        detailsWindow.UpdateLayout();
+        Capture(detailsWindow, "tag-details-transform.png");
+    });
+
     internal static void Capture(Window window, string file)
     {
         if (Environment.GetEnvironmentVariable("PLCMON_UI_CAPTURE_DIR") is not { Length: > 0 } dir)

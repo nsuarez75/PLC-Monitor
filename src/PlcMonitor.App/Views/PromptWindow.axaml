@@ -1,0 +1,24 @@
+<Window xmlns="https://github.com/avaloniaui"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:c="using:PlcMonitor.App.Controls"
+        x:Class="PlcMonitor.App.Views.PromptWindow"
+        Icon="/Assets/plc-monitor.png"
+        Width="460" SizeToContent="Height" CanResize="False"
+        WindowStartupLocation="CenterOwner" ShowInTaskbar="False">
+  <StackPanel Margin="24" Spacing="18">
+    <StackPanel Orientation="Horizontal" Spacing="12">
+      <Border Width="36" Height="36" CornerRadius="10" Background="{DynamicResource App.AccentSoft}" VerticalAlignment="Top">
+        <c:Icon Kind="pencil" Width="18" Height="18" Foreground="{DynamicResource App.Accent}" />
+      </Border>
+      <StackPanel Spacing="10" Width="360">
+        <TextBlock x:Name="TitleText" FontWeight="SemiBold" FontSize="15" />
+        <TextBlock x:Name="MessageText" TextWrapping="Wrap" Classes="muted" />
+        <TextBox x:Name="ValueBox" />
+      </StackPanel>
+    </StackPanel>
+    <StackPanel Orientation="Horizontal" HorizontalAlignment="Right" Spacing="8">
+      <Button x:Name="NoButton" Content="Cancelar" IsCancel="True" Classes="secondary" />
+      <Button x:Name="YesButton" Content="Aceptar" IsDefault="True" Classes="accent" />
+    </StackPanel>
+  </StackPanel>
+</Window>

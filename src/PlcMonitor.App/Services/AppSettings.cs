@@ -20,6 +20,9 @@ public sealed class AppSettings
     /// <summary>Anchos de las columnas de la tabla de tags elegidos por el usuario (null = los de serie).</summary>
     public string? TagColumns { get; set; }
 
+    /// <summary>Grupos de visualización plegados en la tabla de tags (agente/dispositivo/grupo).</summary>
+    public List<string> CollapsedFolders { get; init; } = [];
+
     /// <summary>URLs usadas recientemente (la primera es la última).</summary>
     public List<string> RecentAgents { get; init; } = [];
 

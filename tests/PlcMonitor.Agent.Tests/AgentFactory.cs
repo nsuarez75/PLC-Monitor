@@ -21,6 +21,10 @@ internal sealed class AgentFactory : WebApplicationFactory<Program>
             File.WriteAllText(ConfigPath, ConfigurationFile.Serialize(new AgentConfiguration { Devices = [.. devices] }));
     }
 
+    /// <summary>Agente con una configuración completa (dispositivos, transformaciones...).</summary>
+    public AgentFactory(AgentConfiguration configuration) =>
+        File.WriteAllText(ConfigPath, ConfigurationFile.Serialize(configuration));
+
     public FakeDriverFactory Driver { get; } = new();
 
     /// <summary>Carpeta propia del agente de prueba (configuración e histórico).</summary>

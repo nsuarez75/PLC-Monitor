@@ -66,6 +66,12 @@
             <TextBlock Text="Tendencias" Classes="barlabel" />
           </StackPanel>
         </Button>
+        <Button Classes="ghost" Command="{Binding OpenTransformsCommand}" ToolTip.Tip="Transformaciones: mostrar valores enteros como texto (0 = Parado, 1 = Marcha…)">
+          <StackPanel Orientation="Horizontal" Spacing="6">
+            <c:Icon Kind="replace" Width="16" Height="16" />
+            <TextBlock Text="Transformaciones" Classes="barlabel" />
+          </StackPanel>
+        </Button>
         <Button Classes="ghost" Command="{Binding OpenAgentsCommand}" ToolTip.Tip="Gestionar agentes (instalar en equipos por SSH)">
           <StackPanel Orientation="Horizontal" Spacing="6">
             <c:Icon Kind="server" Width="16" Height="16" />
@@ -221,8 +227,27 @@
                       <TextBlock Text="Sin tags" FontWeight="SemiBold" HorizontalAlignment="Center" />
                       <TextBlock Classes="muted" Text="Añádelos desde la pestaña «Explorar» con el PLC conectado." HorizontalAlignment="Center" />
                     </StackPanel>
-                    <ListBox x:Name="TagsList" Classes="table" ItemsSource="{Binding SelectedDevice.Tags}" ToolTip.Tip="Doble clic para ver el detalle y la configuración del tag">
-                      <ListBox.ItemTemplate>
+                    <ListBox x:Name="TagsList" Classes="table" ItemsSource="{Binding SelectedDevice.Rows}" SelectionMode="Multiple"
+                             ToolTip.Tip="Doble clic para ver el detalle y la configuración del tag. Clic derecho para agrupar (Ctrl o Mayús para elegir varios)">
+                      <ListBox.ContextMenu>
+                        <ContextMenu x:Name="TagsMenu" />
+                      </ListBox.ContextMenu>
+                      <ListBox.DataTemplates>
+                        <!-- Cabecera de un grupo de visualización: clic para plegar o desplegar -->
+                        <DataTemplate x:DataType="vm:TagFolderViewModel">
+                          <Button Classes="ghost folder" Command="{Binding ToggleCommand}" HorizontalAlignment="Stretch" HorizontalContentAlignment="Left" Padding="4,2">
+                            <StackPanel Orientation="Horizontal" Spacing="8">
+                              <c:Icon Kind="chevron-down" Width="14" Height="14" IsVisible="{Binding IsExpanded}" />
+                              <c:Icon Kind="chevron-right" Width="14" Height="14" IsVisible="{Binding !IsExpanded}" />
+                              <c:Icon Kind="folder" Width="15" Height="15" Foreground="{DynamicResource App.Accent}" />
+                              <TextBlock Text="{Binding Title}" FontWeight="SemiBold" VerticalAlignment="Center" />
+                              <TextBlock Text="{Binding CountText}" Classes="muted" FontSize="12" VerticalAlignment="Center" />
+                              <Border Classes="pill bad" IsVisible="{Binding HasBadTags}" Padding="7,0">
+                                <TextBlock><Run Text="{Binding BadCount}" /><Run Text=" con error" /></TextBlock>
+                              </Border>
+                            </StackPanel>
+                          </Button>
+                        </DataTemplate>
                         <DataTemplate x:DataType="vm:TagViewModel">
                           <c:TableRow Columns="{Binding $parent[Window].((vm:MainViewModel)DataContext).TagColumns, FallbackValue=*}" HideOrder="3,5,1" MinStarWidth="45" ColumnSpacing="12">
                             <StackPanel VerticalAlignment="Center">
@@ -235,8 +260,8 @@
                             </StackPanel>
                             <TextBlock Grid.Column="1" Text="{Binding Address}" Classes="muted mono" FontSize="12" TextTrimming="CharacterEllipsis"
                                        VerticalAlignment="Center" ToolTip.Tip="{Binding Address}" />
-                            <TextBlock Grid.Column="2" Text="{Binding ValueText}" Classes="mono" FontSize="13.5" FontWeight="SemiBold"
-                                       Classes.error="{Binding IsBad}" TextTrimming="CharacterEllipsis" VerticalAlignment="Center" ToolTip.Tip="{Binding ValueText}" />
+                            <TextBlock Grid.Column="2" Text="{Binding DisplayText}" Classes="mono" FontSize="13.5" FontWeight="SemiBold"
+                                       Classes.error="{Binding IsBad}" TextTrimming="CharacterEllipsis" VerticalAlignment="Center" ToolTip.Tip="{Binding DisplayText}" />
                             <TextBlock Grid.Column="3" Text="{Binding DataType}" Classes="muted" VerticalAlignment="Center" TextTrimming="CharacterEllipsis" />
                             <Border Grid.Column="4" Classes="pill" HorizontalAlignment="Left" Classes.good="{Binding IsGood}" Classes.warn="{Binding IsUncertain}" Classes.bad="{Binding IsBad}">
                               <TextBlock Text="{Binding Quality}" TextTrimming="CharacterEllipsis" ToolTip.Tip="{Binding Quality}" />
@@ -260,7 +285,7 @@
                             </StackPanel>
                           </c:TableRow>
                         </DataTemplate>
-                      </ListBox.ItemTemplate>
+                      </ListBox.DataTemplates>
                     </ListBox>
                   </DockPanel>
                 </Border>
@@ -430,6 +455,9 @@
 
         <!-- Vistas de tendencia (por encima del contenido) -->
         <v:TrendsView DataContext="{Binding Trends}" IsVisible="{Binding $parent[Window].((vm:MainViewModel)DataContext).Trends, Converter={x:Static ObjectConverters.IsNotNull}}" />
+
+        <!-- Transformaciones (por encima del contenido) -->
+        <v:TransformsView DataContext="{Binding TransformsPanel}" IsVisible="{Binding $parent[Window].((vm:MainViewModel)DataContext).TransformsPanel, Converter={x:Static ObjectConverters.IsNotNull}}" />
 
         <!-- Gestión de agentes (por encima del contenido) -->
         <v:AgentsView DataContext="{Binding Agents}" IsVisible="{Binding $parent[Window].((vm:MainViewModel)DataContext).Agents, Converter={x:Static ObjectConverters.IsNotNull}}" />

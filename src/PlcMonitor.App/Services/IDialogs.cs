@@ -14,4 +14,7 @@ public interface IDialogs
 
     /// <summary>Pide un fichero que abrir. Devuelve la ruta o null si se cancela.</summary>
     Task<string?> OpenFileAsync(string title, string extension);
+
+    /// <summary>Pide un texto. Devuelve el texto o null si se cancela.</summary>
+    Task<string?> PromptAsync(string title, string message, string initial = "");
 }
