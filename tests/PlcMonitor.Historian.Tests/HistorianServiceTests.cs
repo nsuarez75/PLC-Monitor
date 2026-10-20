@@ -104,6 +104,27 @@ public sealed class HistorianServiceTests : IAsyncDisposable
     }
 
     [Fact]
+    public async Task Editing_the_device_does_not_store_the_current_value_again()
+    {
+        var (h, historian) = await StartAsync(Device("plc1", intervalMs: 100, tags: [Historized("DB1.DBW0", "t")]));
+        var plc = h.Driver.Plc("plc1");
+        plc.Values["DB1.DBW0"] = 1;
+        plc.Values["DB1.DBW2"] = 5;
+        await h.AdvanceUntilAsync(() => h.Value("plc1", "t").Quality == QualityCode.Good);
+
+        // Cada cambio de configuración del dispositivo (aquí, añadir tags) rehace sus muestreadores.
+        await h.Engine.PutDeviceAsync(Device("plc1", intervalMs: 100, tags: [Historized("DB1.DBW0", "t"), Tag("DB1.DBW2", "otro")]));
+        await h.Engine.PutDeviceAsync(Device("plc1", intervalMs: 100, tags: [Historized("DB1.DBW0", "t"), Historized("DB1.DBW2", "otro")]));
+        await h.AdvanceUntilAsync(() => historian.GetStats().HistorizedTags == 2 && h.Value("plc1", "otro").Quality == QualityCode.Good);
+        plc.Values["DB1.DBW0"] = 2;
+        await h.AdvanceUntilAsync(() => Equals(h.Value("plc1", "t").Value, 2));
+
+        var points = (await Query(historian, h, "t")).Single().Points.Where(p => p.Quality == QualityCode.Good).ToArray();
+        points.Select(p => p.Number).ShouldBe([1.0, 2.0]);
+        (await Query(historian, h, "otro")).Single().Points.Where(p => p.Quality == QualityCode.Good).Select(p => p.Number).ShouldBe([5.0]);
+    }
+
+    [Fact]
     public async Task Triggered_tag_is_stored_only_while_the_trigger_tag_is_on()
     {
         var valor = Historized("DB1.DBW0", "valor");

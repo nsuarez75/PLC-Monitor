@@ -175,9 +175,10 @@ public sealed class HistorianService : IAsyncDisposable
                 next = null;
                 lock (_sync)
                 {
+                    var previous = new Dictionary<TagKey, HistorySampler>(_samplers);
                     _samplers.Clear();
                     foreach (var tag in subscription.InitialTags)
-                        Configure(tag.Definition);
+                        Configure(tag.Definition, previous);
                     IndexTriggers();
                     var now = _time.GetUtcNow();
                     foreach (var tag in subscription.InitialTags)
@@ -211,10 +212,14 @@ public sealed class HistorianService : IAsyncDisposable
                         Offer(update.Key, update.Value, now);
                     break;
                 case DeviceConfigured configured:
+                    var previous = new Dictionary<TagKey, HistorySampler>();
                     foreach (var key in _samplers.Keys.Where(k => k.Device == configured.Status.Device).ToArray())
+                    {
+                        previous[key] = _samplers[key];
                         _samplers.Remove(key);
+                    }
                     foreach (var tag in configured.Tags)
-                        Configure(tag.Definition);
+                        Configure(tag.Definition, previous);
                     IndexTriggers();
                     foreach (var tag in configured.Tags)
                         Offer(tag.Definition.Key, tag.Value, now);
@@ -230,10 +235,14 @@ public sealed class HistorianService : IAsyncDisposable
         }
     }
 
-    private void Configure(TagDefinition definition)
+    private void Configure(TagDefinition definition, Dictionary<TagKey, HistorySampler> previous)
     {
-        if (definition.IsHistorized)
-            _samplers[definition.Key] = new HistorySampler(definition.Key, definition.History!);
+        if (!definition.IsHistorized)
+            return;
+        var sampler = new HistorySampler(definition.Key, definition.History!);
+        if (previous.TryGetValue(definition.Key, out var old))
+            sampler.ContinueFrom(old);
+        _samplers[definition.Key] = sampler;
     }
 
     private void IndexTriggers()

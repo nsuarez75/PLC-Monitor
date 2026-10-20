@@ -68,12 +68,27 @@ internal sealed class HistorySampler(TagKey key, TagHistorySettings settings)
         return last;
     }
 
+    /// <summary>
+    /// Sigue donde lo dejó el muestreador anterior del mismo tag (al reconfigurar el dispositivo o volver a suscribirse
+    /// se crean muestreadores nuevos): así no se vuelve a guardar el valor actual, que ya está en el histórico.
+    /// </summary>
+    public void ContinueFrom(HistorySampler previous)
+    {
+        ArgumentNullException.ThrowIfNull(previous);
+        _lastStored = previous._lastStored;
+        _lastStoredAt = previous._lastStoredAt;
+        _pending = previous._pending;
+    }
+
     /// <summary>Nuevo valor del tag. Devuelve la muestra a guardar, o null.</summary>
     public HistorySample? Offer(TagValue value, DateTimeOffset now)
     {
         ArgumentNullException.ThrowIfNull(value);
         _current = value;
         if (!_active)
+            return null;
+        // La misma lectura que ya se guardó (misma hora, valor y calidad): no se repite.
+        if (_lastStored is { } last && value.Timestamp == last.Timestamp && value.HasSameValueAndQuality(last))
             return null;
         if (_lastStored is null || value.Quality != _lastStored.Quality)
             return Store(value, value.Timestamp, now);
