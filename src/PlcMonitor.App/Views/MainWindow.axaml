@@ -5,6 +5,7 @@
         xmlns:svc="using:PlcMonitor.App.Services"
         xmlns:v="using:PlcMonitor.App.Views"
         x:Class="PlcMonitor.App.Views.MainWindow"
+        Icon="/Assets/plc-monitor.png"
         x:DataType="vm:MainViewModel"
         Title="PLC-Monitor" Width="1320" Height="820" MinWidth="980" MinHeight="600">
 

@@ -3,6 +3,7 @@
         xmlns:vm="using:PlcMonitor.App.ViewModels"
         xmlns:c="using:PlcMonitor.App.Controls"
         x:Class="PlcMonitor.App.Views.TagDetailsWindow"
+        Icon="/Assets/plc-monitor.png"
         x:DataType="vm:TagDetailsViewModel"
         Title="{Binding Tag.Name, StringFormat='Tag {0}'}"
         Width="640" SizeToContent="Height" MaxHeight="900" CanResize="False"
