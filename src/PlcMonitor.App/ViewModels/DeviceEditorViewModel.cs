@@ -125,6 +125,11 @@ public sealed partial class DeviceEditorViewModel : ObservableObject
             config.ScanGroups.AddRange(_groups);
             var status = await client.PutDeviceAsync(new PutDeviceRequest { Device = config, OriginalName = OriginalName ?? "", Persist = true });
             _context.Report($"{status.Name} guardado");
+            if (OriginalName is { } original && original != status.Name && _groups.SelectMany(g => g.Tags).Any(t => t.History?.Enabled == true))
+            {
+                await HistoryMover.OfferAsync(_context, client, new HistoryRename { FromDevice = original, ToDevice = status.Name },
+                    $"los tags de «{original}»", status.Name);
+            }
             _saved(status.Name);
         }
         catch (RpcException ex) when (ex.StatusCode == StatusCode.InvalidArgument)

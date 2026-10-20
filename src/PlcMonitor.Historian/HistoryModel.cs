@@ -27,6 +27,12 @@ public sealed record HistoryQuery(
     HistoryAggregate Aggregate = HistoryAggregate.Average,
     int MaxPoints = 10_000);
 
+/// <summary>
+/// Cambio de nombre en el histórico: lo guardado como <paramref name="FromDevice"/>/<paramref name="FromTag"/> pasa a
+/// <paramref name="ToDevice"/>/<paramref name="ToTag"/>. Sin tags (null), todos los tags del dispositivo (renombrar el dispositivo).
+/// </summary>
+public sealed record HistoryRename(string FromDevice, string? FromTag, string ToDevice, string? ToTag);
+
 /// <summary>Serie de un tag.</summary>
 public sealed record HistorySeries(TagKey Key, IReadOnlyList<HistoryPoint> Points, bool Truncated);
 

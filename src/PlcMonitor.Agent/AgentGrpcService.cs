@@ -240,6 +240,16 @@ public sealed class AgentGrpcService(EngineHost host, DriverRegistry registry, I
         return ProtoMapper.ToProto(transforms);
     }
 
+    public override async Task<Api.RenameHistoryReply> RenameHistory(Api.RenameHistoryRequest request, ServerCallContext context)
+    {
+        var renames = request.Renames.Select(r => new PlcMonitor.Historian.HistoryRename(
+            r.FromDevice.Trim(), string.IsNullOrWhiteSpace(r.FromTag) ? null : r.FromTag.Trim(),
+            r.ToDevice.Trim(), string.IsNullOrWhiteSpace(r.ToTag) ? null : r.ToTag.Trim())).ToArray();
+        var moved = await Guard(() => host.Historian.RenameAsync(renames, context.CancellationToken));
+        logger.LogInformation("Histórico renombrado desde {Peer}: {Moved} tags", context.Peer, moved);
+        return new Api.RenameHistoryReply { Moved = moved };
+    }
+
     private Api.Device ToProto(DeviceStatus status) => ProtoMapper.ToProto(status, Engine.GetTags(status.Device).Count);
 
     /// <summary>Traduce las excepciones del motor a códigos gRPC.</summary>

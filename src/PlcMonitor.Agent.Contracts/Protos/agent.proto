@@ -58,6 +58,10 @@ service AgentService {
   // Si el historiador está desactivado: FAILED_PRECONDITION.
   rpc QueryHistory(HistoryRequest) returns (HistoryReply);
 
+  // Pasa el histórico guardado con un nombre a otro (tras renombrar un tag o un dispositivo); si el nombre nuevo ya tiene
+  // muestras, se juntan. Si el historiador está desactivado: FAILED_PRECONDITION.
+  rpc RenameHistory(RenameHistoryRequest) returns (RenameHistoryReply);
+
   // Transformaciones de valores (p.ej. 0 = Parado, 1 = Marcha) que se asignan a los tags por su nombre.
   rpc GetTransforms(google.protobuf.Empty) returns (TransformList);
 
@@ -449,4 +453,21 @@ message PutTransformsRequest {
   repeated ValueTransform transforms = 1;
   // Guardar en agent.json.
   bool persist = 2;
+}
+
+message HistoryRename {
+  string from_device = 1;
+  // Vacío (y to_tag vacío) = todos los tags del dispositivo.
+  string from_tag = 2;
+  string to_device = 3;
+  string to_tag = 4;
+}
+
+message RenameHistoryRequest {
+  repeated HistoryRename renames = 1;
+}
+
+message RenameHistoryReply {
+  // Tags distintos cuyo histórico se ha movido.
+  int32 moved = 1;
 }

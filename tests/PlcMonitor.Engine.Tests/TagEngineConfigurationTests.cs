@@ -82,6 +82,22 @@ public class TagEngineConfigurationTests
     }
 
     [Fact]
+    public async Task A_renamed_tag_that_reads_the_same_address_keeps_its_value()
+    {
+        await using var h = new EngineHarness(Device("plc1", tags: [Tag("DB1.DBW0", "viejo")]));
+        var plc = h.Driver.Plc("plc1");
+        plc.Values["DB1.DBW0"] = 7;
+        await h.Engine.StartAsync();
+        await WaitUntilAsync(() => h.Value("plc1", "viejo").Quality == QualityCode.Good);
+        var before = h.Value("plc1", "viejo");
+
+        await h.Engine.PutDeviceAsync(Device("plc1", tags: [Tag("DB1.DBW0", "nuevo")]));
+
+        // El mismo valor (con su hora), sin pasar por «esperando la primera lectura».
+        h.Value("plc1", "nuevo").ShouldBe(before);
+    }
+
+    [Fact]
     public async Task Connection_changes_restart_the_device()
     {
         await using var h = new EngineHarness(Device("plc1", tags: [Tag("DB1.DBW0", "a")]));

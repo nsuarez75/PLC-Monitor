@@ -33,6 +33,34 @@ public sealed class SqliteHistorianStoreTests : IDisposable
     }
 
     [Fact]
+    public async Task Renaming_moves_the_history_in_every_month_and_joins_existing_samples()
+    {
+        using var store = new SqliteHistorianStore(_dir);
+        var march = new DateTimeOffset(2026, 3, 31, 23, 0, 0, TimeSpan.Zero);
+        var april = march.AddHours(2);
+        var renamed = new TagKey("plc1", "rapidez");
+        await store.WriteAsync([S(Speed, march, 1), S(Speed, april, 2), S(Name, april, "a")], Ct);
+        // Lo guardado con el nombre nuevo después del cambio (antes de mover el histórico).
+        await store.WriteAsync([S(renamed, april, 2), S(renamed, april.AddMinutes(5), 3)], Ct);
+
+        var moved = await store.RenameAsync([new HistoryRename("plc1", "velocidad", "plc1", "rapidez")], Ct);
+
+        moved.ShouldBe(1);
+        (await store.ReadAsync(renamed, march.AddDays(-1), april.AddDays(1), 100, Ct)).Select(p => p.Number).ShouldBe([1.0, 2.0, 3.0]);
+        (await store.ReadAsync(Speed, march.AddDays(-1), april.AddDays(1), 100, Ct)).ShouldBeEmpty();
+        // Lo nuevo con el nombre antiguo empieza de cero.
+        await store.WriteAsync([S(Speed, april.AddMinutes(10), 9)], Ct);
+        (await store.ReadAsync(Speed, march.AddDays(-1), april.AddDays(1), 100, Ct)).Select(p => p.Number).ShouldBe([9.0]);
+
+        var device = await store.RenameAsync([new HistoryRename("plc1", null, "prensa", null)], Ct);
+
+        device.ShouldBe(3);
+        (await store.ReadAsync(new TagKey("prensa", "rapidez"), march.AddDays(-1), april.AddDays(1), 100, Ct)).Count.ShouldBe(3);
+        (await store.ReadAsync(new TagKey("prensa", "nombre"), march.AddDays(-1), april.AddDays(1), 100, Ct)).Single().Text.ShouldBe("a");
+        (await store.ReadAsync(renamed, march.AddDays(-1), april.AddDays(1), 100, Ct)).ShouldBeEmpty();
+    }
+
+    [Fact]
     public async Task Bad_quality_samples_keep_their_quality()
     {
         using var store = new SqliteHistorianStore(_dir);

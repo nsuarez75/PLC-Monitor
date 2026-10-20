@@ -152,6 +152,99 @@ public sealed class SqliteHistorianStore : IDisposable
         }
     }
 
+    /// <summary>
+    /// Pasa lo guardado con un nombre a otro en todos los ficheros mensuales. Si el nombre nuevo ya tiene muestras (p.ej.
+    /// las guardadas desde el cambio), se juntan. Devuelve cuántos tags distintos se han movido.
+    /// </summary>
+    public async Task<int> RenameAsync(IReadOnlyList<HistoryRename> renames, CancellationToken cancellationToken = default)
+    {
+        ArgumentNullException.ThrowIfNull(renames);
+        var moved = new HashSet<TagKey>();
+        await _lock.WaitAsync(cancellationToken);
+        try
+        {
+            foreach (var path in System.IO.Directory.EnumerateFiles(Directory, "history-*.db").Order(StringComparer.Ordinal))
+            {
+                var file = System.IO.Path.GetFileName(path);
+                if (Open(file, create: false) is not { } connection)
+                    continue;
+                using (var transaction = connection.BeginTransaction())
+                {
+                    foreach (var rename in renames)
+                        moved.UnionWith(Rename(connection, transaction, rename));
+                    transaction.Commit();
+                }
+                // Los ids en caché de este fichero pueden haber cambiado de nombre o desaparecido.
+                foreach (var key in _tagIds.Keys.Where(k => k.File == file).ToArray())
+                    _tagIds.Remove(key);
+            }
+        }
+        finally
+        {
+            _lock.Release();
+        }
+        return moved.Count;
+    }
+
+    private static List<TagKey> Rename(SqliteConnection connection, SqliteTransaction transaction, HistoryRename rename)
+    {
+        var sources = new List<(long Id, TagKey Key)>();
+        using (var select = connection.CreateCommand())
+        {
+            select.Transaction = transaction;
+            select.CommandText = rename.FromTag is null
+                ? "SELECT id, device, tag FROM tags WHERE device = $d"
+                : "SELECT id, device, tag FROM tags WHERE device = $d AND tag = $t";
+            select.Parameters.AddWithValue("$d", rename.FromDevice);
+            if (rename.FromTag is not null)
+                select.Parameters.AddWithValue("$t", rename.FromTag);
+            using var reader = select.ExecuteReader();
+            while (reader.Read())
+                sources.Add((reader.GetInt64(0), new TagKey(reader.GetString(1), reader.GetString(2))));
+        }
+        var moved = new List<TagKey>();
+        foreach (var (id, key) in sources)
+        {
+            var target = new TagKey(rename.ToDevice, rename.FromTag is null ? key.Tag : rename.ToTag!);
+            if (target == key)
+                continue;
+            long? existing;
+            using (var find = connection.CreateCommand())
+            {
+                find.Transaction = transaction;
+                find.CommandText = "SELECT id FROM tags WHERE device = $d AND tag = $t";
+                find.Parameters.AddWithValue("$d", target.Device);
+                find.Parameters.AddWithValue("$t", target.Tag);
+                existing = find.ExecuteScalar() as long?;
+            }
+            using var change = connection.CreateCommand();
+            change.Transaction = transaction;
+            if (existing is { } targetId)
+            {
+                // Al renombrar, el tag nuevo guarda su valor actual con la misma hora que ya tenía con el nombre viejo:
+                // las muestras idénticas no se duplican.
+                change.CommandText = """
+                    DELETE FROM samples WHERE tag_id = $from AND EXISTS (
+                      SELECT 1 FROM samples s WHERE s.tag_id = $to AND s.t = samples.t AND s.q = samples.q
+                        AND s.num IS samples.num AND s.txt IS samples.txt);
+                    UPDATE samples SET tag_id = $to WHERE tag_id = $from;
+                    DELETE FROM tags WHERE id = $from;
+                    """;
+                change.Parameters.AddWithValue("$to", targetId);
+            }
+            else
+            {
+                change.CommandText = "UPDATE tags SET device = $d, tag = $t WHERE id = $from";
+                change.Parameters.AddWithValue("$d", target.Device);
+                change.Parameters.AddWithValue("$t", target.Tag);
+            }
+            change.Parameters.AddWithValue("$from", id);
+            change.ExecuteNonQuery();
+            moved.Add(key);
+        }
+        return moved;
+    }
+
     /// <summary>Tamaño total y número de ficheros mensuales.</summary>
     public (long SizeBytes, int Files) Usage()
     {
