@@ -20,6 +20,7 @@ internal sealed class S7SymbolicConnection : DeviceConnectionBase, IBrowsableCon
     private readonly Dictionary<string, (PlcTag? Tag, string? Error)> _resolved = new(StringComparer.Ordinal);
     private readonly Dictionary<string, (PlcTag? Tag, string? Error)> _resolvedForWrite = new(StringComparer.Ordinal);
     private ISymbolicClient? _client;
+    private DateTimeOffset? _metadataRefreshed;
     private IReadOnlyList<SymbolEntry>? _symbols;
     private int _symbolCount;
 
@@ -200,6 +201,10 @@ internal sealed class S7SymbolicConnection : DeviceConnectionBase, IBrowsableCon
             try
             {
                 var tag = await client.ResolveTagAsync(address.Trim(), cancellationToken);
+                // Puede ser un símbolo añadido al PLC después de conectar: se vuelve a leer el programa y se reintenta
+                // (como mucho una vez cada MetadataRefreshInterval, para no releerlo por cada símbolo que de verdad no existe).
+                if (tag is null && await RefreshMetadataAsync(client, force: false, cancellationToken))
+                    tag = await client.ResolveTagAsync(address.Trim(), cancellationToken);
                 entry = tag is null ? (null, $"El símbolo '{address}' no existe en la CPU.") : (tag, null);
             }
             catch (ArgumentException ex)
@@ -211,8 +216,35 @@ internal sealed class S7SymbolicConnection : DeviceConnectionBase, IBrowsableCon
         return entry;
     }
 
+    /// <summary>Tiempo mínimo entre dos relecturas del programa provocadas por símbolos que no se encuentran.</summary>
+    internal static TimeSpan MetadataRefreshInterval { get; set; } = TimeSpan.FromSeconds(10);
+
+    /// <summary>
+    /// Vuelve a leer el programa de la CPU para resolver símbolos. Devuelve false si no se ha hecho (se hizo hace menos
+    /// de <see cref="MetadataRefreshInterval"/> y no se fuerza).
+    /// </summary>
+    private async Task<bool> RefreshMetadataAsync(ISymbolicClient client, bool force, CancellationToken cancellationToken)
+    {
+        var now = TimeProvider.GetUtcNow();
+        if (!force && _metadataRefreshed is { } last && now - last < MetadataRefreshInterval)
+            return false;
+        await client.InvalidateMetadataAsync(cancellationToken);
+        _metadataRefreshed = now;
+        return true;
+    }
+
     private async Task<BrowseResult> BrowseCoreAsync(BrowseQuery query, CancellationToken cancellationToken)
     {
+        if (query.Refresh)
+        {
+            // «Releer»: el programa puede haber cambiado. Los símbolos que no se encontraron se vuelven a buscar.
+            await RefreshMetadataAsync(Client, force: true, cancellationToken);
+            foreach (var cache in new[] { _resolved, _resolvedForWrite })
+            {
+                foreach (var missing in cache.Where(e => e.Value.Tag is null).Select(e => e.Key).ToArray())
+                    cache.Remove(missing);
+            }
+        }
         if (_symbols is null || query.Refresh)
         {
             var symbols = await Client.BrowseAsync(cancellationToken);

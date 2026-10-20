@@ -36,6 +36,12 @@ internal interface ISymbolicClient : IAsyncDisposable
 
     /// <summary>Explora todas las variables de la CPU.</summary>
     Task<IReadOnlyList<SymbolEntry>> BrowseAsync(CancellationToken cancellationToken);
+
+    /// <summary>
+    /// Olvida la información del programa que la sesión guarda para resolver símbolos (lista de DB y tipos): sin esto, un
+    /// símbolo añadido al PLC después de conectar no se encuentra hasta reconectar.
+    /// </summary>
+    Task InvalidateMetadataAsync(CancellationToken cancellationToken);
 }
 
 /// <summary>Implementación real sobre <see cref="S7CommPlusClient"/> (fork de DotNetProjects.S7CommPlusDriver).</summary>
@@ -108,6 +114,8 @@ internal sealed class S7CommPlusSymbolicClient : ISymbolicClient
         return vars.Select(v => new SymbolEntry(
             v.Name, v.Softdatatype, v.ArrayDimensions.Count == 0 ? null : v.ArrayDimensions.Select(d => new ArrayDimension(d.LowerBound, d.ElementCount)).ToArray())).ToArray();
     }
+
+    public Task InvalidateMetadataAsync(CancellationToken cancellationToken) => _client.InvalidateSymbolCatalogAsync(cancellationToken);
 
     public async ValueTask DisposeAsync()
     {

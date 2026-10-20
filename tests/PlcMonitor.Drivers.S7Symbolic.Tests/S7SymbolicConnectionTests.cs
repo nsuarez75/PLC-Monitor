@@ -33,14 +33,38 @@ public class S7SymbolicConnectionTests
 
         public bool Disposed { get; private set; }
 
-        public Task ConnectAsync(CancellationToken cancellationToken) =>
-            ConnectError is { } error ? Task.FromException(error) : Task.CompletedTask;
+        /// <summary>
+        /// Como la librería real: la resolución de símbolos usa el programa leído al conectar (o al invalidar), así que un
+        /// símbolo añadido después no se encuentra hasta <see cref="InvalidateMetadataAsync"/>.
+        /// </summary>
+        public bool CachesMetadata { get; set; }
+
+        private HashSet<string>? _sessionSymbols;
+
+        public int InvalidateCalls { get; private set; }
+
+        public Task ConnectAsync(CancellationToken cancellationToken)
+        {
+            if (ConnectError is { } error)
+                return Task.FromException(error);
+            _sessionSymbols = [.. Symbols.Keys];
+            return Task.CompletedTask;
+        }
+
+        public Task InvalidateMetadataAsync(CancellationToken cancellationToken)
+        {
+            InvalidateCalls++;
+            _sessionSymbols = [.. Symbols.Keys];
+            return Task.CompletedTask;
+        }
 
         public Task<PlcTag?> ResolveTagAsync(string symbol, CancellationToken cancellationToken)
         {
             ResolveCalls++;
             if (symbol.Contains('?', StringComparison.Ordinal))
                 throw new ArgumentException("Symbol syntax error");
+            if (CachesMetadata && _sessionSymbols?.Contains(symbol) != true)
+                return Task.FromResult<PlcTag?>(null);
             return Task.FromResult(Symbols.TryGetValue(symbol, out var s) ? PlcTags.TagFactory(symbol, new ItemAddress(), s.Type, s.Value is Array) : null);
         }
 
@@ -168,6 +192,49 @@ public class S7SymbolicConnectionTests
         var resolveCalls = cpu.ResolveCalls;
         await conn.ReadAsync(["Motor.Speed", "No.Existe"]);
         cpu.ResolveCalls.ShouldBe(resolveCalls);
+    }
+
+    [Fact]
+    public async Task A_symbol_added_to_the_plc_after_connecting_is_found()
+    {
+        var (conn, cpu) = Create();
+        cpu.CachesMetadata = true;
+        await conn.ConnectAsync();
+        cpu.Symbols["Motor.Nueva"] = (Softdatatype.S7COMMP_SOFTDATATYPE_INT, (short)7);
+
+        var value = (await conn.ReadAsync(["Motor.Nueva"])).Single();
+
+        value.Quality.ShouldBe(QualityCode.Good);
+        value.Value.ShouldBe((short)7);
+        cpu.InvalidateCalls.ShouldBe(1);
+    }
+
+    [Fact]
+    public async Task Missing_symbols_do_not_reload_the_program_every_time()
+    {
+        var (conn, cpu) = Create();
+        cpu.CachesMetadata = true;
+        await conn.ConnectAsync();
+
+        await conn.ReadAsync(["No.Existe"]);
+        await conn.ReadAsync(["Tampoco.Existe"]);
+
+        cpu.InvalidateCalls.ShouldBe(1);
+    }
+
+    [Fact]
+    public async Task Rereading_the_browser_finds_symbols_that_were_missing()
+    {
+        var (conn, cpu) = Create();
+        cpu.CachesMetadata = true;
+        await conn.ConnectAsync();
+        (await conn.ReadAsync(["Motor.Nueva"])).Single().Quality.ShouldBe(QualityCode.BadAddressInvalid);
+        cpu.Symbols["Motor.Nueva"] = (Softdatatype.S7COMMP_SOFTDATATYPE_INT, (short)7);
+        (await conn.ReadAsync(["Motor.Nueva"])).Single().Quality.ShouldBe(QualityCode.BadAddressInvalid);
+
+        (await conn.BrowseAsync(new BrowseQuery("Nueva", Refresh: true))).Items.ShouldHaveSingleItem().Address.ShouldBe("Motor.Nueva");
+
+        (await conn.ReadAsync(["Motor.Nueva"])).Single().Value.ShouldBe((short)7);
     }
 
     [Fact]
