@@ -112,6 +112,7 @@ public sealed class AgentGrpcService(EngineHost host, DriverRegistry registry, I
         var tagCounts = subscription.InitialTags.CountBy(t => t.Definition.Key.Device).ToDictionary(StringComparer.OrdinalIgnoreCase);
         snapshot.Devices.AddRange(subscription.InitialDevices.Where(d => Wanted(d.Device)).Select(d => ProtoMapper.ToProto(d, tagCounts.GetValueOrDefault(d.Device))));
         snapshot.Tags.AddRange(subscription.InitialTags.Where(t => Wanted(t.Definition.Key.Device)).Select(ProtoMapper.ToProto));
+        snapshot.Transforms.AddRange(subscription.InitialTransforms.Select(ProtoMapper.ToProto));
         await responseStream.WriteAsync(new Api.SubscribeEvent { Snapshot = snapshot }, token);
 
         try
@@ -137,6 +138,9 @@ public sealed class AgentGrpcService(EngineHost host, DriverRegistry registry, I
                     case DeviceRemoved removed when Wanted(removed.Device):
                         await responseStream.WriteAsync(
                             new Api.SubscribeEvent { DeviceRemoved = new Api.DeviceRemoved { Device = removed.Device } }, token);
+                        break;
+                    case TransformsChanged transforms:
+                        await responseStream.WriteAsync(new Api.SubscribeEvent { Transforms = ProtoMapper.ToProto(transforms.Transforms) }, token);
                         break;
                 }
             }
@@ -222,6 +226,18 @@ public sealed class AgentGrpcService(EngineHost host, DriverRegistry registry, I
         var reply = new Api.HistoryReply();
         reply.Series.AddRange(series.Select(ProtoMapper.ToProto));
         return reply;
+    }
+
+    public override Task<Api.TransformList> GetTransforms(Empty request, ServerCallContext context) =>
+        Task.FromResult(ProtoMapper.ToProto(Engine.GetTransforms()));
+
+    public override async Task<Api.TransformList> PutTransforms(Api.PutTransformsRequest request, ServerCallContext context)
+    {
+        var transforms = await Guard(() => Engine.SetTransformsAsync(request.Transforms.Select(ProtoMapper.FromProto).ToArray()));
+        if (request.Persist)
+            await host.SaveConfigurationAsync(context.CancellationToken);
+        logger.LogInformation("Transformaciones cambiadas desde {Peer}", context.Peer);
+        return ProtoMapper.ToProto(transforms);
     }
 
     private Api.Device ToProto(DeviceStatus status) => ProtoMapper.ToProto(status, Engine.GetTags(status.Device).Count);

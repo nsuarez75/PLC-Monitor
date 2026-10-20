@@ -63,6 +63,8 @@ internal sealed class DeviceSupervisor : IAsyncDisposable
             new TagKey(config.Name, t.EffectiveName), t.Address, g.Name, TimeSpan.FromMilliseconds(g.IntervalMs), t.Writable, t.DataType)
         {
             History = t.History,
+            Transform = string.IsNullOrWhiteSpace(t.Transform) ? null : t.Transform,
+            Folder = string.IsNullOrWhiteSpace(t.Folder) ? null : t.Folder,
         }))
         .ToArray();
 

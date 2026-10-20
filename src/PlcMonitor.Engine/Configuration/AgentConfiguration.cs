@@ -10,6 +10,26 @@ public sealed class AgentConfiguration
 
     /// <summary>Historiador: dónde y cuánto tiempo se guardan los tags con historización activada.</summary>
     public HistorianSettings Historian { get; set; } = new();
+
+    /// <summary>Transformaciones de valores que los tags usan por su nombre (<see cref="TagConfiguration.Transform"/>).</summary>
+    public List<ValueTransform> Transforms { get; init; } = [];
+}
+
+/// <summary>Transformación de valores enteros a texto (p.ej. 0 = Parado, 1 = Marcha). La aplican los clientes al mostrar el valor.</summary>
+public sealed class ValueTransform
+{
+    /// <summary>Nombre único (sin distinguir mayúsculas).</summary>
+    public string Name { get; set; } = "";
+
+    public List<TransformEntry> Entries { get; init; } = [];
+}
+
+/// <summary>Un valor y su texto.</summary>
+public sealed class TransformEntry
+{
+    public long Value { get; set; }
+
+    public string Text { get; set; } = "";
 }
 
 /// <summary>Ajustes globales del historiador.</summary>
@@ -193,6 +213,12 @@ public sealed class TagConfiguration
 
     /// <summary>Historización del tag; null = no se historiza.</summary>
     public TagHistorySettings? History { get; set; }
+
+    /// <summary>Nombre de la transformación con la que se muestra el valor; null = ninguna.</summary>
+    public string? Transform { get; set; }
+
+    /// <summary>Grupo de visualización (carpeta plegable en la tabla de los clientes); null = sin grupo.</summary>
+    public string? Folder { get; set; }
 
     internal string EffectiveName => string.IsNullOrWhiteSpace(Name) ? Address : Name;
 }

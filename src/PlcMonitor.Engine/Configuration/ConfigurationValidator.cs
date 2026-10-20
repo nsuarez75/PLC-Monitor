@@ -21,6 +21,7 @@ public static class ConfigurationValidator
             errors.Add("historian.flushIntervalMs debe ser al menos 100.");
         if (string.IsNullOrWhiteSpace(historian.Path))
             errors.Add("historian.path está vacío.");
+        var transforms = ValidateTransforms(configuration.Transforms ?? [], errors);
         var deviceNames = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
         for (var i = 0; i < configuration.Devices.Count; i++)
         {
@@ -40,9 +41,33 @@ public static class ConfigurationValidator
                 errors.AddRange(factory.ValidateSettings(device.Settings).Select(e => $"{where}: {e}"));
 
             ValidateReconnect(device.Reconnect, where, errors);
-            ValidateGroups(device, where, errors);
+            ValidateGroups(device, where, transforms, errors);
         }
         return errors;
+    }
+
+    /// <summary>Comprueba las transformaciones y devuelve sus nombres.</summary>
+    private static HashSet<string> ValidateTransforms(List<ValueTransform> transforms, List<string> errors)
+    {
+        var names = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        for (var i = 0; i < transforms.Count; i++)
+        {
+            var transform = transforms[i];
+            var where = string.IsNullOrWhiteSpace(transform.Name) ? $"Transformación #{i + 1}" : $"Transformación '{transform.Name}'";
+            if (string.IsNullOrWhiteSpace(transform.Name))
+                errors.Add($"{where}: falta el nombre.");
+            else if (!names.Add(transform.Name))
+                errors.Add($"{where}: nombre repetido.");
+            var values = new HashSet<long>();
+            foreach (var entry in transform.Entries ?? [])
+            {
+                if (!values.Add(entry.Value))
+                    errors.Add($"{where}: el valor {entry.Value} está repetido.");
+                if (string.IsNullOrWhiteSpace(entry.Text))
+                    errors.Add($"{where}: falta el texto del valor {entry.Value}.");
+            }
+        }
+        return names;
     }
 
     private static void ValidateReconnect(ReconnectSettings? reconnect, string where, List<string> errors)
@@ -60,7 +85,7 @@ public static class ConfigurationValidator
             errors.Add($"{where}: reconnect.multiplier debe ser 1 o mayor.");
     }
 
-    private static void ValidateGroups(DeviceConfiguration device, string where, List<string> errors)
+    private static void ValidateGroups(DeviceConfiguration device, string where, HashSet<string> transforms, List<string> errors)
     {
         var groupNames = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
         var tagNames = new HashSet<string>(StringComparer.Ordinal);
@@ -84,6 +109,8 @@ public static class ConfigurationValidator
                 }
                 if (!tagNames.Add(tag.EffectiveName))
                     errors.Add($"{groupWhere}: tag '{tag.EffectiveName}' repetido en el dispositivo.");
+                if (!string.IsNullOrWhiteSpace(tag.Transform) && !transforms.Contains(tag.Transform))
+                    errors.Add($"{groupWhere}, tag '{tag.EffectiveName}': la transformación '{tag.Transform}' no existe.");
                 if (tag.History is { } h)
                 {
                     var tagWhere = $"{groupWhere}, tag '{tag.EffectiveName}'";

@@ -635,11 +635,15 @@ public sealed class AgentTagAddCommand : AsyncCommand<AgentTagAddSettings>
             var device = await client.GetDeviceConfigAsync(new DeviceRequest { Device = settings.Device }, cancellationToken: cancellationToken);
             var name = string.IsNullOrWhiteSpace(settings.Name) ? settings.Address : settings.Name;
             // Si ya había un tag con ese nombre se sustituye (puede cambiar de grupo).
+            TagConfig? previous = null;
             foreach (var g in device.ScanGroups)
             {
                 var existing = g.Tags.FirstOrDefault(t => (string.IsNullOrEmpty(t.Name) ? t.Address : t.Name) == name);
                 if (existing is not null)
+                {
                     g.Tags.Remove(existing);
+                    previous = existing;
+                }
             }
             var group = device.ScanGroups.FirstOrDefault(g => string.Equals(g.Name, settings.Group, StringComparison.OrdinalIgnoreCase));
             if (group is null)
@@ -651,6 +655,9 @@ public sealed class AgentTagAddCommand : AsyncCommand<AgentTagAddSettings>
                 Writable = settings.Writable,
                 DataType = dataType,
                 History = settings.HistoryConfig(),
+                // La transformación y el grupo de visualización no se tocan desde aquí: se conservan los que tuviera.
+                Transform = previous?.Transform ?? "",
+                Folder = previous?.Folder ?? "",
             });
 
             await client.PutDeviceAsync(new PutDeviceRequest { Device = device, Persist = !settings.NoPersist }, cancellationToken: cancellationToken);
