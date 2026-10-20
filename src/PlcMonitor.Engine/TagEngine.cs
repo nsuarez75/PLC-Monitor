@@ -218,16 +218,30 @@ public sealed class TagEngine : IAsyncDisposable, IEngineSink
             // Primero los valores: lo que publiquen los grupos nuevos debe encontrar ya sus tags.
             var previous = supervisor.Tags.ToDictionary(t => t.Key);
             var next = DeviceSupervisor.BuildTags(copy);
+            // Tags que desaparecen: si otro nuevo lee la misma dirección (un tag renombrado), hereda su valor.
+            var removed = new Dictionary<(string Address, TagDataType? Type), TagValue>();
             foreach (var key in previous.Keys.Except(next.Select(t => t.Key)))
+            {
+                removed.TryAdd((previous[key].Address, previous[key].DataType), _values[key].Value);
                 _values.Remove(key);
+            }
             var pending = TagValue.Bad(QualityCode.BadNotConnected, _time.GetUtcNow(),
                 supervisor.Status.State == ConnectionState.Connected ? "Esperando la primera lectura" : supervisor.Status.Detail ?? DeviceSupervisor.DisabledDetail);
             foreach (var tag in next)
             {
                 // Un tag que sigue leyendo la misma dirección conserva su valor; si no, espera a la próxima lectura.
-                _values[tag.Key] = previous.TryGetValue(tag.Key, out var old) && old.Address == tag.Address && old.DataType == tag.DataType
-                    ? _values[tag.Key] with { Definition = tag }
-                    : new TagSnapshot(tag, pending);
+                if (previous.TryGetValue(tag.Key, out var old))
+                {
+                    _values[tag.Key] = old.Address == tag.Address && old.DataType == tag.DataType
+                        ? _values[tag.Key] with { Definition = tag }
+                        : new TagSnapshot(tag, pending);
+                }
+                else
+                {
+                    _values[tag.Key] = removed.Remove((tag.Address, tag.DataType), out var inherited)
+                        ? new TagSnapshot(tag, inherited)
+                        : new TagSnapshot(tag, pending);
+                }
             }
             supervisor.Reconfigure(copy);
             Broadcast(new DeviceConfigured(_statuses[copy.Name], next.Select(t => _values[t.Key]).ToArray()));

@@ -489,6 +489,54 @@ public sealed class MainViewModelTests : IDisposable
     }
 
     [Fact]
+    public async Task Renaming_a_historized_tag_or_device_offers_to_take_its_history()
+    {
+        var historized = new Tag { Address = "DB1.DBW0", Name = "velocidad", History = new Engine.Configuration.TagHistorySettings { Enabled = true } };
+        await using var agent = new AgentFactory(Device("plc1", tags: [historized, T("DB1.DBW2", "otro")]));
+        var plc = agent.Driver.Plc("plc1");
+        plc.Values["DB1.DBW0"] = 10;
+        plc.Values["DB1.DBW2"] = 1;
+        await using var vm = await ConnectAsync(agent);
+        await Wait.UntilAsync(() => _ui.Read(() => TagOf(vm, "plc1", "velocidad").IsGood), "valor inicial");
+        var client = agent.CreateGrpcClient();
+        async Task<double[]> Good(string device, string tag) =>
+            [.. (await client.QueryHistoryAsync(new HistoryRequest { Device = device, Tags = { tag } })).Series.Single().Points
+                .Where(p => p.Quality == Quality.Good).Select(p => p.Number)];
+
+        // Tag no historizado: no se pregunta.
+        await vm.OpenTagDetailsCommand.ExecuteAsync(TagOf(vm, "plc1", "otro"));
+        var details = _dialogs.TagDetails.Last();
+        details.Name = "otro2";
+        await details.SaveCommand.ExecuteAsync(null);
+        details.Saved.ShouldBeTrue(details.Errors);
+        _dialogs.Questions.ShouldBeEmpty();
+
+        await Wait.UntilAsync(() => _ui.Read(() => vm.Devices[0].Tags.Any(t => t.Name == "otro2")), "tag renombrado");
+        await vm.OpenTagDetailsCommand.ExecuteAsync(TagOf(vm, "plc1", "velocidad"));
+        details = _dialogs.TagDetails.Last();
+        details.Name = "rapidez";
+        await details.SaveCommand.ExecuteAsync(null);
+
+        details.Saved.ShouldBeTrue(details.Errors);
+        _dialogs.Questions.ShouldHaveSingleItem().ShouldContain("¿Llevarlo a «rapidez»?");
+        (await Good("plc1", "rapidez")).ShouldBe([10.0]);
+        (await Good("plc1", "velocidad")).ShouldBeEmpty();
+
+        // Renombrar el dispositivo, sin llevarse el histórico.
+        await Wait.UntilAsync(() => _ui.Read(() => vm.Devices[0].Tags.Any(t => t.Name == "rapidez")), "tag renombrado");
+        _ui.Read(() => vm.SelectedDevice = vm.Devices[0]);
+        await vm.EditDeviceCommand.ExecuteAsync(null);
+        var editor = _ui.Read(() => vm.Editor!);
+        editor.Name = "prensa";
+        _dialogs.Answer = false;
+        await editor.SaveCommand.ExecuteAsync(null);
+
+        _dialogs.Questions.Count.ShouldBe(2);
+        _dialogs.Questions[1].ShouldContain("los tags de «plc1»");
+        (await Good("plc1", "rapidez")).ShouldBe([10.0]);
+    }
+
+    [Fact]
     public async Task Disconnect_clears_the_model()
     {
         await using var agent = new AgentFactory(Device("plc1", enabled: false));

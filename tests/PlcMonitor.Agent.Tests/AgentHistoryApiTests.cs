@@ -55,6 +55,47 @@ public class AgentHistoryApiTests
     }
 
     [Fact]
+    public async Task History_follows_a_renamed_tag_and_device_when_asked()
+    {
+        await using var agent = new AgentFactory(Device("plc1", tags: [Historized("DB1.DBW0", "velocidad")]));
+        var plc = agent.Driver.Plc("plc1");
+        plc.Values["DB1.DBW0"] = 10;
+        var client = agent.CreateGrpcClient();
+        await EventuallyAsync(async () => await client.ListTagsAsync(new ListTagsRequest(), cancellationToken: Ct), t => t.Tags.Single().Value.Quality == Quality.Good);
+
+        var device = await client.GetDeviceConfigAsync(new DeviceRequest { Device = "plc1" }, cancellationToken: Ct);
+        device.ScanGroups[0].Tags[0].Name = "rapidez";
+        await client.PutDeviceAsync(new PutDeviceRequest { Device = device }, cancellationToken: Ct);
+        await EventuallyAsync(async () => await client.ListTagsAsync(new ListTagsRequest(), cancellationToken: Ct), t => t.Tags.Single().Name == "rapidez");
+        plc.Values["DB1.DBW0"] = 30;
+        await EventuallyAsync(async () => await client.ListTagsAsync(new ListTagsRequest(), cancellationToken: Ct), t => t.Tags.Single().Value.Text == "30");
+
+        var reply = await client.RenameHistoryAsync(new RenameHistoryRequest
+        {
+            Renames = { new HistoryRename { FromDevice = "plc1", FromTag = "velocidad", ToDevice = "plc1", ToTag = "rapidez" } },
+        }, cancellationToken: Ct);
+
+        reply.Moved.ShouldBe(1);
+        async Task<double?[]> Good(string dev, string tag) =>
+            [.. (await client.QueryHistoryAsync(new HistoryRequest { Device = dev, Tags = { tag } }, cancellationToken: Ct)).Series.Single().Points
+                .Where(p => p.Quality == Quality.Good).Select(p => p.HasNumber ? p.Number : (double?)null)];
+        (await Good("plc1", "rapidez")).ShouldBe([10.0, 30.0]);
+        (await Good("plc1", "velocidad")).ShouldBeEmpty();
+
+        device = await client.GetDeviceConfigAsync(new DeviceRequest { Device = "plc1" }, cancellationToken: Ct);
+        device.Name = "prensa";
+        await client.PutDeviceAsync(new PutDeviceRequest { Device = device, OriginalName = "plc1" }, cancellationToken: Ct);
+        await client.RenameHistoryAsync(new RenameHistoryRequest { Renames = { new HistoryRename { FromDevice = "plc1", ToDevice = "prensa" } } }, cancellationToken: Ct);
+        (await Good("prensa", "rapidez")).ShouldContain(10.0);
+
+        var bad = await Should.ThrowAsync<RpcException>(() => client.RenameHistoryAsync(new RenameHistoryRequest
+        {
+            Renames = { new HistoryRename { FromDevice = "prensa", FromTag = "rapidez", ToDevice = "prensa" } },
+        }, cancellationToken: Ct).ResponseAsync);
+        bad.StatusCode.ShouldBe(StatusCode.InvalidArgument);
+    }
+
+    [Fact]
     public async Task History_settings_round_trip_through_the_device_configuration()
     {
         await using var agent = new AgentFactory(Device("plc1", tags: [T("DB1.DBW0", "t")]));

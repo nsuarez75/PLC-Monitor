@@ -118,6 +118,36 @@ public sealed class HistorianService : IAsyncDisposable
         return result;
     }
 
+    /// <summary>
+    /// Pasa el histórico guardado con un nombre a otro (al renombrar un tag o un dispositivo). Antes vuelca lo pendiente,
+    /// para que lo último guardado con el nombre anterior también se mueva. Devuelve cuántos tags se han movido.
+    /// </summary>
+    public async Task<int> RenameAsync(IReadOnlyList<HistoryRename> renames, CancellationToken cancellationToken = default)
+    {
+        ArgumentNullException.ThrowIfNull(renames);
+        if (_store is null)
+            throw new InvalidOperationException("El historiador está desactivado en este agente.");
+        foreach (var rename in renames)
+        {
+            if (string.IsNullOrWhiteSpace(rename.FromDevice) || string.IsNullOrWhiteSpace(rename.ToDevice))
+                throw new ArgumentException("Falta el dispositivo de origen o de destino.", nameof(renames));
+            if ((rename.FromTag is null) != (rename.ToTag is null) || rename.FromTag?.Length == 0 || rename.ToTag?.Length == 0)
+                throw new ArgumentException("Indica el tag de origen y el de destino, o ninguno para todo el dispositivo.", nameof(renames));
+        }
+        await _flushLock.WaitAsync(cancellationToken);
+        try
+        {
+            await FlushLockedAsync(cancellationToken);
+            var moved = await _store.RenameAsync(renames, cancellationToken);
+            _logger.LogInformation("Histórico: {Count} tags cambiados de nombre", moved);
+            return moved;
+        }
+        finally
+        {
+            _flushLock.Release();
+        }
+    }
+
     /// <summary>Vuelca a disco las muestras acumuladas.</summary>
     public async Task FlushAsync(CancellationToken cancellationToken = default)
     {
@@ -126,30 +156,38 @@ public sealed class HistorianService : IAsyncDisposable
         await _flushLock.WaitAsync(cancellationToken);
         try
         {
-            HistorySample[] batch;
-            lock (_sync)
-            {
-                batch = [.. _buffer];
-                _buffer.Clear();
-            }
-            if (batch.Length == 0)
-                return;
-            try
-            {
-                await _store.WriteAsync(batch, cancellationToken);
-            }
-#pragma warning disable CA1031 // Un fallo de disco no debe tumbar el agente: se reintenta en el siguiente volcado.
-            catch (Exception ex) when (ex is not OperationCanceledException)
-#pragma warning restore CA1031
-            {
-                _logger.LogError(ex, "No se pudieron guardar {Count} muestras del histórico; se reintentará", batch.Length);
-                lock (_sync)
-                    _buffer.InsertRange(0, batch);
-            }
+            await FlushLockedAsync(cancellationToken);
         }
         finally
         {
             _flushLock.Release();
+        }
+    }
+
+    // Con _flushLock tomado.
+    private async Task FlushLockedAsync(CancellationToken cancellationToken)
+    {
+        if (_store is not { } store)
+            return;
+        HistorySample[] batch;
+        lock (_sync)
+        {
+            batch = [.. _buffer];
+            _buffer.Clear();
+        }
+        if (batch.Length == 0)
+            return;
+        try
+        {
+            await store.WriteAsync(batch, cancellationToken);
+        }
+#pragma warning disable CA1031 // Un fallo de disco no debe tumbar el agente: se reintenta en el siguiente volcado.
+        catch (Exception ex) when (ex is not OperationCanceledException)
+#pragma warning restore CA1031
+        {
+            _logger.LogError(ex, "No se pudieron guardar {Count} muestras del histórico; se reintentará", batch.Length);
+            lock (_sync)
+                _buffer.InsertRange(0, batch);
         }
     }
 

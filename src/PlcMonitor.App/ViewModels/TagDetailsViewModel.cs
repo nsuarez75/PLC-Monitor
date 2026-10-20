@@ -339,6 +339,11 @@ public sealed partial class TagDetailsViewModel : ObservableObject
 
             await client.PutDeviceAsync(new PutDeviceRequest { Device = device, Persist = true });
             _context.Report($"Tag {Device}/{name} guardado");
+            if (name != _originalName && HistorianEnabled && (Tag.Historized || HistoryEnabled))
+            {
+                await HistoryMover.OfferAsync(_context, client,
+                    new HistoryRename { FromDevice = Device, FromTag = _originalName, ToDevice = Device, ToTag = name }, $"el tag «{_originalName}»", name);
+            }
             Saved = true;
         }
         catch (RpcException ex) when (ex.StatusCode == StatusCode.InvalidArgument)
