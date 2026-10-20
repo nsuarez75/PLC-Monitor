@@ -344,9 +344,8 @@ public sealed partial class MainViewModel : ObservableObject, IAgentContext, IAs
             }
             Client = client;
             _channel = channel;
-            Drivers = [.. info.Drivers];
-            HistorianEnabled = info.Historian?.Enabled ?? false;
-            AgentDescription = $"{info.Machine} · {info.Os} · v{info.Version.Split('+')[0]}";
+            ApplyInfo(info);
+            _infoIsFresh = true;
             IsConnected = true;
             _settings.Remember(url);
             _settings.Save(_settingsPath);
@@ -543,8 +542,45 @@ public sealed partial class MainViewModel : ObservableObject, IAgentContext, IAs
         }
     }
 
+    private void ApplyInfo(AgentInfo info)
+    {
+        Drivers = [.. info.Drivers];
+        HistorianEnabled = info.Historian?.Enabled ?? false;
+        AgentDescription = $"{info.Machine} · {info.Os} · v{info.Version.Split('+')[0]}";
+    }
+
+    // La información del agente se acaba de leer al conectar: la primera foto no hace falta que la vuelva a pedir.
+    private bool _infoIsFresh;
+
+    /// <summary>
+    /// Vuelve a leer versión, drivers e historiador del agente: tras volver a suscribirse puede ser otro (p.ej. se ha
+    /// actualizado y reiniciado), y si no la barra superior seguiría con la versión anterior hasta reconectar a mano.
+    /// </summary>
+    private async Task RefreshInfoAsync()
+    {
+        if (Client is not { } client)
+            return;
+        try
+        {
+            var info = await client.GetInfoAsync(new Empty(), deadline: DateTime.UtcNow.AddSeconds(10));
+            _ui.Post(() =>
+            {
+                if (Client == client)
+                    ApplyInfo(info);
+            });
+        }
+        catch (RpcException)
+        {
+            // Sin información nueva se sigue con la anterior; la suscripción ya avisa si se pierde la conexión.
+        }
+    }
+
     private void ApplySnapshot(Snapshot snapshot)
     {
+        if (_infoIsFresh)
+            _infoIsFresh = false;
+        else
+            _ = RefreshInfoAsync();
         var selected = SelectedDevice?.Name;
         Devices.Clear();
         _tagIndex.Clear();
