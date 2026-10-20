@@ -470,6 +470,25 @@ public sealed class MainViewModelTests : IDisposable
     }
 
     [Fact]
+    public async Task Agent_version_is_read_again_after_resubscribing()
+    {
+        await using var agent = new AgentFactory(Device("plc1", enabled: false));
+        await using var vm = await ConnectAsync(agent);
+        var description = _ui.Read(() => vm.AgentDescription);
+        description.ShouldContain(Environment.MachineName);
+
+        // Tras actualizar el agente (se reinicia), la app se vuelve a suscribir y recibe una foto nueva.
+        _ui.Read(() => vm.AgentDescription = "versión anterior");
+        _ui.Read(() =>
+        {
+            vm.Apply(new SubscribeEvent { Snapshot = new Snapshot() });
+            return true;
+        });
+
+        await Wait.UntilAsync(() => _ui.Read(() => vm.AgentDescription) == description, "versión leída de nuevo");
+    }
+
+    [Fact]
     public async Task Disconnect_clears_the_model()
     {
         await using var agent = new AgentFactory(Device("plc1", enabled: false));
