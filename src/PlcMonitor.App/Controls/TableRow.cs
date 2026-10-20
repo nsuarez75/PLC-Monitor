@@ -1,6 +1,8 @@
 using System.Globalization;
+using System.Windows.Input;
 using Avalonia;
 using Avalonia.Controls;
+using Avalonia.Input;
 
 namespace PlcMonitor.App.Controls;
 
@@ -9,6 +11,8 @@ namespace PlcMonitor.App.Controls;
 /// sola fila, pero que se adapta al ancho: si a las proporcionales no les llega <see cref="MinStarWidth"/> por unidad,
 /// oculta columnas en el orden de <see cref="HideOrder"/> hasta que quepan. Cabecera y filas con los mismos
 /// parámetros ocultan lo mismo. Cada hijo va en su columna con <c>Grid.Column</c>.
+/// Con <see cref="CanResize"/> (la cabecera), arrastrar el borde entre dos columnas pasa ancho de una a la otra y
+/// cambia <see cref="Columns"/>; las filas que lo enlazan siguen el cambio.
 /// </summary>
 public sealed class TableRow : Panel
 {
@@ -24,7 +28,25 @@ public sealed class TableRow : Panel
     public static readonly StyledProperty<double> MinStarWidthProperty =
         AvaloniaProperty.Register<TableRow, double>(nameof(MinStarWidth), 60);
 
+    public static readonly StyledProperty<bool> CanResizeProperty =
+        AvaloniaProperty.Register<TableRow, bool>(nameof(CanResize));
+
+    public static readonly StyledProperty<ICommand?> ResizeCompletedCommandProperty =
+        AvaloniaProperty.Register<TableRow, ICommand?>(nameof(ResizeCompletedCommand));
+
+    /// <summary>Ancho mínimo de una columna al arrastrar su borde.</summary>
+    public const double MinResizeWidth = 32;
+
+    // Distancia al borde, a cada lado, en la que se puede agarrar.
+    private const double GripWidth = 5;
+
+    private static readonly Cursor ResizeCursor = new(StandardCursorType.SizeWestEast);
+
     private (string Columns, string HideOrder, double[] Values, bool[] Stars, int[] Order)? _parsed;
+    private Drag? _drag;
+
+    // Arrastre en curso: columnas a cada lado del borde y valores de partida.
+    private sealed record Drag(int Left, int Right, double StartX, double[] Values, double[] Widths, double PerStar);
 
     static TableRow()
     {
@@ -56,6 +78,35 @@ public sealed class TableRow : Panel
     {
         get => GetValue(MinStarWidthProperty);
         set => SetValue(MinStarWidthProperty, value);
+    }
+
+    /// <summary>Permite cambiar el ancho de las columnas arrastrando sus bordes.</summary>
+    public bool CanResize
+    {
+        get => GetValue(CanResizeProperty);
+        set => SetValue(CanResizeProperty, value);
+    }
+
+    /// <summary>Se ejecuta al soltar el borde (para guardar <see cref="Columns"/>).</summary>
+    public ICommand? ResizeCompletedCommand
+    {
+        get => GetValue(ResizeCompletedCommandProperty);
+        set => SetValue(ResizeCompletedCommandProperty, value);
+    }
+
+    /// <summary>
+    /// <see cref="Columns"/> tras mover <paramref name="delta"/> píxeles el borde derecho de la columna
+    /// <paramref name="left"/> (lo gana o lo pierde la columna visible siguiente), con un ancho total de
+    /// <paramref name="width"/>. El resto de columnas no cambia. null si no hay borde ahí.
+    /// </summary>
+    public string? ResizedColumns(double width, int left, double delta)
+    {
+        var (values, stars, _) = Parse();
+        var widths = Layout(width);
+        var right = NextVisible(widths, left);
+        if (left < 0 || left >= widths.Length || widths[left] <= 0 || right < 0)
+            return null;
+        return Resized(new Drag(left, right, 0, values, widths, PerStar(values, stars, widths)), delta);
     }
 
     /// <summary>Ancho de cada columna para un ancho total; 0 = oculta.</summary>
@@ -106,6 +157,128 @@ public sealed class TableRow : Panel
                 : default);
         }
         return finalSize;
+    }
+
+    protected override void OnPointerMoved(PointerEventArgs e)
+    {
+        base.OnPointerMoved(e);
+        if (!CanResize)
+            return;
+        var x = e.GetPosition(this).X;
+        if (_drag is { } drag)
+        {
+            if (Resized(drag, x - drag.StartX) is { } columns)
+                SetCurrentValue(ColumnsProperty, columns);
+            e.Handled = true;
+            return;
+        }
+        Cursor = BorderAt(x) >= 0 ? ResizeCursor : null;
+    }
+
+    protected override void OnPointerPressed(PointerPressedEventArgs e)
+    {
+        base.OnPointerPressed(e);
+        if (!CanResize || !e.GetCurrentPoint(this).Properties.IsLeftButtonPressed)
+            return;
+        var x = e.GetPosition(this).X;
+        var left = BorderAt(x);
+        if (left < 0)
+            return;
+        var (values, stars, _) = Parse();
+        var widths = Layout(Bounds.Width);
+        _drag = new Drag(left, NextVisible(widths, left), x, values, widths, PerStar(values, stars, widths));
+        e.Pointer.Capture(this);
+        e.Handled = true;
+    }
+
+    protected override void OnPointerReleased(PointerReleasedEventArgs e)
+    {
+        base.OnPointerReleased(e);
+        if (_drag is null)
+            return;
+        _drag = null;
+        e.Pointer.Capture(null);
+        e.Handled = true;
+        if (ResizeCompletedCommand is { } command && command.CanExecute(null))
+            command.Execute(null);
+    }
+
+    protected override void OnPointerCaptureLost(PointerCaptureLostEventArgs e)
+    {
+        base.OnPointerCaptureLost(e);
+        _drag = null;
+    }
+
+    // Columna a la izquierda del borde bajo x (solo entre dos columnas visibles), o -1.
+    private int BorderAt(double x)
+    {
+        var widths = Layout(Bounds.Width);
+        for (var i = 0; i < widths.Length; i++)
+        {
+            if (widths[i] <= 0 || NextVisible(widths, i) < 0)
+                continue;
+            var border = Offset(widths, i) + widths[i] + (ColumnSpacing / 2);
+            if (Math.Abs(x - border) <= GripWidth + (ColumnSpacing / 2))
+                return i;
+        }
+        return -1;
+    }
+
+    private static int NextVisible(double[] widths, int column)
+    {
+        for (var i = column + 1; i < widths.Length; i++)
+        {
+            if (widths[i] > 0)
+                return i;
+        }
+        return -1;
+    }
+
+    // Píxeles por unidad proporcional con el reparto actual.
+    private static double PerStar(double[] values, bool[] stars, double[] widths)
+    {
+        for (var i = 0; i < values.Length; i++)
+        {
+            if (stars[i] && widths[i] > 0 && values[i] > 0)
+                return widths[i] / values[i];
+        }
+        return 0;
+    }
+
+    // Pasa delta píxeles entre la columna izquierda y las de su derecha: al ensanchar, se toma de la vecina y, cuando
+    // llega al mínimo, de las siguientes; al estrechar, todo va a la vecina. Una proporcional cambia en unidades al
+    // ritmo actual: así el resto de proporcionales conserva su ancho aunque la otra sea fija.
+    private string? Resized(Drag drag, double delta)
+    {
+        var (_, stars, _) = Parse();
+        if (drag.Values.Length != stars.Length || drag.PerStar <= 0 && (stars[drag.Left] || stars[drag.Right]))
+            return null;
+        var values = (double[])drag.Values.Clone();
+        if (delta < 0)
+        {
+            delta = Math.Max(delta, MinResizeWidth - drag.Widths[drag.Left]);
+            Shift(drag.Right, -delta);
+        }
+        else
+        {
+            var taken = 0.0;
+            for (var i = drag.Right; i >= 0 && taken < delta; i = NextVisible(drag.Widths, i))
+            {
+                var take = Math.Min(delta - taken, Math.Max(0, drag.Widths[i] - MinResizeWidth));
+                if (take > 0 && (!stars[i] || drag.PerStar > 0))
+                {
+                    Shift(i, -take);
+                    taken += take;
+                }
+            }
+            delta = taken;
+        }
+        if (delta == 0)
+            return null;
+        Shift(drag.Left, delta);
+        return string.Join(",", values.Select((v, i) => Math.Round(v, stars[i] ? 4 : 1).ToString(CultureInfo.InvariantCulture) + (stars[i] ? "*" : "")));
+
+        void Shift(int column, double pixels) => values[column] += stars[column] ? pixels / drag.PerStar : pixels;
     }
 
     private static double ColumnWidth(double[] widths, Control child) => widths[Math.Clamp(Grid.GetColumn(child), 0, widths.Length - 1)];
