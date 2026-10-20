@@ -5,6 +5,8 @@
     <Description>Aplicación de escritorio de PLC-Monitor (cliente del agente).</Description>
     <AvaloniaUseCompiledBindingsByDefault>true</AvaloniaUseCompiledBindingsByDefault>
     <ApplicationManifest>app.manifest</ApplicationManifest>
+    <!-- Icono del .exe en Windows; las ventanas usan Assets/plc-monitor.png (el mismo logo de la barra superior). -->
+    <ApplicationIcon>Assets\plc-monitor.ico</ApplicationIcon>
     <!-- Código generado por Avalonia y CommunityToolkit.Mvvm -->
     <NoWarn>$(NoWarn);CA1822;CA1852</NoWarn>
   </PropertyGroup>
@@ -20,6 +22,9 @@
   <ItemGroup>
     <ProjectReference Include="..\PlcMonitor.Agent.Contracts\PlcMonitor.Agent.Contracts.csproj" />
     <ProjectReference Include="..\PlcMonitor.Deploy\PlcMonitor.Deploy.csproj" />
+  </ItemGroup>
+  <ItemGroup>
+    <AvaloniaResource Include="Assets\plc-monitor.png" />
   </ItemGroup>
   <ItemGroup>
     <InternalsVisibleTo Include="PlcMonitor.App.Tests" />

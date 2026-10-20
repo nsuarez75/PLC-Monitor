@@ -1,4 +1,7 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64">
-  <rect width="64" height="64" rx="14" fill="#2563EB"/>
-  <path d="M54 32h-9l-6 18-14-36-6 18h-9" fill="none" stroke="#fff" stroke-width="5.5" stroke-linecap="round" stroke-linejoin="round"/>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 30 30">
+  <!-- El mismo logo que la barra superior de la app (Border.brand + icono «pulse» de Lucide a 18 px, trazo 2.4). -->
+  <rect width="30" height="30" rx="8" fill="#2563EB"/>
+  <g transform="translate(6 6) scale(0.75)">
+    <path d="M22 12h-4l-3 9L9 3l-3 9H2" fill="none" stroke="#fff" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/>
+  </g>
 </svg>
