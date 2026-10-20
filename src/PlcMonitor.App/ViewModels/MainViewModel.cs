@@ -54,6 +54,7 @@ public sealed partial class MainViewModel : ObservableObject, IAgentContext, IAs
         SelectedProfile = Profiles.FirstOrDefault(p => string.Equals(p.Url, settings.AgentUrl, StringComparison.OrdinalIgnoreCase)) ?? Profiles.FirstOrDefault();
         Theme = settings.Theme is "light" or "dark" ? settings.Theme : "system";
         RecentAgents = [.. settings.RecentAgents];
+        TagColumns = ValidTagColumns(settings.TagColumns) ?? DefaultTagColumns;
         Browse = new BrowseViewModel(this, () => SelectedDevice);
         History = new HistoryViewModel(this, () => SelectedDevice);
         History.OpenInTrendsRequested += (_, view) =>
@@ -187,6 +188,13 @@ public sealed partial class MainViewModel : ObservableObject, IAgentContext, IAs
 
     public string ThemeIcon => Theme switch { "light" => "sun", "dark" => "moon", _ => "monitor" };
 
+    /// <summary>Anchos de serie de las columnas de la tabla de tags (formato de <see cref="Controls.TableRow.Columns"/>).</summary>
+    public const string DefaultTagColumns = "2*,2.2*,1.6*,90,130,100,250";
+
+    /// <summary>Anchos de las columnas de la tabla de tags; se cambian arrastrando los bordes de la cabecera.</summary>
+    [ObservableProperty]
+    public partial string TagColumns { get; set; }
+
     public bool IsReconnecting => IsConnected && !IsLive;
 
     /// <summary>Conectado y recibiendo en vivo.</summary>
@@ -233,6 +241,28 @@ public sealed partial class MainViewModel : ObservableObject, IAgentContext, IAs
         _settings.Theme = Theme;
         _settings.Save(_settingsPath);
     }
+
+    /// <summary>Guarda los anchos de columna al terminar de arrastrar un borde.</summary>
+    [RelayCommand]
+    private void SaveTagColumns()
+    {
+        _settings.TagColumns = TagColumns == DefaultTagColumns ? null : TagColumns;
+        _settings.Save(_settingsPath);
+    }
+
+    [RelayCommand]
+    private void ResetTagColumns()
+    {
+        TagColumns = DefaultTagColumns;
+        SaveTagColumns();
+    }
+
+    // Unos anchos guardados con otro número de columnas (versión anterior o fichero editado) no se aplican.
+    private static string? ValidTagColumns(string? columns) =>
+        columns is not null && columns.Split(',').Length == DefaultTagColumns.Split(',').Length
+            && columns.Split(',').All(c => double.TryParse(c.Trim().TrimEnd('*'), System.Globalization.NumberStyles.Float, System.Globalization.CultureInfo.InvariantCulture, out var v) && v > 0)
+            ? columns
+            : null;
 
     private bool CanConnect() => !IsConnected && !IsConnecting && !string.IsNullOrWhiteSpace(AgentUrl);
 

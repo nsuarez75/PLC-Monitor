@@ -89,6 +89,78 @@ public class MainWindowTests
     });
 
     [Fact]
+    public Task Dragging_a_header_border_resizes_the_tag_columns() => HeadlessApp.RunAsync(() =>
+    {
+        var settingsPath = Path.GetTempFileName();
+        var vm = ViewModelWithData(settingsPath);
+        var window = new MainWindow { DataContext = vm };
+        window.Width = window.MinWidth;
+        window.Show();
+        window.UpdateLayout();
+
+        var header = window.FindControl<PlcMonitor.App.Controls.TableRow>("TagsHeader")!;
+        var row = window.FindControl<ListBox>("TagsList")!.GetVisualDescendants().OfType<PlcMonitor.App.Controls.TableRow>().First();
+        var before = header.Layout(header.Bounds.Width);
+
+        // Arrastra 120 px a la derecha el borde entre TAG y DIRECCIÓN.
+        var border = Avalonia.VisualExtensions.TranslatePoint(header, new Avalonia.Point(before[0] + (header.ColumnSpacing / 2), header.Bounds.Height / 2), window)!.Value;
+        window.MouseDown(border, Avalonia.Input.MouseButton.Left);
+        window.MouseMove(border + new Avalonia.Point(120, 0));
+        window.MouseUp(border + new Avalonia.Point(120, 0), Avalonia.Input.MouseButton.Left);
+        window.UpdateLayout();
+
+        var after = header.Layout(header.Bounds.Width);
+        // Gana los 120 px aunque la vecina no los tenga: sale de las siguientes, sin bajar ninguna del mínimo
+        // (en la ventana mínima DIRECCIÓN ya está oculta y la vecina es VALOR).
+        after[0].ShouldBe(before[0] + 120, 0.5);
+        after.Sum().ShouldBe(before.Sum(), 0.5);
+        after.Where(w => w > 0).ShouldAllBe(w => w >= PlcMonitor.App.Controls.TableRow.MinResizeWidth - 0.5);
+        // Las filas siguen a la cabecera.
+        row.Layout(row.Bounds.Width).ShouldBe(after, 0.5);
+        // Se guarda al soltar y «Restablecer» vuelve a los de serie.
+        AppSettings.Load(settingsPath).TagColumns.ShouldBe(vm.TagColumns);
+        Capture(window, "main-window-resized-columns.png");
+        vm.ResetTagColumnsCommand.Execute(null);
+        vm.TagColumns.ShouldBe(MainViewModel.DefaultTagColumns);
+        AppSettings.Load(settingsPath).TagColumns.ShouldBeNull();
+    });
+
+    [Theory]
+    [InlineData(2, 50)]   // proporcional ← fija
+    [InlineData(2, -40)]  // proporcional → fija
+    [InlineData(4, 30)]   // fija ← fija
+    [InlineData(0, -500)] // se limita: la columna conserva el ancho mínimo
+    public void Resizing_moves_width_between_neighbours_only(int left, double delta)
+    {
+        var row = new PlcMonitor.App.Controls.TableRow { Columns = MainViewModel.DefaultTagColumns, ColumnSpacing = 12, MinStarWidth = 45 };
+        const double width = 1100;
+        var before = row.Layout(width);
+        row.Columns = row.ResizedColumns(width, left, delta)!;
+        var after = row.Layout(width);
+
+        var moved = Math.Max(delta, PlcMonitor.App.Controls.TableRow.MinResizeWidth - before[left]);
+        after[left].ShouldBe(before[left] + moved, 0.5);
+        after[left + 1].ShouldBe(before[left + 1] - moved, 0.5);
+        for (var i = 0; i < before.Length; i++)
+        {
+            if (i != left && i != left + 1)
+                after[i].ShouldBe(before[i], 0.5);
+        }
+    }
+
+    [Theory]
+    [InlineData("2*,2.2*,1.6*,90,130,100,250", true)]
+    [InlineData("3*,1*,1.6*,90,130,100,250", true)]
+    [InlineData("2*,2*", false)]
+    [InlineData("2*,x,1.6*,90,130,100,250", false)]
+    public void Saved_tag_columns_are_applied_only_if_valid(string saved, bool applied)
+    {
+        var vm = new MainViewModel(new GrpcAgentConnector(), new ImmediateDispatcher(), new FakeDialogs(), new AppSettings { TagColumns = saved },
+            Path.GetTempFileName(), Path.Combine(Path.GetTempPath(), $"plcmon-agents-{Guid.NewGuid():N}.json"));
+        vm.TagColumns.ShouldBe(applied ? saved : MainViewModel.DefaultTagColumns);
+    }
+
+    [Fact]
     public Task Device_editor_covers_the_content() => HeadlessApp.RunAsync(() =>
     {
         var vm = ViewModelWithData();

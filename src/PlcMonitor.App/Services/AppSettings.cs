@@ -17,6 +17,9 @@ public sealed class AppSettings
     /// <summary>Tema: "system", "light" o "dark".</summary>
     public string Theme { get; set; } = "system";
 
+    /// <summary>Anchos de las columnas de la tabla de tags elegidos por el usuario (null = los de serie).</summary>
+    public string? TagColumns { get; set; }
+
     /// <summary>URLs usadas recientemente (la primera es la última).</summary>
     public List<string> RecentAgents { get; init; } = [];
 

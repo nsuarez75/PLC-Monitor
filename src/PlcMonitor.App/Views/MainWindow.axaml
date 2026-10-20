@@ -197,7 +197,16 @@
 
                 <Border Classes="card" ClipToBounds="True">
                   <DockPanel>
-                    <c:TableRow DockPanel.Dock="Top" Classes="tablehead" Columns="2*,2.2*,1.6*,90,130,100,250" HideOrder="3,5,1" MinStarWidth="45" ColumnSpacing="12" Margin="16,12,16,10">
+                    <c:TableRow x:Name="TagsHeader" DockPanel.Dock="Top" Classes="tablehead" HideOrder="3,5,1" MinStarWidth="45" ColumnSpacing="12" Margin="16,12,16,10"
+                                CanResize="True" Background="Transparent"
+                                Columns="{Binding $parent[Window].((vm:MainViewModel)DataContext).TagColumns, Mode=TwoWay, FallbackValue=*}"
+                                ResizeCompletedCommand="{Binding $parent[Window].((vm:MainViewModel)DataContext).SaveTagColumnsCommand}"
+                                ToolTip.Tip="Arrastra el borde entre dos columnas para cambiar su ancho">
+                      <c:TableRow.ContextMenu>
+                        <ContextMenu>
+                          <MenuItem Header="Restablecer anchos de columna" Command="{Binding $parent[Window].((vm:MainViewModel)DataContext).ResetTagColumnsCommand}" />
+                        </ContextMenu>
+                      </c:TableRow.ContextMenu>
                       <TextBlock Text="TAG" />
                       <TextBlock Grid.Column="1" Text="DIRECCIÓN" />
                       <TextBlock Grid.Column="2" Text="VALOR" />
@@ -214,7 +223,7 @@
                     <ListBox x:Name="TagsList" Classes="table" ItemsSource="{Binding SelectedDevice.Tags}" ToolTip.Tip="Doble clic para ver el detalle y la configuración del tag">
                       <ListBox.ItemTemplate>
                         <DataTemplate x:DataType="vm:TagViewModel">
-                          <c:TableRow Columns="2*,2.2*,1.6*,90,130,100,250" HideOrder="3,5,1" MinStarWidth="45" ColumnSpacing="12">
+                          <c:TableRow Columns="{Binding $parent[Window].((vm:MainViewModel)DataContext).TagColumns, FallbackValue=*}" HideOrder="3,5,1" MinStarWidth="45" ColumnSpacing="12">
                             <StackPanel VerticalAlignment="Center">
                               <DockPanel>
                                 <c:Icon DockPanel.Dock="Left" Kind="history" Width="13" Height="13" Margin="0,0,6,0" Foreground="{DynamicResource App.Accent}"
