@@ -1,3 +1,4 @@
+using System.Globalization;
 using Microsoft.Extensions.Logging;
 using PlcMonitor.Abstractions;
 using S7CommPlusDriver;
@@ -20,6 +21,7 @@ internal sealed class S7SymbolicConnection : DeviceConnectionBase, IBrowsableCon
     private readonly Dictionary<string, (PlcTag? Tag, string? Error)> _resolvedForWrite = new(StringComparer.Ordinal);
     private ISymbolicClient? _client;
     private IReadOnlyList<SymbolEntry>? _symbols;
+    private int _symbolCount;
 
     public S7SymbolicConnection(
         string deviceName, S7SymbolicSettings settings, ILogger logger, Func<ISymbolicClient>? clientFactory = null, TimeProvider? timeProvider = null)
@@ -86,7 +88,7 @@ internal sealed class S7SymbolicConnection : DeviceConnectionBase, IBrowsableCon
             ["Protocol"] = "S7CommPlus",
             ["Security"] = _client?.NegotiatedSecurity ?? _settings.Security.ToString().ToLowerInvariant(),
             ["Legitimation"] = string.IsNullOrEmpty(_settings.Password) ? "sin contraseña" : "contraseña",
-            ["SymbolsLoaded"] = _symbols is null ? "no" : _symbols.Count.ToString(System.Globalization.CultureInfo.InvariantCulture),
+            ["SymbolsLoaded"] = _symbols is null ? "no" : _symbols.Count.ToString(CultureInfo.InvariantCulture),
         });
 
     protected override bool IsConnectionLost(Exception exception) =>
@@ -215,6 +217,7 @@ internal sealed class S7SymbolicConnection : DeviceConnectionBase, IBrowsableCon
         {
             var symbols = await Client.BrowseAsync(cancellationToken);
             _symbols = symbols;
+            _symbolCount = symbols.Sum(s => 1 + ElementCount(s.Dimensions));
             Logger.LogInformation("{Device}: {Count} símbolos explorados", DeviceName, symbols.Count);
         }
 
@@ -223,12 +226,51 @@ internal sealed class S7SymbolicConnection : DeviceConnectionBase, IBrowsableCon
         var matches = 0;
         foreach (var s in _symbols)
         {
-            if (!string.IsNullOrEmpty(filter) && s.Name.IndexOf(filter, StringComparison.OrdinalIgnoreCase) < 0)
+            var dataType = PlcTagValueMapper.DataTypeOf(s.Softdatatype);
+            var nativeType = PlcTagValueMapper.NativeTypeName(s.Softdatatype);
+            // Un array se ofrece entero (con su tipo real) y elemento a elemento.
+            if (s.Dimensions is not { Count: > 0 } dimensions)
+            {
+                Add(s.Name, dataType, nativeType);
                 continue;
+            }
+            Add(s.Name, dataType, $"{ArrayTypeName(dimensions)} of {nativeType}");
+            foreach (var index in ElementIndices(dimensions))
+                Add(s.Name + index, dataType, nativeType);
+        }
+        return new BrowseResult(items, matches, _symbolCount);
+
+        void Add(string address, TagDataType dataType, string nativeType)
+        {
+            if (!string.IsNullOrEmpty(filter) && address.IndexOf(filter, StringComparison.OrdinalIgnoreCase) < 0)
+                return;
             matches++;
             if (items.Count < query.MaxResults)
-                items.Add(new BrowseItem(s.Name, PlcTagValueMapper.DataTypeOf(s.Softdatatype), PlcTagValueMapper.NativeTypeName(s.Softdatatype)));
+                items.Add(new BrowseItem(address, dataType, nativeType));
         }
-        return new BrowseResult(items, matches, _symbols.Count);
+    }
+
+    private static int ElementCount(IReadOnlyList<ArrayDimension>? dimensions) =>
+        dimensions is { Count: > 0 } ? (int)Math.Min(int.MaxValue, dimensions.Aggregate(1L, (n, d) => n * d.Count)) : 0;
+
+    // Array[0..9] o Array[1..2, 0..3], como en TIA Portal.
+    private static string ArrayTypeName(IReadOnlyList<ArrayDimension> dimensions) =>
+        "Array[" + string.Join(", ", dimensions.Select(d => string.Create(CultureInfo.InvariantCulture, $"{d.LowerBound}..{d.LowerBound + d.Count - 1}"))) + "]";
+
+    // Índices de todos los elementos, el último índice el que más rápido varía: [1,0], [1,1]...
+    private static IEnumerable<string> ElementIndices(IReadOnlyList<ArrayDimension> dimensions)
+    {
+        var current = dimensions.Select(d => (long)d.LowerBound).ToArray();
+        var total = ElementCount(dimensions);
+        for (var n = 0; n < total; n++)
+        {
+            yield return "[" + string.Join(",", current.Select(i => i.ToString(CultureInfo.InvariantCulture))) + "]";
+            for (var k = current.Length - 1; k >= 0; k--)
+            {
+                if (++current[k] < dimensions[k].LowerBound + dimensions[k].Count)
+                    break;
+                current[k] = dimensions[k].LowerBound;
+            }
+        }
     }
 }

@@ -5,8 +5,14 @@ using LibException = S7CommPlusDriver.S7CommPlusException;
 
 namespace PlcMonitor.Drivers.S7Symbolic;
 
-/// <summary>Símbolo descubierto al explorar la CPU.</summary>
-internal readonly record struct SymbolEntry(string Name, uint Softdatatype);
+/// <summary>Dimensión de un array: primer índice y número de elementos.</summary>
+internal readonly record struct ArrayDimension(int LowerBound, uint Count);
+
+/// <summary>
+/// Símbolo descubierto al explorar la CPU. Los arrays de tipos simples llegan como un único símbolo con sus
+/// <paramref name="Dimensions"/> (vacío si no es un array); <paramref name="Softdatatype"/> es el tipo del elemento.
+/// </summary>
+internal readonly record struct SymbolEntry(string Name, uint Softdatatype, IReadOnlyList<ArrayDimension>? Dimensions = null);
 
 /// <summary>
 /// Operaciones de la librería S7CommPlus que usa el driver (sustituible en tests).
@@ -99,7 +105,8 @@ internal sealed class S7CommPlusSymbolicClient : ISymbolicClient
     {
         IReadOnlyList<VarInfo> vars = [];
         await TranslateAsync("Exploración", async () => vars = await _client.BrowseAsync(cancellationToken));
-        return vars.Select(v => new SymbolEntry(v.Name, v.Softdatatype)).ToArray();
+        return vars.Select(v => new SymbolEntry(
+            v.Name, v.Softdatatype, v.ArrayDimensions.Count == 0 ? null : v.ArrayDimensions.Select(d => new ArrayDimension(d.LowerBound, d.ElementCount)).ToArray())).ToArray();
     }
 
     public async ValueTask DisposeAsync()

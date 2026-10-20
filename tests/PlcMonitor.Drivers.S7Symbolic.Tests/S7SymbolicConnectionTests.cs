@@ -27,6 +27,8 @@ public class S7SymbolicConnectionTests
 
         public int BrowseCalls { get; private set; }
 
+        public List<SymbolEntry> Arrays { get; } = [];
+
         public List<List<string>> ReadBatches { get; } = [];
 
         public bool Disposed { get; private set; }
@@ -74,7 +76,8 @@ public class S7SymbolicConnectionTests
         public Task<IReadOnlyList<SymbolEntry>> BrowseAsync(CancellationToken cancellationToken)
         {
             BrowseCalls++;
-            return Task.FromResult<IReadOnlyList<SymbolEntry>>(Symbols.Select(s => new SymbolEntry(s.Key, s.Value.Type)).ToArray());
+            return Task.FromResult<IReadOnlyList<SymbolEntry>>(
+                Symbols.Select(s => new SymbolEntry(s.Key, s.Value.Type)).Concat(Arrays).ToArray());
         }
 
         public ValueTask DisposeAsync()
@@ -239,6 +242,29 @@ public class S7SymbolicConnectionTests
         cpu.BrowseCalls.ShouldBe(1);
         await conn.BrowseAsync(new BrowseQuery(Refresh: true));
         cpu.BrowseCalls.ShouldBe(2);
+    }
+
+    [Fact]
+    public async Task Browse_offers_arrays_whole_and_by_element()
+    {
+        var (conn, cpu) = Create();
+        cpu.Arrays.Add(new SymbolEntry("Arrays.Strings", Softdatatype.S7COMMP_SOFTDATATYPE_STRING, [new ArrayDimension(0, 3)]));
+        cpu.Arrays.Add(new SymbolEntry("Arrays.Matrix", Softdatatype.S7COMMP_SOFTDATATYPE_INT, [new ArrayDimension(1, 2), new ArrayDimension(0, 2)]));
+        await conn.ConnectAsync();
+
+        var strings = await conn.BrowseAsync(new BrowseQuery("Arrays.Strings"));
+        strings.Items.Select(i => (i.Address, i.NativeType)).ShouldBe([
+            ("Arrays.Strings", "Array[0..2] of String"),
+            ("Arrays.Strings[0]", "String"),
+            ("Arrays.Strings[1]", "String"),
+            ("Arrays.Strings[2]", "String")]);
+        strings.Items.ShouldAllBe(i => i.DataType == TagDataType.String);
+        strings.TotalSymbols.ShouldBe(4 + 4 + 5);
+
+        var matrix = await conn.BrowseAsync(new BrowseQuery("Matrix"));
+        matrix.Items.Select(i => i.Address).ShouldBe([
+            "Arrays.Matrix", "Arrays.Matrix[1,0]", "Arrays.Matrix[1,1]", "Arrays.Matrix[2,0]", "Arrays.Matrix[2,1]"]);
+        matrix.Items[0].NativeType.ShouldBe("Array[1..2, 0..1] of Int");
     }
 
     [Fact]

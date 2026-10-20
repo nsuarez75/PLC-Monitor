@@ -38,8 +38,9 @@ public static class ValueFormatter
         var total = 0;
         foreach (var item in items)
         {
+            // Los textos van entre comillas para que se vean los vacíos: ["hola", "", ""].
             if (total++ < MaxArrayItems)
-                parts.Add(Format(item));
+                parts.Add(item is string s ? $"\"{s}\"" : Format(item));
         }
         var suffix = total > MaxArrayItems ? $", … ({total} elementos)" : string.Empty;
         return "[" + string.Join(", ", parts) + suffix + "]";

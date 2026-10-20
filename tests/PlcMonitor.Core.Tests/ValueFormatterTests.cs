@@ -32,6 +32,7 @@ public class ValueFormatterTests
     public void Formats_arrays_and_truncates_long_ones()
     {
         ValueFormatter.Format(new short[] { 1, 2, 3 }).ShouldBe("[1, 2, 3]");
+        ValueFormatter.Format(new[] { "hola", "", "" }).ShouldBe("[\"hola\", \"\", \"\"]");
         var big = ValueFormatter.Format(Enumerable.Range(0, 40).ToArray());
         big.ShouldEndWith(", … (40 elementos)]");
         big.Split(',').Length.ShouldBe(ValueFormatter.MaxArrayItems + 1);
