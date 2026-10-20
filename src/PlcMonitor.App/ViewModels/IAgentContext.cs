@@ -16,4 +16,15 @@ public interface IAgentContext
 
     /// <summary>Describe un error de la API para el usuario.</summary>
     string Describe(Exception exception);
+
+    /// <summary>Transformación de valores del agente por su nombre; null si no existe.</summary>
+    ValueTransform? FindTransform(string name) => null;
+
+    /// <summary>El grupo de visualización <paramref name="folder"/> de un dispositivo está plegado en la tabla de tags.</summary>
+    bool IsFolderCollapsed(string device, string folder) => false;
+
+    /// <summary>Recuerda si un grupo de visualización está plegado.</summary>
+    void SetFolderCollapsed(string device, string folder, bool collapsed)
+    {
+    }
 }

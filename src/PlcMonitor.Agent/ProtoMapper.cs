@@ -47,6 +47,8 @@ internal static class ProtoMapper
         Writable = snapshot.Definition.Writable,
         Value = ToProto(snapshot.Value),
         Historized = snapshot.Definition.IsHistorized,
+        Transform = snapshot.Definition.Transform ?? "",
+        Folder = snapshot.Definition.Folder ?? "",
     };
 
     public static Api.TagUpdate ToProto(TagUpdate update) => new()
@@ -129,6 +131,8 @@ internal static class ProtoMapper
                             : null,
                     }
                     : null,
+                Transform = t.Transform ?? "",
+                Folder = t.Folder ?? "",
             }));
             pb.ScanGroups.Add(g);
         }
@@ -182,11 +186,33 @@ internal static class ProtoMapper
                             : null,
                     }
                     : null,
+                Transform = string.IsNullOrWhiteSpace(t.Transform) ? null : t.Transform.Trim(),
+                Folder = string.IsNullOrWhiteSpace(t.Folder) ? null : t.Folder.Trim(),
             }));
             device.ScanGroups.Add(group);
         }
         return device;
     }
+
+    public static Api.TransformList ToProto(IEnumerable<ValueTransform> transforms)
+    {
+        var list = new Api.TransformList();
+        list.Transforms.AddRange(transforms.Select(ToProto));
+        return list;
+    }
+
+    public static Api.ValueTransform ToProto(ValueTransform transform)
+    {
+        var pb = new Api.ValueTransform { Name = transform.Name };
+        pb.Entries.AddRange(transform.Entries.Select(e => new Api.TransformEntry { Value = e.Value, Text = e.Text }));
+        return pb;
+    }
+
+    public static ValueTransform FromProto(Api.ValueTransform pb) => new()
+    {
+        Name = pb.Name.Trim(),
+        Entries = [.. pb.Entries.Select(e => new TransformEntry { Value = e.Value, Text = e.Text.Trim() })],
+    };
 
     public static Api.TriggerCondition ToProto(TriggerCondition condition) => condition switch
     {

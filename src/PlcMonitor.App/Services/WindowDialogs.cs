@@ -9,6 +9,9 @@ public sealed class WindowDialogs(Window owner) : IDialogs
 {
     public Task<bool> ConfirmAsync(string title, string message) => new ConfirmWindow(title, message).ShowDialog<bool>(owner);
 
+    public Task<string?> PromptAsync(string title, string message, string initial = "") =>
+        new PromptWindow(title, message, initial).ShowDialog<string?>(owner);
+
     public async Task<string?> SaveFileAsync(string title, string suggestedName, string extension)
     {
         var file = await owner.StorageProvider.SaveFilePickerAsync(new Avalonia.Platform.Storage.FilePickerSaveOptions

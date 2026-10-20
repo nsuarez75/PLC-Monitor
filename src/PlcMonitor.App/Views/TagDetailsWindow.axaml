@@ -46,7 +46,7 @@
         <Grid ColumnDefinitions="*,Auto,Auto" ColumnSpacing="14">
           <StackPanel Spacing="2">
             <TextBlock Text="VALOR ACTUAL" Classes="caption" />
-            <TextBlock Text="{Binding Tag.ValueText}" Classes="mono" FontSize="22" FontWeight="SemiBold"
+            <TextBlock Text="{Binding Tag.DisplayText}" Classes="mono" FontSize="22" FontWeight="SemiBold"
                        Classes.error="{Binding Tag.IsBad}" TextWrapping="Wrap" />
           </StackPanel>
           <StackPanel Grid.Column="1" Spacing="6" VerticalAlignment="Center" HorizontalAlignment="Right">
@@ -73,7 +73,7 @@
       <Border Classes="card" Padding="20">
         <StackPanel Spacing="12">
           <TextBlock Text="CONFIGURACIÓN" Classes="caption" />
-          <Grid ColumnDefinitions="150,*" RowDefinitions="Auto,Auto,Auto,Auto,Auto,Auto" RowSpacing="10" ColumnSpacing="16">
+          <Grid ColumnDefinitions="150,*" RowDefinitions="Auto,Auto,Auto,Auto,Auto,Auto,Auto,Auto" RowSpacing="10" ColumnSpacing="16">
             <TextBlock Text="Nombre" VerticalAlignment="Center" FontWeight="Medium" />
             <TextBox Grid.Column="1" Text="{Binding Name}" />
             <TextBlock Grid.Row="1" Text="Dirección" VerticalAlignment="Center" FontWeight="Medium" />
@@ -94,6 +94,18 @@
             </StackPanel>
             <TextBlock Grid.Row="5" Text="Tipo para escribir" VerticalAlignment="Center" FontWeight="Medium" />
             <ComboBox Grid.Row="5" Grid.Column="1" ItemsSource="{Binding DataTypes}" SelectedItem="{Binding SelectedDataType}" MinWidth="180" />
+            <TextBlock Grid.Row="6" Text="Grupo en la tabla" VerticalAlignment="Center" FontWeight="Medium" />
+            <StackPanel Grid.Row="6" Grid.Column="1" Spacing="4">
+              <AutoCompleteBox Text="{Binding Folder}" ItemsSource="{Binding Folders}" MinimumPrefixLength="0" Width="240" HorizontalAlignment="Left"
+                               PlaceholderText="Sin grupo" />
+              <TextBlock Classes="muted" FontSize="12" TextWrapping="Wrap"
+                         Text="Los tags con el mismo grupo se pliegan juntos en la tabla de tags. Escribe un nombre nuevo para crear un grupo." />
+            </StackPanel>
+            <TextBlock Grid.Row="7" Text="Mostrar valor como" VerticalAlignment="Center" FontWeight="Medium" />
+            <StackPanel Grid.Row="7" Grid.Column="1" Spacing="4">
+              <ComboBox ItemsSource="{Binding Transforms}" SelectedItem="{Binding SelectedTransform}" MinWidth="240" />
+              <TextBlock Classes="muted" FontSize="12" TextWrapping="Wrap" Text="{Binding TransformPreview}" />
+            </StackPanel>
           </Grid>
         </StackPanel>
       </Border>

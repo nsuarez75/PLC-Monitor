@@ -15,12 +15,17 @@ public sealed partial class TagDetailsViewModel : ObservableObject
 {
     public const string AutomaticType = "Automático";
 
+    /// <summary>Opción de la lista de transformaciones: el valor se muestra tal cual.</summary>
+    public const string NoTransform = "Valor sin transformar";
+
     private readonly IAgentContext _context;
     private readonly string _originalName;
     private readonly Dictionary<string, int> _groupIntervals;
 
     /// <param name="isBoolean">Si un tag del dispositivo (por nombre) es booleano según sus valores en vivo.</param>
-    public TagDetailsViewModel(IAgentContext context, TagViewModel tag, DeviceConfig device, bool historianEnabled = true, Func<string, bool>? isBoolean = null)
+    /// <param name="transforms">Nombres de las transformaciones del agente.</param>
+    public TagDetailsViewModel(IAgentContext context, TagViewModel tag, DeviceConfig device, bool historianEnabled = true, Func<string, bool>? isBoolean = null,
+        IReadOnlyList<string>? transforms = null)
     {
         HistorianEnabled = historianEnabled;
         ArgumentNullException.ThrowIfNull(tag);
@@ -41,6 +46,15 @@ public sealed partial class TagDetailsViewModel : ObservableObject
         SelectedDataType = config is null || config.DataType == Agent.Contracts.DataType.Unknown ? AutomaticType : config.DataType.ToString();
         GroupName = group?.Name ?? "default";
         IntervalMs = group?.IntervalMs ?? 1000;
+        Folder = config?.Folder ?? tag.Folder;
+        Folders = [.. device.ScanGroups.SelectMany(g => g.Tags).Select(t => t.Folder).Where(f => f.Length > 0)
+            .Distinct(StringComparer.CurrentCultureIgnoreCase).Order(StringComparer.CurrentCultureIgnoreCase)];
+        var current = config?.Transform ?? tag.Transform;
+        Transforms = [NoTransform, .. (transforms ?? []).Order(StringComparer.CurrentCultureIgnoreCase)];
+        // Una transformación que ya no existe en el agente se sigue mostrando para no perderla al guardar sin querer.
+        if (current.Length > 0 && !Transforms.Contains(current, StringComparer.OrdinalIgnoreCase))
+            Transforms.Add(current);
+        SelectedTransform = current.Length == 0 ? NoTransform : Transforms.First(t => string.Equals(t, current, StringComparison.OrdinalIgnoreCase));
 
         // Disparo: cualquier otro tag del dispositivo.
         var others = device.ScanGroups.SelectMany(g => g.Tags).Where(t => t != config).ToArray();
@@ -194,6 +208,27 @@ public sealed partial class TagDetailsViewModel : ObservableObject
 
     public ObservableCollection<string> Groups { get; }
 
+    /// <summary>Grupo de visualización (carpeta plegable de la tabla); vacío = sin grupo.</summary>
+    [ObservableProperty]
+    public partial string Folder { get; set; } = "";
+
+    /// <summary>Grupos de visualización que ya usan otros tags del dispositivo.</summary>
+    public IReadOnlyList<string> Folders { get; }
+
+    /// <summary><see cref="NoTransform"/> y las transformaciones del agente.</summary>
+    public ObservableCollection<string> Transforms { get; }
+
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(TransformPreview))]
+    public partial string SelectedTransform { get; set; } = NoTransform;
+
+    /// <summary>Los textos de la transformación elegida (p.ej. «0 = Parado · 1 = Marcha»).</summary>
+    public string TransformPreview => SelectedTransform == NoTransform
+        ? "Las transformaciones se crean en «Transformaciones», en la barra superior."
+        : _context.FindTransform(SelectedTransform) is { } transform
+            ? transform.Entries.Count == 0 ? "La transformación no tiene valores." : string.Join(" · ", transform.Entries.Select(e => $"{e.Value} = {e.Text}"))
+            : "Esta transformación ya no existe en el agente.";
+
     public ObservableCollection<string> DataTypes { get; }
 
     /// <summary>Se pone a true al guardar: la vista cierra la ventana.</summary>
@@ -296,6 +331,8 @@ public sealed partial class TagDetailsViewModel : ObservableObject
                         Trigger = BuildTrigger(),
                     }
                     : null,
+                Transform = SelectedTransform == NoTransform ? "" : SelectedTransform,
+                Folder = Folder?.Trim() ?? "",
             });
             foreach (var empty in device.ScanGroups.Where(g => g.Tags.Count == 0).ToArray())
                 device.ScanGroups.Remove(empty);

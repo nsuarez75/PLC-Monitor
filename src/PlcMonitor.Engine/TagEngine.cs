@@ -236,6 +236,59 @@ public sealed class TagEngine : IAsyncDisposable, IEngineSink
         return GetDevice(copy.Name);
     }
 
+    /// <summary>Copia de las transformaciones de valores.</summary>
+    public IReadOnlyList<ValueTransform> GetTransforms()
+    {
+        lock (_sync)
+            return CloneTransforms(Configuration.Transforms);
+    }
+
+    /// <summary>
+    /// Sustituye todas las transformaciones. Si alguna que se quita la usa un tag, o la configuración resultante no es
+    /// válida, lanza <see cref="EngineConfigurationException"/> y no cambia nada.
+    /// </summary>
+    public async Task<IReadOnlyList<ValueTransform>> SetTransformsAsync(IReadOnlyList<ValueTransform> transforms)
+    {
+        ArgumentNullException.ThrowIfNull(transforms);
+        await _changes.WaitAsync();
+        try
+        {
+            var candidate = SnapshotConfiguration();
+            candidate.Transforms.Clear();
+            candidate.Transforms.AddRange(CloneTransforms(transforms));
+            var names = new HashSet<string>(candidate.Transforms.Select(t => t.Name), StringComparer.OrdinalIgnoreCase);
+            var errors = candidate.Devices
+                .SelectMany(d => d.ScanGroups.SelectMany(g => g.Tags).Where(t => !string.IsNullOrWhiteSpace(t.Transform) && !names.Contains(t.Transform))
+                    .Select(t => (Transform: t.Transform!, Tag: $"{d.Name}/{t.EffectiveName}")))
+                .GroupBy(x => x.Transform, StringComparer.OrdinalIgnoreCase)
+                .Select(g => $"La transformación '{g.Key}' la usan {string.Join(", ", g.Select(x => x.Tag))}: quítasela antes a esos tags.")
+                .ToList();
+            if (errors.Count == 0)
+                errors.AddRange(ConfigurationValidator.Validate(candidate, _registry));
+            if (errors.Count > 0)
+                throw new EngineConfigurationException(errors);
+            lock (_sync)
+            {
+                Configuration.Transforms.Clear();
+                Configuration.Transforms.AddRange(candidate.Transforms);
+                Broadcast(new TransformsChanged(CloneTransforms(candidate.Transforms)));
+            }
+            _logger.LogInformation("Transformaciones actualizadas ({Count})", candidate.Transforms.Count);
+            return GetTransforms();
+        }
+        finally
+        {
+            _changes.Release();
+        }
+    }
+
+    private static List<ValueTransform> CloneTransforms(IEnumerable<ValueTransform> transforms) =>
+        [.. transforms.Select(t => new ValueTransform
+        {
+            Name = t.Name.Trim(),
+            Entries = [.. (t.Entries ?? []).Select(e => new TransformEntry { Value = e.Value, Text = e.Text.Trim() })],
+        })];
+
     /// <summary>Da de baja un dispositivo: lo detiene y lo quita de la configuración.</summary>
     public async Task DeleteDeviceAsync(string device)
     {
@@ -316,7 +369,7 @@ public sealed class TagEngine : IAsyncDisposable, IEngineSink
             _subscribers.Add(subscriber);
             var tags = Configuration.Devices.SelectMany(d => _devices[d.Name].Tags).Select(t => _values[t.Key]).ToArray();
             var devices = Configuration.Devices.Select(d => _statuses[d.Name]).ToArray();
-            return new EngineSubscription(this, subscriber, tags, devices);
+            return new EngineSubscription(this, subscriber, tags, devices, CloneTransforms(Configuration.Transforms));
         }
     }
 
@@ -428,13 +481,18 @@ public sealed class EngineSubscription : IDisposable
     private readonly TagEngine _engine;
     private readonly TagEngine.Subscriber _subscriber;
 
-    internal EngineSubscription(TagEngine engine, TagEngine.Subscriber subscriber, IReadOnlyList<TagSnapshot> tags, IReadOnlyList<DeviceStatus> devices)
+    internal EngineSubscription(TagEngine engine, TagEngine.Subscriber subscriber, IReadOnlyList<TagSnapshot> tags, IReadOnlyList<DeviceStatus> devices,
+        IReadOnlyList<ValueTransform> transforms)
     {
         _engine = engine;
         _subscriber = subscriber;
         InitialTags = tags;
         InitialDevices = devices;
+        InitialTransforms = transforms;
     }
+
+    /// <summary>Transformaciones de valores en el momento de suscribirse.</summary>
+    public IReadOnlyList<ValueTransform> InitialTransforms { get; }
 
     /// <summary>Valores de todos los tags en el momento de suscribirse.</summary>
     public IReadOnlyList<TagSnapshot> InitialTags { get; }

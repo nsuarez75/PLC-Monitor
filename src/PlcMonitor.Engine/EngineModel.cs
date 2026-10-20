@@ -18,6 +18,12 @@ public sealed record TagDefinition(TagKey Key, string Address, string Group, Tim
     public Configuration.TagHistorySettings? History { get; init; }
 
     public bool IsHistorized => History is { Enabled: true };
+
+    /// <summary>Transformación con la que los clientes muestran el valor; null = ninguna.</summary>
+    public string? Transform { get; init; }
+
+    /// <summary>Grupo de visualización; null = sin grupo.</summary>
+    public string? Folder { get; init; }
 }
 
 /// <summary>Definición de un tag con su último valor conocido.</summary>
@@ -55,3 +61,6 @@ public sealed record DeviceConfigured(DeviceStatus Status, IReadOnlyList<TagSnap
 
 /// <summary>Un dispositivo se ha dado de baja (o se ha renombrado).</summary>
 public sealed record DeviceRemoved(string Device) : EngineEvent;
+
+/// <summary>Han cambiado las transformaciones: estas sustituyen a todas las anteriores.</summary>
+public sealed record TransformsChanged(IReadOnlyList<Configuration.ValueTransform> Transforms) : EngineEvent;

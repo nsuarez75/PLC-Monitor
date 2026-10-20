@@ -57,6 +57,13 @@ service AgentService {
   // Histórico de uno o varios tags entre dos instantes, en bruto o agregado por intervalo.
   // Si el historiador está desactivado: FAILED_PRECONDITION.
   rpc QueryHistory(HistoryRequest) returns (HistoryReply);
+
+  // Transformaciones de valores (p.ej. 0 = Parado, 1 = Marcha) que se asignan a los tags por su nombre.
+  rpc GetTransforms(google.protobuf.Empty) returns (TransformList);
+
+  // Sustituye todas las transformaciones. Se valida antes de aplicar (nombres y valores repetidos, transformaciones
+  // en uso por algún tag); si hay errores devuelve INVALID_ARGUMENT con la lista y no cambia nada.
+  rpc PutTransforms(PutTransformsRequest) returns (TransformList);
 }
 
 enum ConnectionState {
@@ -190,6 +197,10 @@ message Tag {
   TagValue value = 7;
   // Se guarda en el histórico.
   bool historized = 8;
+  // Transformación que se aplica al mostrar el valor; vacío = ninguna.
+  string transform = 9;
+  // Grupo de visualización (carpeta plegable en la tabla); vacío = sin grupo.
+  string folder = 10;
 }
 
 message ListTagsRequest {
@@ -233,6 +244,7 @@ message SubscribeRequest {
 message Snapshot {
   repeated Device devices = 1;
   repeated Tag tags = 2;
+  repeated ValueTransform transforms = 3;
 }
 
 message TagUpdate {
@@ -253,6 +265,8 @@ message SubscribeEvent {
     // El dispositivo se ha dado de alta o se ha reconfigurado: sustituye todos sus tags por estos.
     DeviceConfigured device_configured = 4;
     DeviceRemoved device_removed = 5;
+    // Han cambiado las transformaciones: sustituyen a todas las anteriores.
+    TransformList transforms = 6;
   }
 }
 
@@ -303,6 +317,10 @@ message TagConfig {
   DataType data_type = 4;
   // Historización; ausente = no se historiza.
   HistoryConfig history = 5;
+  // Nombre de la transformación que se aplica al mostrar el valor; vacío = ninguna.
+  string transform = 6;
+  // Grupo de visualización (carpeta plegable en la tabla); vacío = sin grupo.
+  string folder = 7;
 }
 
 message HistoryConfig {
@@ -409,5 +427,26 @@ message PutDeviceRequest {
 
 message DeleteDeviceRequest {
   string device = 1;
+  bool persist = 2;
+}
+
+// Transformación de valores enteros a texto.
+message ValueTransform {
+  string name = 1;
+  repeated TransformEntry entries = 2;
+}
+
+message TransformEntry {
+  int64 value = 1;
+  string text = 2;
+}
+
+message TransformList {
+  repeated ValueTransform transforms = 1;
+}
+
+message PutTransformsRequest {
+  repeated ValueTransform transforms = 1;
+  // Guardar en agent.json.
   bool persist = 2;
 }

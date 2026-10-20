@@ -42,7 +42,11 @@ public sealed partial class DeviceViewModel : ObservableObject
     private void OnTagChanged(object? sender, System.ComponentModel.PropertyChangedEventArgs e)
     {
         if (e.PropertyName == nameof(TagViewModel.Quality))
+        {
             NotifyCounts();
+            foreach (var folder in _folders)
+                folder.NotifyCounts();
+        }
     }
 
     private void NotifyCounts()
@@ -57,6 +61,110 @@ public sealed partial class DeviceViewModel : ObservableObject
     public string Name { get; }
 
     public ObservableCollection<TagViewModel> Tags { get; } = [];
+
+    private readonly List<TagFolderViewModel> _folders = [];
+
+    /// <summary>
+    /// Filas de la tabla de tags: los tags tal cual si ninguno tiene grupo de visualización; si no, cada grupo (por
+    /// nombre, y al final los tags sin grupo) con su cabecera plegable y, si está desplegado, sus tags.
+    /// </summary>
+    public ObservableCollection<object> Rows { get; } = [];
+
+    /// <summary>Grupos de visualización en uso en el dispositivo, por nombre.</summary>
+    public IReadOnlyList<string> Folders => [.. _folders.Where(f => f.Name.Length > 0).Select(f => f.Name)];
+
+    /// <summary>Rehace <see cref="Rows"/> a partir de <see cref="Tags"/> (tras cambiar los tags del dispositivo).</summary>
+    public void RebuildRows()
+    {
+        Rows.Clear();
+        _folders.Clear();
+        if (Tags.All(t => t.Folder.Length == 0))
+        {
+            foreach (var tag in Tags)
+                Rows.Add(tag);
+            return;
+        }
+        var groups = Tags.GroupBy(t => t.Folder, StringComparer.CurrentCultureIgnoreCase)
+            .OrderBy(g => g.Key.Length == 0 ? 1 : 0)
+            .ThenBy(g => g.Key, StringComparer.CurrentCultureIgnoreCase);
+        foreach (var group in groups)
+        {
+            var folder = new TagFolderViewModel(this, group.Key, [.. group], !_context.IsFolderCollapsed(Name, group.Key));
+            _folders.Add(folder);
+            Rows.Add(folder);
+            if (folder.IsExpanded)
+            {
+                foreach (var tag in folder.Tags)
+                    Rows.Add(tag);
+            }
+        }
+    }
+
+    /// <summary>Pliega o despliega un grupo (quita o inserta sus filas, sin rehacer el resto de la tabla).</summary>
+    internal void ToggleFolder(TagFolderViewModel folder)
+    {
+        var index = Rows.IndexOf(folder);
+        if (index < 0)
+            return;
+        if (folder.IsExpanded)
+        {
+            for (var i = 0; i < folder.Tags.Count && index + 1 < Rows.Count && Rows[index + 1] is TagViewModel; i++)
+                Rows.RemoveAt(index + 1);
+        }
+        else
+        {
+            for (var i = 0; i < folder.Tags.Count; i++)
+                Rows.Insert(index + 1 + i, folder.Tags[i]);
+        }
+        folder.IsExpanded = !folder.IsExpanded;
+        _context.SetFolderCollapsed(Name, folder.Name, !folder.IsExpanded);
+    }
+
+    /// <summary>
+    /// Mueve tags al grupo de visualización <paramref name="folder"/> (vacío = sin grupo). Se reescribe el dispositivo en
+    /// el agente; la tabla se rehace al llegar el cambio por la suscripción.
+    /// </summary>
+    public async Task MoveToFolderAsync(IReadOnlyList<TagViewModel> tags, string folder)
+    {
+        ArgumentNullException.ThrowIfNull(tags);
+        if (_context.Client is not { } client || tags.Count == 0)
+            return;
+        folder = folder.Trim();
+        try
+        {
+            var names = tags.Select(t => t.Name).ToHashSet(StringComparer.Ordinal);
+            var device = await client.GetDeviceConfigAsync(new DeviceRequest { Device = Name });
+            foreach (var tag in device.ScanGroups.SelectMany(g => g.Tags).Where(t => names.Contains(string.IsNullOrEmpty(t.Name) ? t.Address : t.Name)))
+                tag.Folder = folder;
+            await client.PutDeviceAsync(new PutDeviceRequest { Device = device, Persist = true });
+            var what = tags.Count == 1 ? $"{tags[0].Name}" : $"{tags.Count} tags";
+            _context.Report(folder.Length == 0 ? $"{what} sin grupo" : $"{what} en el grupo «{folder}»");
+        }
+        catch (RpcException ex)
+        {
+            _context.Report(_context.Describe(ex), isError: true);
+        }
+    }
+
+    /// <summary>Pide el nombre de un grupo nuevo y mueve a él los tags.</summary>
+    public async Task MoveToNewFolderAsync(IReadOnlyList<TagViewModel> tags)
+    {
+        ArgumentNullException.ThrowIfNull(tags);
+        var name = await _context.Dialogs.PromptAsync("Nuevo grupo", tags.Count == 1
+            ? $"Nombre del grupo para {tags[0].Name}:"
+            : $"Nombre del grupo para los {tags.Count} tags seleccionados:");
+        if (!string.IsNullOrWhiteSpace(name))
+            await MoveToFolderAsync(tags, name);
+    }
+
+    /// <summary>Pliega o despliega todos los grupos.</summary>
+    [RelayCommand]
+    private void SetAllFolders(string expand)
+    {
+        var wanted = bool.Parse(expand);
+        foreach (var folder in _folders.Where(f => f.IsExpanded != wanted).ToArray())
+            ToggleFolder(folder);
+    }
 
     [ObservableProperty]
     public partial string Driver { get; set; } = "";

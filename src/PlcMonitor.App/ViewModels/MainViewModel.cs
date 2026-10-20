@@ -123,6 +123,26 @@ public sealed partial class MainViewModel : ObservableObject, IAgentContext, IAs
     [RelayCommand]
     private void CloseAgents() => Agents = null;
 
+    /// <summary>Panel de transformaciones abierto; null si no.</summary>
+    [ObservableProperty]
+    public partial TransformsViewModel? TransformsPanel { get; set; }
+
+    [RelayCommand(CanExecute = nameof(IsConnected))]
+    private void OpenTransforms()
+    {
+        TransformsPanel?.Dispose();
+        TransformsPanel = new TransformsViewModel(this);
+    }
+
+    [RelayCommand]
+    private async Task CloseTransformsAsync()
+    {
+        if (TransformsPanel is { IsDirty: true } && !await Dialogs.ConfirmAsync("Transformaciones", "Hay cambios sin guardar. ¿Cerrar y descartarlos?"))
+            return;
+        TransformsPanel?.Dispose();
+        TransformsPanel = null;
+    }
+
     public BrowseViewModel Browse { get; }
 
     /// <summary>Consulta del histórico del dispositivo seleccionado.</summary>
@@ -167,7 +187,8 @@ public sealed partial class MainViewModel : ObservableObject, IAgentContext, IAs
 
     [ObservableProperty]
     [NotifyPropertyChangedFor(nameof(ConnectionText), nameof(IsReconnecting), nameof(IsOnline))]
-    [NotifyCanExecuteChangedFor(nameof(ConnectCommand), nameof(DisconnectCommand), nameof(NewDeviceCommand), nameof(EditDeviceCommand), nameof(DeleteDeviceCommand))]
+    [NotifyCanExecuteChangedFor(nameof(ConnectCommand), nameof(DisconnectCommand), nameof(NewDeviceCommand), nameof(EditDeviceCommand), nameof(DeleteDeviceCommand),
+        nameof(OpenTransformsCommand))]
     public partial bool IsConnected { get; set; }
 
     [ObservableProperty]
@@ -232,6 +253,39 @@ public sealed partial class MainViewModel : ObservableObject, IAgentContext, IAs
     });
 
     public string Describe(Exception exception) => AgentErrors.Describe(exception, AgentUrl);
+
+    /// <summary>Transformaciones de valores del agente conectado.</summary>
+    public IReadOnlyList<ValueTransform> Transforms { get; private set; } = [];
+
+    /// <summary>Han cambiado las transformaciones del agente.</summary>
+    public event EventHandler? TransformsChanged;
+
+    public ValueTransform? FindTransform(string name) =>
+        Transforms.FirstOrDefault(t => string.Equals(t.Name, name, StringComparison.OrdinalIgnoreCase));
+
+    /// <summary>Tags del agente conectado (todos los dispositivos).</summary>
+    public IEnumerable<TagViewModel> AllTags => _tagIndex.Values;
+
+    private void SetTransforms(IEnumerable<ValueTransform> transforms)
+    {
+        Transforms = [.. transforms];
+        foreach (var tag in _tagIndex.Values)
+            tag.RefreshDisplay();
+        TransformsChanged?.Invoke(this, EventArgs.Empty);
+    }
+
+    private string FolderKey(string device, string folder) => $"{AgentKey}/{device}/{folder}";
+
+    public bool IsFolderCollapsed(string device, string folder) => _settings.CollapsedFolders.Contains(FolderKey(device, folder));
+
+    public void SetFolderCollapsed(string device, string folder, bool collapsed)
+    {
+        var key = FolderKey(device, folder);
+        _settings.CollapsedFolders.Remove(key);
+        if (collapsed)
+            _settings.CollapsedFolders.Add(key);
+        _settings.Save(_settingsPath);
+    }
 
     /// <summary>Alterna sistema → claro → oscuro y lo recuerda.</summary>
     [RelayCommand]
@@ -329,8 +383,11 @@ public sealed partial class MainViewModel : ObservableObject, IAgentContext, IAs
         IsConnected = false;
         IsLive = false;
         Editor = null;
+        TransformsPanel?.Dispose();
+        TransformsPanel = null;
         Devices.Clear();
         _tagIndex.Clear();
+        SetTransforms([]);
         SelectedDevice = null;
         AgentDescription = "";
         TagsChanged?.Invoke(this, EventArgs.Empty);
@@ -370,7 +427,8 @@ public sealed partial class MainViewModel : ObservableObject, IAgentContext, IAs
         try
         {
             var config = await client.GetDeviceConfigAsync(new DeviceRequest { Device = tag.Device });
-            await Dialogs.ShowTagDetailsAsync(new TagDetailsViewModel(this, tag, config, HistorianEnabled, name => FindTag(tag.Device, name)?.IsBoolean == true));
+            await Dialogs.ShowTagDetailsAsync(new TagDetailsViewModel(this, tag, config, HistorianEnabled, name => FindTag(tag.Device, name)?.IsBoolean == true,
+                [.. Transforms.Select(t => t.Name)]));
         }
         catch (RpcException ex)
         {
@@ -477,6 +535,9 @@ public sealed partial class MainViewModel : ObservableObject, IAgentContext, IAs
             case SubscribeEvent.EventOneofCase.DeviceRemoved:
                 Remove(ev.DeviceRemoved.Device);
                 break;
+            case SubscribeEvent.EventOneofCase.Transforms:
+                SetTransforms(ev.Transforms.Transforms);
+                break;
             default:
                 break;
         }
@@ -487,6 +548,8 @@ public sealed partial class MainViewModel : ObservableObject, IAgentContext, IAs
         var selected = SelectedDevice?.Name;
         Devices.Clear();
         _tagIndex.Clear();
+        // Primero las transformaciones: los tags las usan al recibir su valor.
+        Transforms = [.. snapshot.Transforms];
         var tagsByDevice = snapshot.Tags.ToLookup(t => t.Device);
         foreach (var d in snapshot.Devices)
         {
@@ -494,6 +557,7 @@ public sealed partial class MainViewModel : ObservableObject, IAgentContext, IAs
             AddTags(device, tagsByDevice[d.Name]);
             Devices.Add(device);
         }
+        TransformsChanged?.Invoke(this, EventArgs.Empty);
         SelectedDevice = Find(selected) ?? Devices.FirstOrDefault();
         IsLive = true;
         TagsChanged?.Invoke(this, EventArgs.Empty);
@@ -556,6 +620,7 @@ public sealed partial class MainViewModel : ObservableObject, IAgentContext, IAs
             device.Tags.Add(tag);
             _tagIndex[(t.Device, t.Name)] = tag;
         }
+        device.RebuildRows();
     }
 
     private DeviceViewModel? Find(string? name) => name is null ? null : Devices.FirstOrDefault(d => d.Name == name);

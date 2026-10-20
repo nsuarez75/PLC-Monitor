@@ -274,7 +274,7 @@
     <Setter Property="Background" Value="{DynamicResource App.SurfaceAlt}" />
   </Style>
   <Style Selector="ListBox.table ListBoxItem:selected /template/ ContentPresenter">
-    <Setter Property="Background" Value="{DynamicResource App.SurfaceAlt}" />
+    <Setter Property="Background" Value="{DynamicResource App.AccentSoft}" />
   </Style>
   <Style Selector="ListBox.table ListBoxItem:selected:pointerover /template/ ContentPresenter">
     <Setter Property="Background" Value="{DynamicResource App.SurfaceHover}" />
