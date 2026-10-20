@@ -57,7 +57,10 @@ public sealed class HistorianService : IAsyncDisposable
         _store = new SqliteHistorianStore(Path);
         _cts = new CancellationTokenSource();
         var token = _cts.Token;
-        _events = Task.Run(() => ListenAsync(token), CancellationToken.None);
+        // La primera suscripción se toma aquí y no en la tarea: al volver ya se escucha, así no se pierde el estado
+        // inicial de los tags si el motor publica algo antes de que la tarea arranque.
+        var subscription = _engine.Subscribe();
+        _events = Task.Run(() => ListenAsync(subscription, token), CancellationToken.None);
         _clock = Task.Run(() => ClockAsync(token), CancellationToken.None);
         _logger.LogInformation("Historiador en {Path} (retención {Days} días)", Path, _settings.RetentionDays);
         return Task.CompletedTask;
@@ -161,13 +164,15 @@ public sealed class HistorianService : IAsyncDisposable
         _flushLock.Release();
     }
 
-    private async Task ListenAsync(CancellationToken token)
+    private async Task ListenAsync(EngineSubscription first, CancellationToken token)
     {
+        EngineSubscription? next = first;
         while (!token.IsCancellationRequested)
         {
             try
             {
-                using var subscription = _engine.Subscribe();
+                using var subscription = next ?? _engine.Subscribe();
+                next = null;
                 lock (_sync)
                 {
                     _samplers.Clear();
@@ -191,6 +196,7 @@ public sealed class HistorianService : IAsyncDisposable
                 _logger.LogWarning("Historiador: suscripción desbordada; se vuelve a suscribir");
             }
         }
+        next?.Dispose(); // parado antes de llegar a usar la primera suscripción
     }
 
     private void Handle(EngineEvent engineEvent)
