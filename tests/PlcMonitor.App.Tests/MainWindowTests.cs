@@ -309,6 +309,11 @@ public class MainWindowTests
         Capture(window, "history.png");
         vm.History.ShowTable = true;
         Capture(window, "history-table.png");
+
+        vm.History.ToggleDeleteCommand.Execute(null);
+        window.UpdateLayout();
+        window.GetVisualDescendants().OfType<TextBlock>().Select(t => t.Text).ShouldContain("Borrar los tags marcados desde");
+        Capture(window, "history-delete.png");
     });
 
     [Fact]
@@ -567,8 +572,9 @@ public class MainWindowTests
         Avalonia.Application.Current.RequestedThemeVariant = Avalonia.Styling.ThemeVariant.Dark;
         Capture(window, "transforms-dark.png");
         Avalonia.Application.Current.RequestedThemeVariant = Avalonia.Styling.ThemeVariant.Light;
-        await vm.CloseTransformsCommand.ExecuteAsync(null);
-        vm.TransformsPanel.ShouldBeNull();
+        vm.CloseTransformsCommand.Execute(null);
+        vm.Page.ShouldBe(AppPage.Tags);
+        vm.TransformsPanel.ShouldNotBeNull("cambiar de pestaña no la cierra");
 
         var tag = vm.Devices[0].Tags.Single(t => t.Name == "motor_cinta");
         var config = new DeviceConfig { Name = "casa1200" };

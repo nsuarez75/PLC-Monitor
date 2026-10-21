@@ -96,6 +96,45 @@ public class AgentHistoryApiTests
     }
 
     [Fact]
+    public async Task History_of_a_tag_can_be_deleted_between_two_instants()
+    {
+        await using var agent = new AgentFactory(Device("plc1", tags: [Historized("DB1.DBW0", "velocidad"), Historized("DB1.DBW2", "otro")]));
+        var plc = agent.Driver.Plc("plc1");
+        plc.Values["DB1.DBW0"] = 10;
+        plc.Values["DB1.DBW2"] = 1;
+        var client = agent.CreateGrpcClient();
+        await EventuallyAsync(async () => await client.ListTagsAsync(new ListTagsRequest(), cancellationToken: Ct), t => t.Tags.All(x => x.Value.Quality == Quality.Good));
+        async Task<int> Count(string tag) =>
+            (await client.QueryHistoryAsync(new HistoryRequest { Device = "plc1", Tags = { tag } }, cancellationToken: Ct)).Series.Single().Points.Count(p => p.Quality == Quality.Good);
+        await EventuallyAsync(() => Count("velocidad"), n => n > 0);
+
+        // Lo que aún no se ha volcado a disco también se borra.
+        var reply = await client.DeleteHistoryAsync(new DeleteHistoryRequest
+        {
+            Device = "plc1",
+            Tags = { "velocidad" },
+            From = Timestamp.FromDateTimeOffset(DateTimeOffset.UtcNow.AddHours(-1)),
+            To = Timestamp.FromDateTimeOffset(DateTimeOffset.UtcNow.AddMinutes(1)),
+        }, cancellationToken: Ct);
+
+        reply.Deleted.ShouldBeGreaterThan(0);
+        (await Count("velocidad")).ShouldBe(0);
+        (await Count("otro")).ShouldBeGreaterThan(0);
+
+        var noRange = await Should.ThrowAsync<RpcException>(async () =>
+            await client.DeleteHistoryAsync(new DeleteHistoryRequest { Device = "plc1", Tags = { "velocidad" } }, cancellationToken: Ct));
+        noRange.StatusCode.ShouldBe(StatusCode.InvalidArgument);
+        var reversed = await Should.ThrowAsync<RpcException>(async () => await client.DeleteHistoryAsync(new DeleteHistoryRequest
+        {
+            Device = "plc1",
+            Tags = { "velocidad" },
+            From = Timestamp.FromDateTimeOffset(DateTimeOffset.UtcNow),
+            To = Timestamp.FromDateTimeOffset(DateTimeOffset.UtcNow.AddHours(-1)),
+        }, cancellationToken: Ct));
+        reversed.StatusCode.ShouldBe(StatusCode.InvalidArgument);
+    }
+
+    [Fact]
     public async Task History_settings_round_trip_through_the_device_configuration()
     {
         await using var agent = new AgentFactory(Device("plc1", tags: [T("DB1.DBW0", "t")]));

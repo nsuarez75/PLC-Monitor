@@ -10,6 +10,15 @@ using PlcMonitor.Agent.Contracts.Client;
 
 namespace PlcMonitor.App.ViewModels;
 
+/// <summary>Pestañas de la ventana principal.</summary>
+public enum AppPage
+{
+    Tags,
+    Trends,
+    Transforms,
+    Agents,
+}
+
 /// <summary>
 /// Ventana principal: conexión con un agente, dispositivos con sus tags en vivo (por suscripción), explorador de
 /// símbolos y editor de dispositivos.
@@ -117,31 +126,52 @@ public sealed partial class MainViewModel : ObservableObject, IAgentContext, IAs
     /// <summary>Guarda los perfiles en disco.</summary>
     public void SaveProfiles() => AgentProfileStore.Save(_profilesPath, Profiles);
 
-    [RelayCommand]
-    private void OpenAgents() => Agents = new AgentsViewModel(this, _sshFactory, _localFactory);
+    /// <summary>
+    /// Pestaña de la ventana: Tags (dispositivos), Tendencias, Transformaciones o Agentes. Cambiar de pestaña no cierra
+    /// nada: cada una sigue como se dejó (la tendencia abierta, lo editado sin guardar…).
+    /// </summary>
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(IsTagsPage), nameof(IsTrendsPage), nameof(IsTransformsPage), nameof(IsAgentsPage))]
+    public partial AppPage Page { get; set; }
+
+    public bool IsTagsPage => Page == AppPage.Tags;
+
+    public bool IsTrendsPage => Page == AppPage.Trends;
+
+    public bool IsTransformsPage => Page == AppPage.Transforms;
+
+    public bool IsAgentsPage => Page == AppPage.Agents;
 
     [RelayCommand]
-    private void CloseAgents() => Agents = null;
+    private void ShowTags() => Page = AppPage.Tags;
 
-    /// <summary>Panel de transformaciones abierto; null si no.</summary>
+    /// <summary>Va a la pestaña Agentes (la crea la primera vez).</summary>
+    [RelayCommand]
+    private void OpenAgents()
+    {
+        Agents ??= new AgentsViewModel(this, _sshFactory, _localFactory);
+        Page = AppPage.Agents;
+    }
+
+    /// <summary>Vuelve a la pestaña Tags (la de agentes sigue como estaba).</summary>
+    [RelayCommand]
+    private void CloseAgents() => Page = AppPage.Tags;
+
+    /// <summary>Panel de transformaciones del agente conectado; null si aún no se ha abierto o sin conexión.</summary>
     [ObservableProperty]
     public partial TransformsViewModel? TransformsPanel { get; set; }
 
+    /// <summary>Va a la pestaña Transformaciones (la crea la primera vez; lo editado sin guardar se conserva al cambiar de pestaña).</summary>
     [RelayCommand(CanExecute = nameof(IsConnected))]
     private void OpenTransforms()
     {
-        TransformsPanel?.Dispose();
-        TransformsPanel = new TransformsViewModel(this);
+        TransformsPanel ??= new TransformsViewModel(this);
+        Page = AppPage.Transforms;
     }
 
+    /// <summary>Vuelve a la pestaña Tags; lo editado en Transformaciones sigue ahí.</summary>
     [RelayCommand]
-    private async Task CloseTransformsAsync()
-    {
-        if (TransformsPanel is { IsDirty: true } && !await Dialogs.ConfirmAsync("Transformaciones", "Hay cambios sin guardar. ¿Cerrar y descartarlos?"))
-            return;
-        TransformsPanel?.Dispose();
-        TransformsPanel = null;
-    }
+    private void CloseTransforms() => Page = AppPage.Tags;
 
     public BrowseViewModel Browse { get; }
 
@@ -161,19 +191,29 @@ public sealed partial class MainViewModel : ObservableObject, IAgentContext, IAs
     /// <summary>Tag del agente conectado; null si no existe.</summary>
     public TagViewModel? FindTag(string device, string tag) => _tagIndex.GetValueOrDefault((device, tag));
 
+    // Agente para el que se creó Trends (las vistas guardadas son de cada agente).
+    private string? _trendsAgent;
+
+    /// <summary>Va a la pestaña Tendencias, con la vista que se dejó abierta (se crea la primera vez o al cambiar de agente).</summary>
     [RelayCommand]
     private void OpenTrends()
     {
+        EnsureTrends();
+        Page = AppPage.Trends;
+    }
+
+    private void EnsureTrends()
+    {
+        if (Trends is not null && _trendsAgent == AgentKey)
+            return;
         Trends?.Dispose();
+        _trendsAgent = AgentKey;
         Trends = new TrendsViewModel(this, TrendViewStore.PathNextTo(_settingsPath));
     }
 
+    /// <summary>Vuelve a la pestaña Tags; las tendencias siguen como estaban.</summary>
     [RelayCommand]
-    private void CloseTrends()
-    {
-        Trends?.Dispose();
-        Trends = null;
-    }
+    private void CloseTrends() => Page = AppPage.Tags;
 
     /// <summary>El agente conectado tiene el historiador activado.</summary>
     [ObservableProperty]
@@ -360,6 +400,9 @@ public sealed partial class MainViewModel : ObservableObject, IAgentContext, IAs
             }
             _subscriptionCts = new CancellationTokenSource();
             _subscription = RunSubscriptionAsync(client, _subscriptionCts.Token);
+            // Las tendencias abiertas eran de otro agente: se cargan las de este.
+            if (Trends is not null)
+                EnsureTrends();
             Report($"Conectado a {url}");
         }
         catch (Exception ex) when (ex is RpcException or UriFormatException or InvalidOperationException)
@@ -384,6 +427,8 @@ public sealed partial class MainViewModel : ObservableObject, IAgentContext, IAs
         Editor = null;
         TransformsPanel?.Dispose();
         TransformsPanel = null;
+        if (Page == AppPage.Transforms)
+            Page = AppPage.Tags;
         Devices.Clear();
         _tagIndex.Clear();
         SetTransforms([]);
@@ -394,7 +439,11 @@ public sealed partial class MainViewModel : ObservableObject, IAgentContext, IAs
     }
 
     [RelayCommand(CanExecute = nameof(IsConnected))]
-    private void NewDevice() => Editor = new DeviceEditorViewModel(this, Drivers, OnEditorSaved);
+    private void NewDevice()
+    {
+        Editor = new DeviceEditorViewModel(this, Drivers, OnEditorSaved);
+        Page = AppPage.Tags;
+    }
 
     private bool CanEditDevice() => IsConnected && SelectedDevice is not null;
 
@@ -407,6 +456,7 @@ public sealed partial class MainViewModel : ObservableObject, IAgentContext, IAs
         {
             var config = await client.GetDeviceConfigAsync(new DeviceRequest { Device = device.Name });
             Editor = new DeviceEditorViewModel(this, Drivers, config, OnEditorSaved);
+            Page = AppPage.Tags;
         }
         catch (RpcException ex)
         {
@@ -433,6 +483,33 @@ public sealed partial class MainViewModel : ObservableObject, IAgentContext, IAs
         {
             Report(Describe(ex), isError: true);
         }
+    }
+
+    /// <summary>Pestaña elegida del dispositivo: 0 = Tags, 1 = Histórico, 2 = Explorar.</summary>
+    [ObservableProperty]
+    public partial int DeviceTab { get; set; }
+
+    public const int HistoryTab = 1;
+
+    /// <summary>Abre la pestaña Histórico con solo este tag marcado y lo consulta (menú del tag).</summary>
+    [RelayCommand]
+    private async Task OpenTagHistoryAsync(TagViewModel? tag)
+    {
+        if (tag is null)
+            return;
+        if (!tag.Historized)
+        {
+            Report($"{tag.Name} no se guarda en el histórico: actívalo en su detalle (doble clic → Histórico).");
+            return;
+        }
+        if (SelectedDevice?.Name != tag.Device)
+            SelectedDevice = Find(tag.Device);
+        History.RefreshTags();
+        if (!History.SelectOnly(tag.Name))
+            return;
+        DeviceTab = HistoryTab;
+        Page = AppPage.Tags;
+        await History.QueryCommand.ExecuteAsync(null);
     }
 
     [RelayCommand(CanExecute = nameof(CanEditDevice))]

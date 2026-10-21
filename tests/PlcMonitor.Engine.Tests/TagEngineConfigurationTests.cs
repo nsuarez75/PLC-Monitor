@@ -16,6 +16,42 @@ public class TagEngineConfigurationTests
     }
 
     [Fact]
+    public async Task Changing_tags_during_a_slow_read_does_not_wait_for_it_nor_publish_its_stale_values()
+    {
+        await using var h = new EngineHarness(Device("plc1", tags: [Tag("DB1.DBW0", "x"), Tag("DB1.DBW4", "quitado")]));
+        var plc = h.Driver.Plc("plc1");
+        plc.Values["DB1.DBW0"] = 1;
+        plc.Values["DB1.DBW2"] = 50;
+        plc.Values["DB1.DBW4"] = 7;
+        await h.Engine.StartAsync();
+        await WaitUntilAsync(() => h.Value("plc1", "x").Quality == QualityCode.Good);
+
+        // Una lectura se queda esperando al PLC con el valor viejo de la dirección vieja.
+        plc.Values["DB1.DBW0"] = 2;
+        plc.Values["DB1.DBW4"] = 8;
+        var gate = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        plc.ReadGate = gate;
+        var reads = plc.ReadCount;
+        await h.AdvanceUntilAsync(() => plc.ReadCount > reads);
+        using var subscription = h.Engine.Subscribe();
+
+        // Quitar un tag y cambiar la dirección de otro no espera a la lectura colgada.
+        var put = h.Engine.PutDeviceAsync(Device("plc1", tags: [Tag("DB1.DBW2", "x")]));
+        (await Task.WhenAny(put, Task.Delay(TimeSpan.FromSeconds(5)))).ShouldBe(put, "PutDevice no debe esperar a la lectura en curso");
+        await put;
+
+        plc.ReadGate = null;
+        gate.SetResult();
+        await h.AdvanceUntilAsync(() => h.Value("plc1", "x").Value is 50);
+        var events = new List<EngineEvent>();
+        while (subscription.Events.TryRead(out var pending))
+            events.Add(pending);
+        var stale = events.OfType<TagValuesChanged>().SelectMany(e => e.Updates).Where(u => Equals(u.Value.Value, 2) || u.Key.Tag == "quitado").ToArray();
+        stale.ShouldBeEmpty();
+        h.Engine.GetTags("plc1").Select(t => t.Definition.Key.Tag).ShouldBe(["x"]);
+    }
+
+    [Fact]
     public async Task New_device_is_added_started_and_announced()
     {
         await using var h = new EngineHarness(Device("plc1", tags: [Tag("DB1.DBW0", "a")]));

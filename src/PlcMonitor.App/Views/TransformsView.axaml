@@ -33,20 +33,11 @@
 
     <!-- Detalle de la transformación seleccionada -->
     <DockPanel Grid.Column="1">
-      <Grid DockPanel.Dock="Top" ColumnDefinitions="*,Auto" Margin="0,0,0,14">
-        <StackPanel Spacing="2">
-          <TextBlock Text="Transformaciones" Classes="title" />
-          <TextBlock Classes="muted" TextWrapping="Wrap"
-                     Text="Muestran valores enteros como texto (0 = Parado, 1 = Marcha…). Se guardan en el agente y se asignan a cada tag en su detalle (doble clic → «Mostrar valor como»)." />
-        </StackPanel>
-        <Button Grid.Column="1" Classes="secondary" VerticalAlignment="Top"
-                Command="{Binding $parent[Window].((vm:MainViewModel)DataContext).CloseTransformsCommand}">
-          <StackPanel Orientation="Horizontal" Spacing="6">
-            <c:Icon Kind="x" />
-            <TextBlock Text="Cerrar" />
-          </StackPanel>
-        </Button>
-      </Grid>
+      <StackPanel DockPanel.Dock="Top" Spacing="2" Margin="0,0,0,14">
+        <TextBlock Text="Transformaciones" Classes="title" />
+        <TextBlock Classes="muted" TextWrapping="Wrap"
+                   Text="Muestran valores enteros como texto (0 = Parado, 1 = Marcha…). Se guardan en el agente y se asignan a cada tag en su detalle (doble clic → «Mostrar valor como»)." />
+      </StackPanel>
 
       <!-- Guardar / descartar -->
       <StackPanel DockPanel.Dock="Bottom" Spacing="10" Margin="0,14,0,0">

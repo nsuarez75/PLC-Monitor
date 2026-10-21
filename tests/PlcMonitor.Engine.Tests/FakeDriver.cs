@@ -60,6 +60,9 @@ internal sealed class FakePlc
 
     public int ReadCount;
 
+    /// <summary>Si no es null, las lecturas leen los valores y esperan a que se complete (un PLC lento que no atiende la cancelación).</summary>
+    public TaskCompletionSource? ReadGate { get; set; }
+
     public ConcurrentQueue<WriteRequest> Writes { get; } = new();
 }
 
@@ -97,9 +100,8 @@ internal sealed class FakeConnection(string name, FakePlc plc) : DeviceConnectio
 
     protected override Task CloseCoreAsync() => Task.CompletedTask;
 
-    protected override Task<IReadOnlyList<TagValue>> ReadCoreAsync(IReadOnlyList<string> addresses, CancellationToken cancellationToken)
+    protected override async Task<IReadOnlyList<TagValue>> ReadCoreAsync(IReadOnlyList<string> addresses, CancellationToken cancellationToken)
     {
-        Interlocked.Increment(ref plc.ReadCount);
         if (plc.Unplugged)
             throw new IOException("Cable desconectado");
         var now = TimeProvider.GetUtcNow();
@@ -108,7 +110,11 @@ internal sealed class FakeConnection(string name, FakePlc plc) : DeviceConnectio
                 ? TagValue.Good(v, ValidateAddress(a).DataType, now)
                 : TagValue.Bad(QualityCode.BadAddressInvalid, now, "no existe"))
             .ToArray();
-        return Task.FromResult(result);
+        var gate = plc.ReadGate;
+        Interlocked.Increment(ref plc.ReadCount);
+        if (gate is not null)
+            await gate.Task;
+        return result;
     }
 
     protected override Task<IReadOnlyList<WriteResult>> WriteCoreAsync(IReadOnlyList<WriteRequest> requests, CancellationToken cancellationToken)

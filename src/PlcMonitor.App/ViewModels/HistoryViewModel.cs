@@ -98,7 +98,7 @@ public sealed partial class HistoryViewModel(IAgentContext context, Func<DeviceV
     public partial string Summary { get; set; } = "";
 
     [ObservableProperty]
-    [NotifyCanExecuteChangedFor(nameof(QueryCommand), nameof(ExportCommand))]
+    [NotifyCanExecuteChangedFor(nameof(QueryCommand), nameof(ExportCommand), nameof(DeleteCommand))]
     public partial bool IsBusy { get; set; }
 
     public bool IsAggregated => Aggregate.Value is not null;
@@ -122,6 +122,16 @@ public sealed partial class HistoryViewModel(IAgentContext context, Func<DeviceV
         foreach (var tag in device()?.Tags.Where(t => t.Historized) ?? [])
             Tags.Add(new HistoryTagOption(tag.Name) { IsSelected = selected.Contains(tag.Name) || selected.Count == 0 });
         OnPropertyChanged(nameof(HasHistorizedTags));
+    }
+
+    /// <summary>Deja marcado solo <paramref name="tag"/> (si es un tag historizado del dispositivo).</summary>
+    public bool SelectOnly(string tag)
+    {
+        if (!Tags.Any(t => t.Name == tag))
+            return false;
+        foreach (var option in Tags)
+            option.IsSelected = option.Name == tag;
+        return true;
     }
 
     private bool CanQuery() => !IsBusy;
@@ -181,6 +191,101 @@ public sealed partial class HistoryViewModel(IAgentContext context, Func<DeviceV
         {
             IsBusy = false;
         }
+    }
+
+    /// <summary>Se ve el panel para borrar datos del histórico.</summary>
+    [ObservableProperty]
+    public partial bool ShowDelete { get; set; }
+
+    [ObservableProperty]
+    public partial DateTime? DeleteFromDate { get; set; }
+
+    [ObservableProperty]
+    public partial TimeSpan? DeleteFromTime { get; set; }
+
+    [ObservableProperty]
+    public partial DateTime? DeleteToDate { get; set; }
+
+    [ObservableProperty]
+    public partial TimeSpan? DeleteToTime { get; set; }
+
+    /// <summary>Abre o cierra el panel de borrar; al abrirlo propone el periodo elegido para consultar.</summary>
+    [RelayCommand]
+    private void ToggleDelete()
+    {
+        ShowDelete = !ShowDelete;
+        if (!ShowDelete)
+            return;
+        var to = DateTime.Now;
+        var from = to - Range.Value;
+        (DeleteFromDate, DeleteFromTime) = (from.Date, new TimeSpan(from.Hour, from.Minute, 0));
+        (DeleteToDate, DeleteToTime) = (to.Date, new TimeSpan(to.Hour, to.Minute, 0) + TimeSpan.FromMinutes(1));
+    }
+
+    /// <summary>Inicio y final (hora local) del intervalo que se borra; null si falta algo.</summary>
+    private (DateTimeOffset From, DateTimeOffset To)? DeleteRange() =>
+        DeleteFromDate is { } fromDate && DeleteToDate is { } toDate
+            ? (new DateTimeOffset(fromDate.Date + (DeleteFromTime ?? TimeSpan.Zero)), new DateTimeOffset(toDate.Date + (DeleteToTime ?? TimeSpan.Zero)))
+            : null;
+
+    /// <summary>Borra del agente lo guardado de los tags marcados en el intervalo elegido (tras confirmarlo).</summary>
+    [RelayCommand(CanExecute = nameof(CanQuery))]
+    private async Task DeleteAsync()
+    {
+        if (context.Client is not { } client || device() is not { } target)
+            return;
+        var tags = Tags.Where(t => t.IsSelected).Select(t => t.Name).ToArray();
+        if (tags.Length == 0)
+        {
+            Summary = "Marca al menos un tag.";
+            return;
+        }
+        if (DeleteRange() is not { } range)
+        {
+            Summary = "Indica el día de inicio y el de final.";
+            return;
+        }
+        if (range.To <= range.From)
+        {
+            Summary = "El final del intervalo debe ser posterior al inicio.";
+            return;
+        }
+        const string format = "dd/MM/yyyy HH:mm";
+        var what = tags.Length == 1 ? $"del tag {tags[0]}" : $"de {tags.Length} tags ({string.Join(", ", tags)})";
+        if (!await context.Dialogs.ConfirmAsync("Borrar histórico",
+                $"¿Borrar los datos guardados {what} de {target.Name} entre el {range.From.ToString(format, CultureInfo.InvariantCulture)} y el {range.To.ToString(format, CultureInfo.InvariantCulture)}?\nNo se puede deshacer."))
+            return;
+        IsBusy = true;
+        try
+        {
+            var request = new DeleteHistoryRequest
+            {
+                Device = target.Name,
+                From = Timestamp.FromDateTimeOffset(range.From),
+                To = Timestamp.FromDateTimeOffset(range.To),
+            };
+            request.Tags.AddRange(tags);
+            var reply = await client.DeleteHistoryAsync(request);
+            context.Report(reply.Deleted == 0 ? "No había datos en ese intervalo" : $"{reply.Deleted} datos borrados del histórico {what}");
+            ShowDelete = false;
+        }
+        catch (RpcException ex) when (ex.StatusCode == StatusCode.Unimplemented)
+        {
+            context.Report("Este agente no sabe borrar histórico: actualízalo desde «Agentes» (Instalar / actualizar).", isError: true);
+            return;
+        }
+        catch (RpcException ex)
+        {
+            context.Report(context.Describe(ex), isError: true);
+            return;
+        }
+        finally
+        {
+            IsBusy = false;
+        }
+        // Lo que se estaba viendo se vuelve a consultar para que no siga mostrando lo borrado.
+        if (Rows.Count > 0 || Chart.HasOptions)
+            await QueryAsync();
     }
 
     /// <summary>Crea una vista de Tendencias con los tags marcados y el periodo, leída del histórico, y la abre.</summary>

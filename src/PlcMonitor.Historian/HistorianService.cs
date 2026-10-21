@@ -148,6 +148,34 @@ public sealed class HistorianService : IAsyncDisposable
         }
     }
 
+    /// <summary>
+    /// Borra lo guardado de unos tags entre dos instantes (ambos incluidos). Antes vuelca lo pendiente, para que lo
+    /// recibido en ese intervalo y aún no guardado también se borre. Devuelve cuántas muestras se han borrado.
+    /// </summary>
+    public async Task<long> DeleteAsync(IReadOnlyList<TagKey> keys, DateTimeOffset from, DateTimeOffset to, CancellationToken cancellationToken = default)
+    {
+        ArgumentNullException.ThrowIfNull(keys);
+        if (_store is null)
+            throw new InvalidOperationException("El historiador está desactivado en este agente.");
+        if (keys.Count == 0 || keys.Any(k => string.IsNullOrWhiteSpace(k.Device) || string.IsNullOrWhiteSpace(k.Tag)))
+            throw new ArgumentException("Indica el dispositivo y al menos un tag.", nameof(keys));
+        if (to < from)
+            throw new ArgumentException("El final del intervalo es anterior al inicio.", nameof(to));
+        await _flushLock.WaitAsync(cancellationToken);
+        try
+        {
+            await FlushLockedAsync(cancellationToken);
+            var deleted = await _store.DeleteAsync(keys, from, to, cancellationToken);
+            _logger.LogInformation("Histórico: {Count} muestras borradas de {Tags} entre {From} y {To}", deleted, string.Join(", ", keys),
+                SqliteHistorianStore.Describe(from), SqliteHistorianStore.Describe(to));
+            return deleted;
+        }
+        finally
+        {
+            _flushLock.Release();
+        }
+    }
+
     /// <summary>Vuelca a disco las muestras acumuladas.</summary>
     public async Task FlushAsync(CancellationToken cancellationToken = default)
     {

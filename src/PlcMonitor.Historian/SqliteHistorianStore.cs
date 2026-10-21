@@ -152,6 +152,42 @@ public sealed class SqliteHistorianStore : IDisposable
         }
     }
 
+    /// <summary>Borra las muestras de unos tags entre dos instantes (ambos incluidos). Devuelve cuántas se han borrado.</summary>
+    public async Task<long> DeleteAsync(IReadOnlyList<TagKey> keys, DateTimeOffset from, DateTimeOffset to, CancellationToken cancellationToken = default)
+    {
+        ArgumentNullException.ThrowIfNull(keys);
+        long deleted = 0;
+        await _lock.WaitAsync(cancellationToken);
+        try
+        {
+            for (var month = MonthStart(from); month <= to; month = month.AddMonths(1))
+            {
+                var file = FileName(month);
+                if (Open(file, create: false) is not { } connection)
+                    continue;
+                using var transaction = connection.BeginTransaction();
+                foreach (var key in keys)
+                {
+                    if (TagId(connection, transaction, file, key, TagDataType.Unknown, create: false) is not { } id)
+                        continue;
+                    using var delete = connection.CreateCommand();
+                    delete.Transaction = transaction;
+                    delete.CommandText = "DELETE FROM samples WHERE tag_id = $id AND t >= $from AND t <= $to";
+                    delete.Parameters.AddWithValue("$id", id);
+                    delete.Parameters.AddWithValue("$from", from.ToUnixTimeMilliseconds());
+                    delete.Parameters.AddWithValue("$to", to.ToUnixTimeMilliseconds());
+                    deleted += delete.ExecuteNonQuery();
+                }
+                transaction.Commit();
+            }
+        }
+        finally
+        {
+            _lock.Release();
+        }
+        return deleted;
+    }
+
     /// <summary>
     /// Pasa lo guardado con un nombre a otro en todos los ficheros mensuales. Si el nombre nuevo ya tiene muestras (p.ej.
     /// las guardadas desde el cambio), se juntan. Devuelve cuántos tags distintos se han movido.

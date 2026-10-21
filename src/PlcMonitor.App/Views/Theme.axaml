@@ -192,6 +192,14 @@
   <Style Selector="Button.ghost:pointerover /template/ ContentPresenter">
     <Setter Property="Background" Value="{DynamicResource App.SurfaceHover}" />
   </Style>
+  <!-- Pestañas de la barra superior: la página en la que se está, con el acento -->
+  <Style Selector="Button.tab.on /template/ ContentPresenter">
+    <Setter Property="Background" Value="{DynamicResource App.AccentSoft}" />
+    <Setter Property="Foreground" Value="{DynamicResource App.AccentText}" />
+  </Style>
+  <Style Selector="Button.tab">
+    <Setter Property="Padding" Value="10,7" />
+  </Style>
   <Style Selector="Button.danger:pointerover">
     <Setter Property="Foreground" Value="{DynamicResource App.Bad}" />
   </Style>
@@ -278,6 +286,22 @@
   </Style>
   <Style Selector="ListBox.table ListBoxItem:selected:pointerover /template/ ContentPresenter">
     <Setter Property="Background" Value="{DynamicResource App.SurfaceHover}" />
+  </Style>
+  <!-- Zona de una acción que no se puede deshacer (borrar histórico) -->
+  <Style Selector="Border.danger">
+    <Setter Property="Background" Value="{DynamicResource App.BadSoft}" />
+    <Setter Property="BorderBrush" Value="{DynamicResource App.Bad}" />
+    <Setter Property="BorderThickness" Value="1" />
+    <Setter Property="CornerRadius" Value="8" />
+  </Style>
+  <!-- Tags de un grupo: sangrados bajo la cabecera (el nombre queda a la altura del icono de la carpeta) -->
+  <Style Selector="StackPanel.tagname.infolder">
+    <Setter Property="Margin" Value="22,0,0,0" />
+  </Style>
+  <!-- Fila sobre la que se van a soltar tags arrastrados -->
+  <Style Selector="ListBox.table ListBoxItem.droptarget /template/ ContentPresenter">
+    <Setter Property="Background" Value="{DynamicResource App.AccentSoft}" />
+    <Setter Property="BorderBrush" Value="{DynamicResource App.Accent}" />
   </Style>
   <!-- Ventana estrecha: los botones de la barra superior se quedan con el icono -->
   <Style Selector="Window.narrow TextBlock.barlabel">

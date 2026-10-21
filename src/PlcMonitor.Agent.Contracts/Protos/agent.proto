@@ -62,6 +62,10 @@ service AgentService {
   // muestras, se juntan. Si el historiador está desactivado: FAILED_PRECONDITION.
   rpc RenameHistory(RenameHistoryRequest) returns (RenameHistoryReply);
 
+  // Borra lo guardado de unos tags entre dos instantes (ambos incluidos). Si el historiador está desactivado:
+  // FAILED_PRECONDITION.
+  rpc DeleteHistory(DeleteHistoryRequest) returns (DeleteHistoryReply);
+
   // Transformaciones de valores (p.ej. 0 = Parado, 1 = Marcha) que se asignan a los tags por su nombre.
   rpc GetTransforms(google.protobuf.Empty) returns (TransformList);
 
@@ -470,4 +474,17 @@ message RenameHistoryRequest {
 message RenameHistoryReply {
   // Tags distintos cuyo histórico se ha movido.
   int32 moved = 1;
+}
+
+message DeleteHistoryRequest {
+  string device = 1;
+  repeated string tags = 2;
+  // Obligatorios los dos.
+  google.protobuf.Timestamp from = 3;
+  google.protobuf.Timestamp to = 4;
+}
+
+message DeleteHistoryReply {
+  // Muestras borradas.
+  int64 deleted = 1;
 }
