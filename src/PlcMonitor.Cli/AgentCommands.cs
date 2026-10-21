@@ -616,10 +616,16 @@ public sealed class AgentTagAddSettings : AgentPersistSettings
     [Description("Decimales con los que se muestran los reales (0-9); -1 los quita (valor completo). Si no se indica, se conservan.")]
     public int? Decimals { get; set; }
 
+    [CommandOption("--scale <ESCALADO>")]
+    [Description("Escalado del bruto a unidades de ingeniería: brutoMín:brutoMáx:ingMín:ingMáx, con :clamp al final para limitar al rango (p.ej. 0:27648:0:10). \"none\" lo quita. Si empieza por '-', usa --scale=-10:10:0:1. Si no se indica, se conserva.")]
+    public string? Scale { get; set; }
+
     public override ValidationResult Validate()
     {
         if (Decimals is < -1 or > 9)
             return ValidationResult.Error("--decimals debe estar entre 0 y 9 (o -1 para quitarlos).");
+        if (Scale is not null && !TryParseScale(Scale, out _))
+            return ValidationResult.Error($"Escalado no válido: '{Scale}'. Formato: brutoMín:brutoMáx:ingMín:ingMáx[:clamp], o none.");
         if (HistoryMin is not null && Durations.Parse(HistoryMin) is null)
             return ValidationResult.Error($"Duración no válida: '{HistoryMin}'.");
         if (HistoryMax is not null && Durations.Parse(HistoryMax) is null)
@@ -643,6 +649,27 @@ public sealed class AgentTagAddSettings : AgentPersistSettings
             Deadband = double.Parse(deadband.TrimEnd('%'), CultureInfo.InvariantCulture),
             DeadbandPercent = deadband.EndsWith('%'),
         };
+    }
+
+    /// <summary>Interpreta --scale; <paramref name="scaling"/> null = quitar el escalado ("none" o vacío).</summary>
+    public static bool TryParseScale(string text, out Scaling? scaling)
+    {
+        scaling = null;
+        var trimmed = text.Trim();
+        if (trimmed.Length == 0 || trimmed.Equals("none", StringComparison.OrdinalIgnoreCase))
+            return true;
+        var parts = trimmed.Split(':', StringSplitOptions.TrimEntries);
+        var clamp = parts.Length == 5 && parts[4].Equals("clamp", StringComparison.OrdinalIgnoreCase);
+        if (parts.Length != 4 && !clamp)
+            return false;
+        var numbers = new double[4];
+        for (var i = 0; i < 4; i++)
+        {
+            if (!double.TryParse(parts[i], NumberStyles.Float, CultureInfo.InvariantCulture, out numbers[i]) || !double.IsFinite(numbers[i]))
+                return false;
+        }
+        scaling = new Scaling { RawMin = numbers[0], RawMax = numbers[1], EngMin = numbers[2], EngMax = numbers[3], Clamp = clamp };
+        return true;
     }
 }
 
@@ -686,6 +713,7 @@ public sealed class AgentTagAddCommand : AsyncCommand<AgentTagAddSettings>
                 Transform = previous?.Transform ?? "",
                 Folder = previous?.Folder ?? "",
                 Unit = settings.Unit?.Trim() ?? previous?.Unit ?? "",
+                Scaling = settings.Scale is { } scale && AgentTagAddSettings.TryParseScale(scale, out var scaling) ? scaling : previous?.Scaling,
             };
             if ((settings.Decimals ?? previous?.GetDecimals()) is { } decimals and >= 0)
                 tag.Decimals = decimals;

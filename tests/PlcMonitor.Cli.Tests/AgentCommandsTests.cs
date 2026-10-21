@@ -135,6 +135,52 @@ public sealed class AgentCommandsTests : IDisposable
     }
 
     [Fact]
+    public async Task Scaling_is_set_with_tag_add_and_tags_and_write_use_engineering_units()
+    {
+        await using var agent = new AgentFactory(Device("plc1", writesEnabled: true));
+        var plc = agent.Driver.Plc("plc1");
+        plc.Values["DB1.DBW0"] = 13824;
+        UseAgent(agent);
+        _console.Profile.Width = 200;
+
+        (await RunAsync("agent", "tag", "add", "plc1", "DB1.DBW0", "--name", "presion", "--writable", "--scale", "0:27648:0:10:clamp", "--unit", "bar")).ShouldBe(0);
+        await WaitForGoodValuesAsync(agent);
+        (await RunAsync("agent", "tags", "plc1")).ShouldBe(0);
+        Output.ShouldContain("5 bar");
+
+        (await RunAsync("agent", "write", "plc1", "presion", "2.5", "-y")).ShouldBe(0);
+        plc.Writes.ShouldHaveSingleItem().Value.ShouldBe(6912);
+        (await RunAsync("agent", "write", "plc1", "presion", "11", "-y")).ShouldBe(1);
+        Output.ShouldContain("fuera del rango de ingeniería");
+
+        // Sin --scale se conserva; "none" lo quita; un formato incorrecto se rechaza.
+        var client = agent.CreateGrpcClient();
+        (await RunAsync("agent", "tag", "add", "plc1", "DB1.DBW0", "--name", "presion", "--writable")).ShouldBe(0);
+        var tag = (await client.GetDeviceConfigAsync(new DeviceRequest { Device = "plc1" })).ScanGroups.SelectMany(g => g.Tags).Single();
+        tag.Scaling.ShouldBe(new Scaling { RawMin = 0, RawMax = 27648, EngMin = 0, EngMax = 10, Clamp = true });
+        (await RunAsync("agent", "tag", "add", "plc1", "DB1.DBW0", "--name", "presion", "--scale=-100:100:0:1")).ShouldBe(0);
+        tag = (await client.GetDeviceConfigAsync(new DeviceRequest { Device = "plc1" })).ScanGroups.SelectMany(g => g.Tags).Single();
+        (tag.Scaling.RawMin, tag.Scaling.Clamp).ShouldBe((-100, false));
+        (await RunAsync("agent", "tag", "add", "plc1", "DB1.DBW0", "--name", "presion", "--scale", "none")).ShouldBe(0);
+        (await client.GetDeviceConfigAsync(new DeviceRequest { Device = "plc1" })).ScanGroups.SelectMany(g => g.Tags).Single().Scaling.ShouldBeNull();
+        (await RunAsync("agent", "tag", "add", "plc1", "DB1.DBW0", "--name", "presion", "--scale", "0:10:5")).ShouldNotBe(0);
+    }
+
+    [Theory]
+    [InlineData("0:27648:0:10", true, false)]
+    [InlineData(" 4 : 20 : 0 : 1.5 : CLAMP ", true, true)]
+    [InlineData("none", true, false)]
+    [InlineData("0:10:5", false, false)]
+    [InlineData("0:10:0:1:limitar", false, false)]
+    [InlineData("0,5:10:0:1", false, false)]
+    public void Scale_option_is_parsed(string text, bool valid, bool clamp)
+    {
+        AgentTagAddSettings.TryParseScale(text, out var scaling).ShouldBe(valid);
+        if (valid && text != "none")
+            scaling.ShouldNotBeNull().Clamp.ShouldBe(clamp);
+    }
+
+    [Fact]
     public async Task Read_returns_values_and_fails_on_bad_quality()
     {
         await using var agent = new AgentFactory(Device("plc1"));
