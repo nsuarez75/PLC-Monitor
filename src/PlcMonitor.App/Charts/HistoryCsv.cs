@@ -4,23 +4,26 @@ using System.Text;
 namespace PlcMonitor.App.Charts;
 
 /// <summary>
-/// Lee el CSV que exporta la pestaña Histórico (<c>device,tag,timestamp,value,quality</c>; hora UTC ISO 8601) para verlo
-/// sin conexión con el agente. Los valores numéricos y booleanos se dibujan; los de texto se ignoran; una calidad mala
-/// deja un hueco.
+/// Lee el CSV que exporta la pestaña Histórico (<c>device,tag,timestamp,value,quality,unit</c>; hora UTC ISO 8601) para
+/// verlo sin conexión con el agente. Los valores numéricos y booleanos se dibujan; los de texto se ignoran; una calidad
+/// mala deja un hueco. También lee los CSV anteriores a 1.8, sin la columna <c>unit</c>.
 /// </summary>
 public static class HistoryCsv
 {
-    public const string Header = "device,tag,timestamp,value,quality";
+    public const string Header = "device,tag,timestamp,value,quality,unit";
+
+    /// <summary>Cabecera de los CSV exportados antes de la versión 1.8 (sin unidad).</summary>
+    public const string LegacyHeader = "device,tag,timestamp,value,quality";
 
     /// <summary>Series del fichero, una por tag (con «dispositivo/tag» si hay varios dispositivos).</summary>
     public static HistoryCsvContent Parse(TextReader reader)
     {
         ArgumentNullException.ThrowIfNull(reader);
         var header = reader.ReadLine()?.Trim().TrimStart('﻿');
-        if (!string.Equals(header, Header, StringComparison.OrdinalIgnoreCase))
+        if (!string.Equals(header, Header, StringComparison.OrdinalIgnoreCase) && !string.Equals(header, LegacyHeader, StringComparison.OrdinalIgnoreCase))
             throw new FormatException($"No es un CSV de histórico de PLC-Monitor: la primera línea debe ser «{Header}».");
 
-        var rows = new List<(string Device, string Tag, DateTimeOffset Time, string Value, string Quality)>();
+        var rows = new List<(string Device, string Tag, DateTimeOffset Time, string Value, string Quality, string Unit)>();
         var skipped = 0;
         var lineNumber = 1;
         while (ReadRecord(reader, ref lineNumber) is { } fields)
@@ -32,7 +35,7 @@ public static class HistoryCsv
                 skipped++;
                 continue;
             }
-            rows.Add((fields[0], fields[1], time, fields[3], fields[4]));
+            rows.Add((fields[0], fields[1], time, fields[3], fields[4], fields.Count > 5 ? fields[5].Trim() : ""));
         }
 
         var multiDevice = rows.Select(r => r.Device).Distinct(StringComparer.Ordinal).Count() > 1;
@@ -55,7 +58,11 @@ public static class HistoryCsv
             }
             if (numeric)
             {
-                series.Add(new ChartSeriesData(multiDevice ? $"{group.Key.Device}/{group.Key.Tag}" : group.Key.Tag, points, Step: true, isBoolean));
+                var unit = values.LastOrDefault(v => v.Unit.Length > 0).Unit ?? "";
+                series.Add(new ChartSeriesData(multiDevice ? $"{group.Key.Device}/{group.Key.Tag}" : group.Key.Tag, points, Step: true, isBoolean)
+                {
+                    Display = new SeriesFormat(unit, null),
+                });
                 keys.Add(group.Key);
             }
         }

@@ -160,7 +160,7 @@ public sealed class HistogramChart : Control
         var name = Text(series.Name, text, 12, FontWeight.SemiBold);
         context.DrawText(name, new Point(x, area.Top + 2));
         x += name.Width + 14;
-        string F(double v) => ChartAxis.FormatValue(Math.Round(v, 4));
+        string F(double v) => series.Display.Format(series.Display.Decimals is null ? Math.Round(v, 4) : v);
         var parts = new List<(string Text, IBrush Brush)>
         {
             ($"n {stats.Count}", muted), ($"media {F(stats.Mean)}", muted), ($"σ {F(stats.StdDev)}", muted),
@@ -259,7 +259,7 @@ public sealed class HistogramChart : Control
             if (limit is not { } l || l < x0 || l > x1)
                 continue;
             context.DrawLine(new Pen(bad, 1.8), new Point(X(l), plot.Top), new Point(X(l), plot.Bottom));
-            var t = Text($"{label} {ChartAxis.FormatValue(l)}", bad, AxisFontSize, FontWeight.SemiBold);
+            var t = Text($"{label} {series.Display.Format(l)}", bad, AxisFontSize, FontWeight.SemiBold);
             context.DrawText(t, new Point(Math.Clamp(X(l) + 4, plot.Left, plot.Right - t.Width), plot.Top + 2));
         }
 

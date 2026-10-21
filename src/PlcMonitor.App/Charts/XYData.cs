@@ -9,7 +9,11 @@ public readonly record struct XYPoint(double X, double? Y);
 /// </summary>
 /// <param name="IsOut">Se sale de la banda de tolerancia de su referencia: se dibuja en rojo.</param>
 public sealed record XYCurve(string Name, IReadOnlyList<XYPoint> Points, int ColorIndex, bool Highlight = true, bool Step = false, bool IsBoolean = false,
-    bool IsOut = false);
+    bool IsOut = false)
+{
+    /// <summary>Unidad y decimales del tag (para el valor de la leyenda).</summary>
+    public SeriesFormat Display { get; init; } = SeriesFormat.None;
+}
 
 /// <summary>Activación del disparo: cuándo empezó a cumplirse y cuándo dejó de hacerlo (null = sigue).</summary>
 public readonly record struct TriggerActivation(DateTimeOffset On, DateTimeOffset? Off);

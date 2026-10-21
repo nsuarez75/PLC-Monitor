@@ -586,6 +586,7 @@ public class MainWindowTests
         var detailsWindow = new TagDetailsWindow { DataContext = details };
         detailsWindow.Show();
         detailsWindow.GetVisualDescendants().OfType<TextBlock>().Select(t => t.Text).ShouldContain("Mostrar valor como");
+        detailsWindow.GetVisualDescendants().OfType<TextBlock>().Select(t => t.Text).ShouldContain("Unidad");
         detailsWindow.GetVisualDescendants().OfType<ScrollViewer>().First().Offset = new Avalonia.Vector(0, 420);
         detailsWindow.UpdateLayout();
         Capture(detailsWindow, "tag-details-transform.png");

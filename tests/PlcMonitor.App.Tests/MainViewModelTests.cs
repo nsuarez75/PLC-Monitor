@@ -398,7 +398,7 @@ public sealed class MainViewModelTests : IDisposable
         var csv = Path.Combine(agent.Directory, "export.csv");
         _dialogs.SavePath = csv;
         await vm.History.ExportCommand.ExecuteAsync(null);
-        File.ReadAllLines(csv)[0].ShouldBe("device,tag,timestamp,value,quality");
+        File.ReadAllLines(csv)[0].ShouldBe("device,tag,timestamp,value,quality,unit");
         File.ReadAllLines(csv).Skip(1).ShouldAllBe(l => l.StartsWith("plc1,velocidad,", StringComparison.Ordinal));
 
         vm.History.Tags.Single().IsSelected = false;

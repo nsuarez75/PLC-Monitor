@@ -138,7 +138,8 @@ public sealed partial class PeriodBarsViewModel : ObservableObject
                         .ToList();
                     if (_view.BarMetric == BarMetric.Increase)
                         points = PeriodBars.Increase(points);
-                    data.Add(new ChartSeriesData(new TrendTagRef(device.Key, series.Tag).ToString(), points, Step: false));
+                    var key = new TrendTagRef(device.Key, series.Tag);
+                    data.Add(new ChartSeriesData(key.ToString(), points, Step: false) { Display = Format(key) });
                 }
             }
             Chart.EmptyText = "No hay histórico de estos tags en ese periodo";
@@ -164,12 +165,14 @@ public sealed partial class PeriodBarsViewModel : ObservableObject
         var missing = _view.Tags.Except(present).Select(t => t.ToString()).ToList();
         Missing = missing.Count == 0 ? "" : $"No están en el CSV: {string.Join(", ", missing)}";
         var data = present.Select(t => new ChartSeriesData(t.ToString(),
-            PeriodBars.Compute(local[t].Points, _view.BarPeriod, _view.BarMetric, _view.ShiftStartHour), Step: false)).ToList();
+            PeriodBars.Compute(local[t].Points, _view.BarPeriod, _view.BarMetric, _view.ShiftStartHour), Step: false) { Display = Format(t) }).ToList();
         Chart.EmptyText = "El CSV no tiene valores de estos tags";
         Chart.SetData(data);
         var periods = data.SelectMany(d => d.Points).Select(p => p.Time).Distinct().Count();
         Summary = $"{periods} {(periods == 1 ? "periodo" : "periodos")}";
     }
+
+    private SeriesFormat Format(TrendTagRef tag) => _findTag?.Invoke(tag)?.SeriesFormat ?? SeriesFormat.None;
 
     private static string Text<T>(IReadOnlyList<Choice<T>> choices, T value) =>
         choices.FirstOrDefault(c => EqualityComparer<T>.Default.Equals(c.Value, value))?.Text ?? "";

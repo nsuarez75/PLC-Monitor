@@ -11,7 +11,10 @@ namespace PlcMonitor.App.ViewModels;
 /// <param name="Step">Escalón (valores por cambio, en bruto) o rectas entre puntos (agregados).</param>
 public sealed record TrendSource(List<ChartPoint> Points, bool IsBoolean, bool Step = true)
 {
-    public static TrendSource? Of(TagViewModel? tag) => tag is null ? null : new TrendSource(tag.TrendPoints, tag.IsBoolean);
+    /// <summary>Unidad y decimales del tag.</summary>
+    public SeriesFormat Display { get; init; } = SeriesFormat.None;
+
+    public static TrendSource? Of(TagViewModel? tag) => tag is null ? null : new TrendSource(tag.TrendPoints, tag.IsBoolean) { Display = tag.SeriesFormat };
 }
 
 /// <summary>
@@ -202,7 +205,7 @@ public sealed partial class LiveTrendViewModel : ObservableObject, IDisposable
             Chart.XLabel = "s desde el disparo";
         }
         Chart.SetData(
-            plotted.Where(t => t.Tag is not null).Select(t => new ChartSeriesData(t.Name, Shown(t.Tag!), t.Tag!.Step, t.Tag!.IsBoolean)),
+            plotted.Where(t => t.Tag is not null).Select(t => new ChartSeriesData(t.Name, Shown(t.Tag!), t.Tag!.Step, t.Tag!.IsBoolean) { Display = t.Tag!.Display }),
             from, now, selectFirst);
         var missing = tags.Where(t => t.Tag is null).Select(t => t.Name).ToList();
         if (_trigger is not null && _triggerSource is null)
@@ -290,7 +293,7 @@ public sealed partial class LiveTrendViewModel : ObservableObject, IDisposable
             var bands = new List<ReferenceBand>();
             foreach (var option in options)
             {
-                var series = new ChartSeries(option.Name, option.Points, option.Step);
+                var series = option.ToSeries();
                 var band = Reference.TryGetValue(option.Name, out var reference)
                     ? new ReferenceBand(option.Name, option.ColorIndex, reference, ReferenceCycles.Tolerance(reference, (double)Tolerance, TolerancePercent), option.Step)
                     : null;
@@ -303,7 +306,7 @@ public sealed partial class LiveTrendViewModel : ObservableObject, IDisposable
                     var isOut = band is not null && !ReferenceCycles.IsInside(points, band, option.Step);
                     outside[i] |= isOut;
                     curves.Add(new XYCurve(option.Name, points, option.ColorIndex,
-                        Highlight: i == activations.Count - 1, Step: option.Step, IsBoolean: option.IsBoolean, IsOut: isOut));
+                        Highlight: i == activations.Count - 1, Step: option.Step, IsBoolean: option.IsBoolean, IsOut: isOut) { Display = option.Display });
                 }
             }
             Chart.Bands = bands;
@@ -322,9 +325,9 @@ public sealed partial class LiveTrendViewModel : ObservableObject, IDisposable
                 : activations.Select(a => XYData.CycleWindow(a, before, hold, now)).ToList();
             foreach (var option in options)
             {
-                var y = new ChartSeries(option.Name, option.Points, option.Step);
+                var y = option.ToSeries();
                 for (var i = 0; i < windows.Count; i++)
-                    curves.Add(new XYCurve(option.Name, XYData.Pairs(x, y, windows[i].Item1, windows[i].Item2), option.ColorIndex, Highlight: i == windows.Count - 1));
+                    curves.Add(new XYCurve(option.Name, XYData.Pairs(x, y, windows[i].Item1, windows[i].Item2), option.ColorIndex, Highlight: i == windows.Count - 1) { Display = option.Display });
             }
             Chart.Caption = _trigger is null ? "" : activations.Count switch { 0 => "", 1 => "1 ciclo", var n => $"{n} ciclos" };
         }

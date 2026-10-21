@@ -1,9 +1,20 @@
 using System.Globalization;
+using PlcMonitor.Agent.Contracts.Client;
 
 namespace PlcMonitor.App.Charts;
 
 /// <summary>Punto de una serie. <see cref="Value"/> null = sin valor (calidad mala): la línea se corta.</summary>
 public readonly record struct ChartPoint(DateTimeOffset Time, double? Value);
+
+/// <summary>Unidad y decimales con los que se leen los valores de una serie (los del tag).</summary>
+/// <param name="Decimals">Decimales fijos; null = los que hagan falta (solo se ponen en los tags reales).</param>
+public sealed record SeriesFormat(string Unit, int? Decimals)
+{
+    public static SeriesFormat None { get; } = new("", null);
+
+    public string Format(double value) =>
+        ValueDisplay.WithUnit(Decimals is { } d ? ValueDisplay.Number(value, d) : ChartAxis.FormatValue(value), Unit);
+}
 
 /// <summary>
 /// Serie de la gráfica, con sus puntos ordenados por tiempo. En escalón (<see cref="Step"/>) el valor se mantiene hasta
@@ -23,6 +34,9 @@ public sealed class ChartSeries(string name, IReadOnlyList<ChartPoint> points, b
 
     /// <summary>Color de la paleta (App.Chart0…7): fijo por tag aunque se oculten otros.</summary>
     public int ColorIndex { get; init; }
+
+    /// <summary>Unidad y decimales del tag para leer los valores.</summary>
+    public SeriesFormat Display { get; init; } = SeriesFormat.None;
 
     /// <summary>Valor de la serie en un instante (el último punto anterior o igual); null si no hay o es un hueco.</summary>
     public double? ValueAt(DateTimeOffset time)
@@ -58,7 +72,7 @@ public sealed class ChartSeries(string name, IReadOnlyList<ChartPoint> points, b
         return found;
     }
 
-    public string Format(double? value) => value is not { } v ? "—" : IsBoolean ? (v >= 0.5 ? "true" : "false") : ChartAxis.FormatValue(v);
+    public string Format(double? value) => value is not { } v ? "—" : IsBoolean ? (v >= 0.5 ? "true" : "false") : Display.Format(v);
 }
 
 /// <summary>Cálculo de los ejes: rango y marcas «redondas» en Y, y marcas de tiempo en X.</summary>

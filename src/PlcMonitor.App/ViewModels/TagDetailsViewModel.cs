@@ -1,8 +1,10 @@
 using System.Collections.ObjectModel;
+using System.Globalization;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using Grpc.Core;
 using PlcMonitor.Agent.Contracts;
+using PlcMonitor.Agent.Contracts.Client;
 using PlcMonitor.App.Charts;
 
 namespace PlcMonitor.App.ViewModels;
@@ -49,6 +51,9 @@ public sealed partial class TagDetailsViewModel : ObservableObject
         Folder = config?.Folder ?? tag.Folder;
         Folders = [.. device.ScanGroups.SelectMany(g => g.Tags).Select(t => t.Folder).Where(f => f.Length > 0)
             .Distinct(StringComparer.CurrentCultureIgnoreCase).Order(StringComparer.CurrentCultureIgnoreCase)];
+        Unit = config?.Unit ?? tag.Unit;
+        var decimals = config is null ? tag.Decimals : config.GetDecimals();
+        SelectedDecimals = decimals is { } d ? d.ToString(CultureInfo.InvariantCulture) : AllDecimals;
         var current = config?.Transform ?? tag.Transform;
         Transforms = [NoTransform, .. (transforms ?? []).Order(StringComparer.CurrentCultureIgnoreCase)];
         // Una transformación que ya no existe en el agente se sigue mostrando para no perderla al guardar sin querer.
@@ -180,7 +185,7 @@ public sealed partial class TagDetailsViewModel : ObservableObject
     public static readonly TimeSpan TrendWindow = TimeSpan.FromMinutes(5);
 
     /// <summary>Mini tendencia de los últimos minutos (los valores que ha recibido la app).</summary>
-    public IReadOnlyList<ChartSeries> Trend => _trend ??= [new ChartSeries(Tag.Name, Tag.TrendPoints) { IsBoolean = Tag.IsBoolean }];
+    public IReadOnlyList<ChartSeries> Trend => _trend ??= [new ChartSeries(Tag.Name, Tag.TrendPoints) { IsBoolean = Tag.IsBoolean, Display = Tag.SeriesFormat }];
 
     private IReadOnlyList<ChartSeries>? _trend;
 
@@ -219,7 +224,7 @@ public sealed partial class TagDetailsViewModel : ObservableObject
     public ObservableCollection<string> Transforms { get; }
 
     [ObservableProperty]
-    [NotifyPropertyChangedFor(nameof(TransformPreview))]
+    [NotifyPropertyChangedFor(nameof(TransformPreview), nameof(DisplayPreview))]
     public partial string SelectedTransform { get; set; } = NoTransform;
 
     /// <summary>Los textos de la transformación elegida (p.ej. «0 = Parado · 1 = Marcha»).</summary>
@@ -230,6 +235,40 @@ public sealed partial class TagDetailsViewModel : ObservableObject
             : "Esta transformación ya no existe en el agente.";
 
     public ObservableCollection<string> DataTypes { get; }
+
+    /// <summary>Opción de decimales: el valor se muestra completo, como llega del PLC.</summary>
+    public const string AllDecimals = "Todos";
+
+    /// <summary>Máximo de decimales que admite el agente.</summary>
+    public const int MaxDecimals = 9;
+
+    public static IReadOnlyList<string> DecimalChoices { get; } =
+        [AllDecimals, .. Enumerable.Range(0, MaxDecimals + 1).Select(n => n.ToString(CultureInfo.InvariantCulture))];
+
+    /// <summary>Unidad con la que se muestra el valor (bar, °C...); vacío = ninguna.</summary>
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(DisplayPreview))]
+    public partial string Unit { get; set; } = "";
+
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(DisplayPreview))]
+    public partial string SelectedDecimals { get; set; } = AllDecimals;
+
+    private int? Decimals => int.TryParse(SelectedDecimals, NumberStyles.None, CultureInfo.InvariantCulture, out var n) ? n : null;
+
+    /// <summary>Cómo se verá el valor actual con la unidad y los decimales elegidos.</summary>
+    public string DisplayPreview
+    {
+        get
+        {
+            const string note = "Los decimales se aplican a los reales. Solo cambia cómo se ve: el histórico guarda el valor completo.";
+            if (SelectedTransform != NoTransform)
+                return "Con transformación se ve su texto; la unidad y los decimales, en los valores que no tienen texto y en las gráficas.";
+            if (Tag.IsBad || Tag.ValueText.Length == 0 || !Enum.TryParse<DataType>(Tag.DataType, out var type) || !ValueDisplay.IsNumeric(type))
+                return note;
+            return $"Se verá como {ValueDisplay.Format(Tag.ValueText, type, Decimals, Unit)}. {note}";
+        }
+    }
 
     /// <summary>Se pone a true al guardar: la vista cierra la ventana.</summary>
     [ObservableProperty]
@@ -285,6 +324,15 @@ public sealed partial class TagDetailsViewModel : ObservableObject
             IntervalMs = interval;
     }
 
+    /// <summary>Un agente anterior a 1.8 descarta la unidad y los decimales sin dar error: se avisa al releer el tag.</summary>
+    private async Task WarnIfUnitIgnoredAsync(AgentService.AgentServiceClient client, string name)
+    {
+        var device = await client.GetDeviceConfigAsync(new DeviceRequest { Device = Device });
+        var (_, stored) = Find(device, name);
+        if (stored is not null && stored.Unit.Length == 0 && !stored.HasDecimals)
+            _context.Report("El agente no guarda la unidad ni los decimales: actualízalo a la versión 1.8 o posterior.", isError: true);
+    }
+
     private bool CanSave() => !IsBusy && !string.IsNullOrWhiteSpace(Name) && !string.IsNullOrWhiteSpace(Address);
 
     [RelayCommand(CanExecute = nameof(CanSave))]
@@ -313,7 +361,7 @@ public sealed partial class TagDetailsViewModel : ObservableObject
             group.IntervalMs = IntervalMs;
             var name = Name.Trim();
             var address = Address.Trim();
-            group.Tags.Add(new TagConfig
+            var saved = new TagConfig
             {
                 // Si el nombre es la dirección se guarda vacío (el agente usa la dirección).
                 Name = name == address ? "" : name,
@@ -333,7 +381,11 @@ public sealed partial class TagDetailsViewModel : ObservableObject
                     : null,
                 Transform = SelectedTransform == NoTransform ? "" : SelectedTransform,
                 Folder = Folder?.Trim() ?? "",
-            });
+                Unit = Unit?.Trim() ?? "",
+            };
+            if (Decimals is { } decimals)
+                saved.Decimals = decimals;
+            group.Tags.Add(saved);
             foreach (var empty in device.ScanGroups.Where(g => g.Tags.Count == 0).ToArray())
                 device.ScanGroups.Remove(empty);
             // Los tags que historizan con este como disparo lo siguen usando con el nombre nuevo.
@@ -354,6 +406,8 @@ public sealed partial class TagDetailsViewModel : ObservableObject
                 1 => " (1 tag sigue disparándose con él)",
                 _ => $" ({retargeted} tags siguen disparándose con él)",
             });
+            if (saved.Unit.Length > 0 || saved.HasDecimals)
+                await WarnIfUnitIgnoredAsync(client, name);
             if (name != _originalName && HistorianEnabled && (Tag.Historized || HistoryEnabled))
             {
                 await HistoryMover.OfferAsync(_context, client,
