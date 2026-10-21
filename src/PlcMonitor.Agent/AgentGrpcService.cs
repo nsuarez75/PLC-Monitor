@@ -250,6 +250,18 @@ public sealed class AgentGrpcService(EngineHost host, DriverRegistry registry, I
         return new Api.RenameHistoryReply { Moved = moved };
     }
 
+    public override async Task<Api.DeleteHistoryReply> DeleteHistory(Api.DeleteHistoryRequest request, ServerCallContext context)
+    {
+        if (string.IsNullOrWhiteSpace(request.Device) || request.Tags.Count == 0)
+            throw new RpcException(new Status(StatusCode.InvalidArgument, "Indica el dispositivo y al menos un tag."));
+        if (request.From is null || request.To is null)
+            throw new RpcException(new Status(StatusCode.InvalidArgument, "Indica el inicio y el final del intervalo que se borra."));
+        var keys = request.Tags.Select(t => new TagKey(request.Device.Trim(), t.Trim())).ToArray();
+        var deleted = await Guard(() => host.Historian.DeleteAsync(keys, request.From.ToDateTimeOffset(), request.To.ToDateTimeOffset(), context.CancellationToken));
+        logger.LogInformation("Histórico borrado desde {Peer}: {Deleted} muestras de {Device}/{Tags}", context.Peer, deleted, request.Device, string.Join(", ", request.Tags));
+        return new Api.DeleteHistoryReply { Deleted = deleted };
+    }
+
     private Api.Device ToProto(DeviceStatus status) => ProtoMapper.ToProto(status, Engine.GetTags(status.Device).Count);
 
     /// <summary>Traduce las excepciones del motor a códigos gRPC.</summary>

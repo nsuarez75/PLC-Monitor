@@ -330,7 +330,31 @@
                           <TextBlock Text="Abrir en Tendencias" />
                         </StackPanel>
                       </Button>
+                      <Button Classes="ghost danger" Command="{Binding ToggleDeleteCommand}" ToolTip.Tip="Borrar los datos guardados de los tags marcados entre dos fechas">
+                        <StackPanel Orientation="Horizontal" Spacing="6">
+                          <c:Icon Kind="trash" />
+                          <TextBlock Text="Borrar datos…" />
+                        </StackPanel>
+                      </Button>
                     </StackPanel>
+                    <!-- Borrar datos de los tags marcados entre dos instantes -->
+                    <Border Classes="pill bad" CornerRadius="8" Padding="12,10" HorizontalAlignment="Stretch" IsVisible="{Binding ShowDelete}">
+                      <WrapPanel Orientation="Horizontal" ItemSpacing="8" LineSpacing="8">
+                        <TextBlock Text="Borrar los tags marcados desde" VerticalAlignment="Center" />
+                        <CalendarDatePicker SelectedDate="{Binding DeleteFromDate}" Width="140" />
+                        <TimePicker SelectedTime="{Binding DeleteFromTime}" ClockIdentifier="24HourClock" />
+                        <TextBlock Text="hasta" VerticalAlignment="Center" />
+                        <CalendarDatePicker SelectedDate="{Binding DeleteToDate}" Width="140" />
+                        <TimePicker SelectedTime="{Binding DeleteToTime}" ClockIdentifier="24HourClock" />
+                        <Button Classes="accent" Command="{Binding DeleteCommand}">
+                          <StackPanel Orientation="Horizontal" Spacing="6">
+                            <c:Icon Kind="trash" />
+                            <TextBlock Text="Borrar" />
+                          </StackPanel>
+                        </Button>
+                        <Button Classes="secondary" Content="Cancelar" Command="{Binding ToggleDeleteCommand}" />
+                      </WrapPanel>
+                    </Border>
                   </StackPanel>
                 </Border>
 

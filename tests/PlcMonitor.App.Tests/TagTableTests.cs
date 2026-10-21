@@ -165,6 +165,49 @@ public sealed class TagTableTests : IDisposable
         vm.History.Summary.ShouldContain("de 1 tags");
     }
 
+    [Fact]
+    public async Task History_of_the_checked_tags_is_deleted_between_two_dates_after_confirming()
+    {
+        await using var agent = new AgentFactory(Device("plc1",
+            tags: [new Tag { Address = "DB1.DBW0", Name = "presion", History = new TagHistorySettings { Enabled = true } }, new Tag { Address = "DB1.DBW2", Name = "temp", History = new TagHistorySettings { Enabled = true } }]));
+        agent.Driver.Plc("plc1").Values["DB1.DBW0"] = 3;
+        agent.Driver.Plc("plc1").Values["DB1.DBW2"] = 4;
+        await using var vm = await ConnectAsync(agent);
+        await Wait.UntilAsync(() => _ui.Read(() => TagOf(vm, "presion").IsGood && TagOf(vm, "temp").IsGood), "valores leídos");
+        await vm.OpenTagHistoryCommand.ExecuteAsync(TagOf(vm, "presion"));
+        var history = vm.History;
+        for (var i = 0; i < 200 && history.Rows.Count == 0; i++)
+        {
+            await Task.Delay(50);
+            await history.QueryCommand.ExecuteAsync(null);
+        }
+        history.Rows.Count.ShouldBeGreaterThan(0, "histórico guardado");
+
+        history.ToggleDeleteCommand.Execute(null);
+        history.ShowDelete.ShouldBeTrue();
+        (history.DeleteFromDate, history.DeleteToDate).ShouldBe((DateTime.Now.AddHours(-1).Date, DateTime.Today));
+        _dialogs.Answer = false;
+        await history.DeleteCommand.ExecuteAsync(null);
+        _dialogs.Questions.Last().ShouldContain("del tag presion de plc1");
+        history.Rows.Count.ShouldBeGreaterThan(0);
+
+        _dialogs.Answer = true;
+        await history.DeleteCommand.ExecuteAsync(null);
+
+        vm.Message.ShouldContain("datos borrados del histórico del tag presion");
+        history.ShowDelete.ShouldBeFalse();
+        history.Rows.ShouldBeEmpty("se vuelve a consultar sin lo borrado");
+        history.SelectOnly("temp").ShouldBeTrue();
+        await history.QueryCommand.ExecuteAsync(null);
+        history.Rows.Count.ShouldBeGreaterThan(0, "el otro tag conserva su histórico");
+
+        history.ToggleDeleteCommand.Execute(null);
+        (history.DeleteFromDate, history.DeleteToDate) = (DateTime.Today, DateTime.Today);
+        (history.DeleteFromTime, history.DeleteToTime) = (TimeSpan.FromHours(10), TimeSpan.FromHours(9));
+        await history.DeleteCommand.ExecuteAsync(null);
+        history.Summary.ShouldBe("El final del intervalo debe ser posterior al inicio.");
+    }
+
     public void Dispose()
     {
         File.Delete(_settingsPath);

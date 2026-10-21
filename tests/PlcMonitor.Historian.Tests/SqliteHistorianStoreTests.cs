@@ -61,6 +61,22 @@ public sealed class SqliteHistorianStoreTests : IDisposable
     }
 
     [Fact]
+    public async Task Deleting_removes_only_the_chosen_tags_between_both_instants_across_months()
+    {
+        using var store = new SqliteHistorianStore(_dir);
+        var march = new DateTimeOffset(2026, 3, 31, 22, 0, 0, TimeSpan.Zero);
+        await store.WriteAsync([.. Enumerable.Range(0, 5).Select(h => S(Speed, march.AddHours(h), h)), S(Name, march.AddHours(1), "a")], Ct);
+
+        // De 23:00 del 31 de marzo a 01:00 del 1 de abril, ambos incluidos.
+        var deleted = await store.DeleteAsync([Speed, new TagKey("plc1", "sin datos")], march.AddHours(1), march.AddHours(3), Ct);
+
+        deleted.ShouldBe(3);
+        (await store.ReadAsync(Speed, march.AddDays(-1), march.AddDays(1), 100, Ct)).Select(p => p.Number).ShouldBe([0.0, 4.0]);
+        (await store.ReadAsync(Name, march.AddDays(-1), march.AddDays(1), 100, Ct)).ShouldHaveSingleItem();
+        (await store.DeleteAsync([Speed], march.AddYears(-1), march.AddYears(-1).AddDays(1), Ct)).ShouldBe(0);
+    }
+
+    [Fact]
     public async Task Bad_quality_samples_keep_their_quality()
     {
         using var store = new SqliteHistorianStore(_dir);

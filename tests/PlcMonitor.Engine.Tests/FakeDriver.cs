@@ -61,7 +61,7 @@ internal sealed class FakePlc
     public int ReadCount;
 
     /// <summary>Si no es null, las lecturas leen los valores y esperan a que se complete (un PLC lento que no atiende la cancelación).</summary>
-    public volatile TaskCompletionSource? ReadGate;
+    public TaskCompletionSource? ReadGate { get; set; }
 
     public ConcurrentQueue<WriteRequest> Writes { get; } = new();
 }
