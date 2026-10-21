@@ -166,6 +166,50 @@ public sealed class TagTableTests : IDisposable
     }
 
     [Fact]
+    public async Task Pages_keep_their_state_when_switching_tabs_and_transforms_close_on_disconnect()
+    {
+        await using var agent = new AgentFactory(Device("plc1", enabled: false, tags: [T("DB1.DBW0", "a")]));
+        await using var vm = await ConnectAsync(agent);
+        vm.Page.ShouldBe(AppPage.Tags);
+
+        vm.OpenTrendsCommand.Execute(null);
+        var trends = vm.Trends.ShouldNotBeNull();
+        vm.IsTrendsPage.ShouldBeTrue();
+        trends.NewCommand.Execute(null);
+        var opened = trends.Selected;
+        vm.ShowTagsCommand.Execute(null);
+        vm.IsTagsPage.ShouldBeTrue();
+        vm.OpenTrendsCommand.Execute(null);
+        vm.Trends.ShouldBeSameAs(trends);
+        trends.Selected.ShouldBeSameAs(opened, "vuelve con la última tendencia abierta");
+
+        vm.OpenTransformsCommand.Execute(null);
+        var transforms = vm.TransformsPanel.ShouldNotBeNull();
+        transforms.AddCommand.Execute(null);
+        vm.OpenAgentsCommand.Execute(null);
+        var agents = vm.Agents.ShouldNotBeNull();
+        vm.IsAgentsPage.ShouldBeTrue();
+        vm.OpenTransformsCommand.Execute(null);
+        vm.TransformsPanel.ShouldBeSameAs(transforms);
+        transforms.IsDirty.ShouldBeTrue("lo editado sin guardar sigue ahí");
+        vm.OpenAgentsCommand.Execute(null);
+        vm.Agents.ShouldBeSameAs(agents);
+
+        // Editar un dispositivo lleva a la pestaña Tags.
+        vm.NewDeviceCommand.Execute(null);
+        vm.IsTagsPage.ShouldBeTrue();
+        vm.CloseEditorCommand.Execute(null);
+
+        vm.OpenTransformsCommand.Execute(null);
+        await vm.DisconnectCommand.ExecuteAsync(null);
+        vm.TransformsPanel.ShouldBeNull();
+        vm.Page.ShouldBe(AppPage.Tags);
+        vm.OpenTransformsCommand.CanExecute(null).ShouldBeFalse();
+        vm.OpenTrendsCommand.Execute(null);
+        vm.Trends.ShouldBeSameAs(trends, "mismo agente");
+    }
+
+    [Fact]
     public async Task History_of_the_checked_tags_is_deleted_between_two_dates_after_confirming()
     {
         await using var agent = new AgentFactory(Device("plc1",

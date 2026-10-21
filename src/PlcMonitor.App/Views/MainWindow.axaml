@@ -59,26 +59,33 @@
           </StackPanel>
         </Border>
 
+        <!-- Pestañas: cambian de página sin cerrar nada (cada una sigue como se dejó) -->
         <StackPanel Grid.Column="3" Orientation="Horizontal" Spacing="2">
-        <Button Classes="ghost" Command="{Binding OpenTrendsCommand}" ToolTip.Tip="Gráficas de tags de cualquier dispositivo o de un CSV: en vivo, del histórico o del fichero">
+        <Button Classes="ghost tab" Classes.on="{Binding IsTagsPage}" Command="{Binding ShowTagsCommand}" ToolTip.Tip="Dispositivos y sus tags en vivo, histórico y explorador">
+          <StackPanel Orientation="Horizontal" Spacing="6">
+            <c:Icon Kind="list" Width="16" Height="16" />
+            <TextBlock Text="Tags" Classes="barlabel" />
+          </StackPanel>
+        </Button>
+        <Button Classes="ghost tab" Classes.on="{Binding IsTrendsPage}" Command="{Binding OpenTrendsCommand}" ToolTip.Tip="Gráficas de tags de cualquier dispositivo o de un CSV: en vivo, del histórico o del fichero">
           <StackPanel Orientation="Horizontal" Spacing="6">
             <c:Icon Kind="pulse" Width="16" Height="16" />
             <TextBlock Text="Tendencias" Classes="barlabel" />
           </StackPanel>
         </Button>
-        <Button Classes="ghost" Command="{Binding OpenTransformsCommand}" ToolTip.Tip="Transformaciones: mostrar valores enteros como texto (0 = Parado, 1 = Marcha…)">
+        <Button Classes="ghost tab" Classes.on="{Binding IsTransformsPage}" Command="{Binding OpenTransformsCommand}" ToolTip.Tip="Transformaciones: mostrar valores enteros como texto (0 = Parado, 1 = Marcha…)">
           <StackPanel Orientation="Horizontal" Spacing="6">
             <c:Icon Kind="replace" Width="16" Height="16" />
             <TextBlock Text="Transformaciones" Classes="barlabel" />
           </StackPanel>
         </Button>
-        <Button Classes="ghost" Command="{Binding OpenAgentsCommand}" ToolTip.Tip="Gestionar agentes (instalar en equipos por SSH)">
+        <Button Classes="ghost tab" Classes.on="{Binding IsAgentsPage}" Command="{Binding OpenAgentsCommand}" ToolTip.Tip="Gestionar agentes (instalar en equipos por SSH)">
           <StackPanel Orientation="Horizontal" Spacing="6">
             <c:Icon Kind="server" Width="16" Height="16" />
             <TextBlock Text="Agentes" Classes="barlabel" />
           </StackPanel>
         </Button>
-        <Button Classes="ghost" Command="{Binding ToggleThemeCommand}" ToolTip.Tip="{Binding ThemeText, StringFormat='Tema: {0}'}">
+        <Button Classes="ghost" Command="{Binding ToggleThemeCommand}" ToolTip.Tip="{Binding ThemeText, StringFormat='Tema: {0}'}" Margin="6,0,0,0">
           <c:Icon Kind="{Binding ThemeIcon}" Width="18" Height="18" />
         </Button>
         </StackPanel>
@@ -94,7 +101,9 @@
       </StackPanel>
     </Border>
 
-    <Grid ColumnDefinitions="280,*">
+    <Panel>
+    <!-- ░░ Página Tags ░░ -->
+    <Grid ColumnDefinitions="280,*" IsVisible="{Binding IsTagsPage}">
       <!-- ░░ Lateral: dispositivos ░░ -->
       <Border Classes="bar" BorderThickness="0,0,1,0">
         <DockPanel Margin="12,14,12,12">
@@ -338,9 +347,9 @@
                       </Button>
                     </StackPanel>
                     <!-- Borrar datos de los tags marcados entre dos instantes -->
-                    <Border Classes="pill bad" CornerRadius="8" Padding="12,10" HorizontalAlignment="Stretch" IsVisible="{Binding ShowDelete}">
+                    <Border Classes="danger" Padding="12,10" IsVisible="{Binding ShowDelete}">
                       <WrapPanel Orientation="Horizontal" ItemSpacing="8" LineSpacing="8">
-                        <TextBlock Text="Borrar los tags marcados desde" VerticalAlignment="Center" />
+                        <TextBlock Text="Borrar los tags marcados desde" VerticalAlignment="Center" Foreground="{DynamicResource App.Bad}" FontWeight="SemiBold" />
                         <CalendarDatePicker SelectedDate="{Binding DeleteFromDate}" Width="140" />
                         <TimePicker SelectedTime="{Binding DeleteFromTime}" ClockIdentifier="24HourClock" />
                         <TextBlock Text="hasta" VerticalAlignment="Center" />
@@ -474,16 +483,7 @@
           </TabControl>
         </DockPanel>
 
-        <!-- Vistas de tendencia (por encima del contenido) -->
-        <v:TrendsView DataContext="{Binding Trends}" IsVisible="{Binding $parent[Window].((vm:MainViewModel)DataContext).Trends, Converter={x:Static ObjectConverters.IsNotNull}}" />
-
-        <!-- Transformaciones (por encima del contenido) -->
-        <v:TransformsView DataContext="{Binding TransformsPanel}" IsVisible="{Binding $parent[Window].((vm:MainViewModel)DataContext).TransformsPanel, Converter={x:Static ObjectConverters.IsNotNull}}" />
-
-        <!-- Gestión de agentes (por encima del contenido) -->
-        <v:AgentsView DataContext="{Binding Agents}" IsVisible="{Binding $parent[Window].((vm:MainViewModel)DataContext).Agents, Converter={x:Static ObjectConverters.IsNotNull}}" />
-
-        <!-- Editor de dispositivo (por encima del contenido) -->
+        <!-- Editor de dispositivo (por encima de los tags) -->
         <Border Background="{DynamicResource App.Background}" IsVisible="{Binding Editor, Converter={x:Static ObjectConverters.IsNotNull}}">
           <ScrollViewer>
             <Border Classes="card" Margin="24" Padding="24" MaxWidth="760" HorizontalAlignment="Left" VerticalAlignment="Top">
@@ -541,5 +541,11 @@
         </Border>
       </Panel>
     </Grid>
+
+    <!-- ░░ Páginas Tendencias, Transformaciones y Agentes ░░ -->
+    <v:TrendsView DataContext="{Binding Trends}" IsVisible="{Binding $parent[Window].((vm:MainViewModel)DataContext).IsTrendsPage}" />
+    <v:TransformsView DataContext="{Binding TransformsPanel}" IsVisible="{Binding $parent[Window].((vm:MainViewModel)DataContext).IsTransformsPage}" />
+    <v:AgentsView DataContext="{Binding Agents}" IsVisible="{Binding $parent[Window].((vm:MainViewModel)DataContext).IsAgentsPage}" />
+    </Panel>
   </DockPanel>
 </Window>

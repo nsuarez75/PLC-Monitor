@@ -34,19 +34,10 @@
     <!-- Detalle del agente seleccionado -->
     <ScrollViewer Grid.Column="1">
       <StackPanel Spacing="14" IsVisible="{Binding Selected, Converter={x:Static ObjectConverters.IsNotNull}}">
-        <Grid ColumnDefinitions="*,Auto">
-          <StackPanel Spacing="2">
-            <TextBlock Text="{Binding Name}" Classes="title" />
-            <TextBlock Text="{Binding Info}" Classes="muted" />
-          </StackPanel>
-          <Button Grid.Column="1" Classes="secondary" VerticalAlignment="Top"
-                  Command="{Binding $parent[Window].((vm:MainViewModel)DataContext).CloseAgentsCommand}">
-            <StackPanel Orientation="Horizontal" Spacing="6">
-              <c:Icon Kind="x" />
-              <TextBlock Text="Cerrar" />
-            </StackPanel>
-          </Button>
-        </Grid>
+        <StackPanel Spacing="2">
+          <TextBlock Text="{Binding Name}" Classes="title" />
+          <TextBlock Text="{Binding Info}" Classes="muted" />
+        </StackPanel>
 
         <!-- Conexión -->
         <Border Classes="card" Padding="20">

@@ -44,9 +44,14 @@ public sealed partial class MainWindow : Window
         _tags.AddHandler(DragDrop.DragLeaveEvent, (_, _) => SetDropTarget(null));
         _tags.AddHandler(DragDrop.DropEvent, OnTagsDrop);
         this.FindControl<ContextMenu>("TagsMenu")!.Opening += OnTagsMenuOpening;
-        // La tendencia en vivo avanza con el reloj aunque no lleguen valores nuevos.
+        // La tendencia en vivo avanza con el reloj aunque no lleguen valores nuevos (solo si se está viendo: al volver a
+        // la pestaña se pone al día en el siguiente paso, los valores se siguen recibiendo igual).
         var trend = new DispatcherTimer { Interval = TimeSpan.FromMilliseconds(500) };
-        trend.Tick += (_, _) => (DataContext as MainViewModel)?.Trends?.Refresh(DateTimeOffset.UtcNow);
+        trend.Tick += (_, _) =>
+        {
+            if (DataContext is MainViewModel { IsTrendsPage: true, Trends: { } trends })
+                trends.Refresh(DateTimeOffset.UtcNow);
+        };
         Opened += (_, _) => trend.Start();
         SizeChanged += (_, e) => Classes.Set("narrow", e.NewSize.Width < NarrowWidth);
         Closed += (_, _) => trend.Stop();
