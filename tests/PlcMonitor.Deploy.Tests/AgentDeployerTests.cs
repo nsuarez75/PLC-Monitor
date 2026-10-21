@@ -224,6 +224,60 @@ public sealed class AgentDeployerTests : IDisposable
     }
 
     [Fact]
+    public void Windows_update_waits_for_the_old_agent_to_exit_retries_and_restarts_it_if_replacing_fails()
+    {
+        var script = AgentScripts.WindowsInstall(@"C:\Temp\a.exe", null, 5311);
+        script.ShouldContain("WaitForExit(30000)");
+        script.ShouldContain("Stop-Process -Id $_.Id -Force");
+        script.ShouldContain("Start-Sleep -Milliseconds 500");
+        script.ShouldContain("Se ha vuelto a arrancar el agente anterior");
+        // La espera va antes de tocar los ficheros.
+        script.IndexOf("WaitForExit(30000)", StringComparison.Ordinal).ShouldBeLessThan(script.IndexOf("Remove-Item", StringComparison.Ordinal));
+        AgentScripts.WindowsUninstall(false).ShouldContain("WaitForExit(30000)");
+    }
+
+    [Fact]
+    public void Generated_windows_scripts_are_valid_powershell()
+    {
+        var shell = OperatingSystem.IsWindows() ? "powershell" : "pwsh";
+        var files = new AgentSecurityFiles(AgentScripts.SettingsJson("ABC", 5311, "clave"), [1, 2, 3]);
+        foreach (var script in new[]
+                 {
+                     AgentScripts.WindowsInstall(@"C:\Temp\a.exe", files, 5311),
+                     AgentScripts.WindowsInstall(@"C:\Temp\a.exe", null, 5311),
+                     AgentScripts.WindowsUninstall(true),
+                     AgentScripts.WindowsUninstall(false),
+                     AgentScripts.WindowsStatus,
+                 })
+        {
+            var path = Path.Combine(Path.GetTempPath(), $"plcmon-check-{Guid.NewGuid():N}.ps1");
+            File.WriteAllText(path, script, new System.Text.UTF8Encoding(true));
+            try
+            {
+                Process check;
+                try
+                {
+                    check = Process.Start(new ProcessStartInfo(shell, ["-NoProfile", "-NonInteractive", "-Command",
+                        $"$e = $null; [System.Management.Automation.Language.Parser]::ParseFile('{path}', [ref]$null, [ref]$e) | Out-Null; if ($e) {{ $e | ForEach-Object {{ $_.Message }}; exit 1 }}"])
+                    { RedirectStandardOutput = true })!;
+                }
+                catch (System.ComponentModel.Win32Exception)
+                {
+                    Assert.Skip($"{shell} no está instalado");
+                    return;
+                }
+                var output = check.StandardOutput.ReadToEnd();
+                check.WaitForExit();
+                check.ExitCode.ShouldBe(0, output + "\n" + script);
+            }
+            finally
+            {
+                File.Delete(path);
+            }
+        }
+    }
+
+    [Fact]
     public async Task Status_is_parsed()
     {
         var ssh = new FakeSsh().On("uname -sm", Ok("Linux x86_64"))
