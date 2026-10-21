@@ -54,6 +54,16 @@ public sealed partial class TagDetailsViewModel : ObservableObject
         Unit = config?.Unit ?? tag.Unit;
         var decimals = config is null ? tag.Decimals : config.GetDecimals();
         SelectedDecimals = decimals is { } d ? d.ToString(CultureInfo.InvariantCulture) : AllDecimals;
+        _originalScaling = config is null ? tag.Scaling : config.Scaling;
+        if (_originalScaling is { } scaling)
+        {
+            ScalingEnabled = true;
+            ScaleRawMin = Number(scaling.RawMin);
+            ScaleRawMax = Number(scaling.RawMax);
+            ScaleEngMin = Number(scaling.EngMin);
+            ScaleEngMax = Number(scaling.EngMax);
+            ScaleClamp = scaling.Clamp;
+        }
         var current = config?.Transform ?? tag.Transform;
         Transforms = [NoTransform, .. (transforms ?? []).Order(StringComparer.CurrentCultureIgnoreCase)];
         // Una transformación que ya no existe en el agente se sigue mostrando para no perderla al guardar sin querer.
@@ -247,11 +257,11 @@ public sealed partial class TagDetailsViewModel : ObservableObject
 
     /// <summary>Unidad con la que se muestra el valor (bar, °C...); vacío = ninguna.</summary>
     [ObservableProperty]
-    [NotifyPropertyChangedFor(nameof(DisplayPreview))]
+    [NotifyPropertyChangedFor(nameof(DisplayPreview), nameof(ScalingPreview))]
     public partial string Unit { get; set; } = "";
 
     [ObservableProperty]
-    [NotifyPropertyChangedFor(nameof(DisplayPreview))]
+    [NotifyPropertyChangedFor(nameof(DisplayPreview), nameof(ScalingPreview))]
     public partial string SelectedDecimals { get; set; } = AllDecimals;
 
     private int? Decimals => int.TryParse(SelectedDecimals, NumberStyles.None, CultureInfo.InvariantCulture, out var n) ? n : null;
@@ -267,6 +277,78 @@ public sealed partial class TagDetailsViewModel : ObservableObject
             if (Tag.IsBad || Tag.ValueText.Length == 0 || !Enum.TryParse<DataType>(Tag.DataType, out var type) || !ValueDisplay.IsNumeric(type))
                 return note;
             return $"Se verá como {ValueDisplay.Format(Tag.ValueText, type, Decimals, Unit)}. {note}";
+        }
+    }
+
+    private readonly Scaling? _originalScaling;
+
+    private static string Number(double value) => value.ToString("R", CultureInfo.InvariantCulture);
+
+    /// <summary>El agente convierte el valor bruto a unidades de ingeniería con dos pares de puntos.</summary>
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(ScalingPreview))]
+    public partial bool ScalingEnabled { get; set; }
+
+    // Por defecto, una entrada analógica de un S7 (0–27648).
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(ScalingPreview))]
+    public partial string ScaleRawMin { get; set; } = "0";
+
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(ScalingPreview))]
+    public partial string ScaleRawMax { get; set; } = "27648";
+
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(ScalingPreview))]
+    public partial string ScaleEngMin { get; set; } = "0";
+
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(ScalingPreview))]
+    public partial string ScaleEngMax { get; set; } = "100";
+
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(ScalingPreview))]
+    public partial bool ScaleClamp { get; set; }
+
+    /// <summary>Escalado de los campos; null si está desactivado. <paramref name="error"/> si algún campo no vale.</summary>
+    private Scaling? BuildScaling(out string? error)
+    {
+        error = null;
+        if (!ScalingEnabled)
+            return null;
+        static bool Parse(string text, out double value) =>
+            double.TryParse(text.Trim().Replace(',', '.'), NumberStyles.Float, CultureInfo.InvariantCulture, out value) && double.IsFinite(value);
+        if (!Parse(ScaleRawMin, out var rawMin) || !Parse(ScaleRawMax, out var rawMax) || !Parse(ScaleEngMin, out var engMin) || !Parse(ScaleEngMax, out var engMax))
+        {
+            error = "Los cuatro puntos del escalado deben ser números.";
+            return null;
+        }
+        if (rawMin == rawMax)
+            error = "El bruto mínimo y el máximo no pueden ser iguales.";
+        else if (engMin == engMax)
+            error = "El mínimo y el máximo de ingeniería no pueden ser iguales.";
+        return new Scaling { RawMin = rawMin, RawMax = rawMax, EngMin = engMin, EngMax = engMax, Clamp = ScaleClamp };
+    }
+
+    /// <summary>Qué hará el escalado con el valor actual, o por qué no vale.</summary>
+    public string ScalingPreview
+    {
+        get
+        {
+            const string note = "Cambia los números: el histórico, las bandas muertas, los disparos y las escrituras usan el valor escalado.";
+            var scaling = BuildScaling(out var error);
+            if (error is not null)
+                return error;
+            if (scaling is null)
+                return "El valor se usa tal como lo lee el PLC.";
+            // El bruto actual: el que manda el agente si ya escala, o el valor tal cual si aún no.
+            var rawText = Tag.HasRaw ? Tag.RawText : _originalScaling is null ? Tag.ValueText : "";
+            if (Tag.IsBad || !double.TryParse(rawText, NumberStyles.Float, CultureInfo.InvariantCulture, out var raw))
+                return note;
+            var engineering = (raw - scaling.RawMin) / (scaling.RawMax - scaling.RawMin) * (scaling.EngMax - scaling.EngMin) + scaling.EngMin;
+            if (scaling.Clamp)
+                engineering = Math.Clamp(engineering, Math.Min(scaling.EngMin, scaling.EngMax), Math.Max(scaling.EngMin, scaling.EngMax));
+            return $"Bruto {rawText} → {ValueDisplay.Format(Number(engineering), Agent.Contracts.DataType.Double, Decimals, Unit)}. {note}";
         }
     }
 
@@ -324,12 +406,19 @@ public sealed partial class TagDetailsViewModel : ObservableObject
             IntervalMs = interval;
     }
 
-    /// <summary>Un agente anterior a 1.8 descarta la unidad y los decimales sin dar error: se avisa al releer el tag.</summary>
-    private async Task WarnIfUnitIgnoredAsync(AgentService.AgentServiceClient client, string name)
+    /// <summary>
+    /// Un agente anterior descarta sin dar error los campos que no conoce (la unidad y los decimales antes de 1.8, el
+    /// escalado antes de 1.9): se avisa al releer el tag.
+    /// </summary>
+    private async Task WarnIfIgnoredAsync(AgentService.AgentServiceClient client, TagConfig saved, string name)
     {
         var device = await client.GetDeviceConfigAsync(new DeviceRequest { Device = Device });
         var (_, stored) = Find(device, name);
-        if (stored is not null && stored.Unit.Length == 0 && !stored.HasDecimals)
+        if (stored is null)
+            return;
+        if (saved.Scaling is not null && stored.Scaling is null)
+            _context.Report("El agente no aplica el escalado: actualízalo a la versión 1.9 o posterior.", isError: true);
+        else if ((saved.Unit.Length > 0 || saved.HasDecimals) && stored.Unit.Length == 0 && !stored.HasDecimals)
             _context.Report("El agente no guarda la unidad ni los decimales: actualízalo a la versión 1.8 o posterior.", isError: true);
     }
 
@@ -340,6 +429,19 @@ public sealed partial class TagDetailsViewModel : ObservableObject
     {
         if (_context.Client is not { } client)
             return;
+        var scaling = BuildScaling(out var scalingError);
+        if (scalingError is not null)
+        {
+            Errors = scalingError;
+            return;
+        }
+        // Lo ya guardado se queda con la escala anterior: las muestras viejas y las nuevas no se pueden comparar.
+        if (!Equals(scaling, _originalScaling) && HistorianEnabled && (Tag.Historized || HistoryEnabled)
+            && !await _context.Dialogs.ConfirmAsync("Escalado",
+                $"El histórico de «{_originalName}» ya guardado seguirá con la escala anterior: las muestras viejas y las nuevas no serán comparables.\n¿Cambiar el escalado?"))
+        {
+            return;
+        }
         IsBusy = true;
         Errors = "";
         try
@@ -382,6 +484,7 @@ public sealed partial class TagDetailsViewModel : ObservableObject
                 Transform = SelectedTransform == NoTransform ? "" : SelectedTransform,
                 Folder = Folder?.Trim() ?? "",
                 Unit = Unit?.Trim() ?? "",
+                Scaling = scaling,
             };
             if (Decimals is { } decimals)
                 saved.Decimals = decimals;
@@ -406,8 +509,8 @@ public sealed partial class TagDetailsViewModel : ObservableObject
                 1 => " (1 tag sigue disparándose con él)",
                 _ => $" ({retargeted} tags siguen disparándose con él)",
             });
-            if (saved.Unit.Length > 0 || saved.HasDecimals)
-                await WarnIfUnitIgnoredAsync(client, name);
+            if (saved.Unit.Length > 0 || saved.HasDecimals || saved.Scaling is not null)
+                await WarnIfIgnoredAsync(client, saved, name);
             if (name != _originalName && HistorianEnabled && (Tag.Historized || HistoryEnabled))
             {
                 await HistoryMover.OfferAsync(_context, client,

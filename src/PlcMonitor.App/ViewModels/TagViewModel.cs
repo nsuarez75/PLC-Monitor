@@ -27,6 +27,7 @@ public sealed partial class TagViewModel : ObservableObject
         Folder = tag.Folder;
         Unit = tag.Unit;
         Decimals = tag.GetDecimals();
+        Scaling = tag.Scaling;
         if (tag.Value is not null)
             Apply(tag.Value);
     }
@@ -56,6 +57,9 @@ public sealed partial class TagViewModel : ObservableObject
     /// <summary>Decimales con los que se muestran los reales; null = el valor completo.</summary>
     public int? Decimals { get; }
 
+    /// <summary>Escalado que aplica el agente; null = el valor tal como lo lee el driver.</summary>
+    public Scaling? Scaling { get; }
+
     /// <summary>Nombre con la unidad, para leyendas y cabeceras: «presion [bar]».</summary>
     public string Label => ValueDisplay.Label(Name, Unit);
 
@@ -77,7 +81,18 @@ public sealed partial class TagViewModel : ObservableObject
     /// unidad del tag («23.45 bar»).
     /// </summary>
     [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(DetailText))]
     public partial string DisplayText { get; private set; } = "";
+
+    /// <summary>Valor bruto del PLC en texto si el agente lo escala; vacío si no.</summary>
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(DetailText), nameof(HasRaw))]
+    public partial string RawText { get; private set; } = "";
+
+    public bool HasRaw => RawText.Length > 0;
+
+    /// <summary>Valor para la ventana de detalle: con el bruto si está escalado («5.00 bar (bruto 13824)»).</summary>
+    public string DetailText => HasRaw ? $"{DisplayText} (bruto {RawText})" : DisplayText;
 
     [ObservableProperty]
     [NotifyPropertyChangedFor(nameof(IsTrue), nameof(IsFalse))]
@@ -144,6 +159,7 @@ public sealed partial class TagViewModel : ObservableObject
         Quality = value.Quality;
         ValueText = value.Quality is Quality.Good or Quality.Uncertain ? value.Text : value.Error;
         _type = value.DataType;
+        RawText = value.Quality is Quality.Good or Quality.Uncertain ? value.RawText : "";
         DataType = value.DataType == Agent.Contracts.DataType.Unknown ? "" : value.DataType.ToString();
         Time = value.Timestamp?.ToDateTime().ToLocalTime().ToString("HH:mm:ss.fff", CultureInfo.InvariantCulture) ?? "";
         _integer = value.Quality is not (Quality.Good or Quality.Uncertain) ? null : value.TypedCase switch

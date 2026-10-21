@@ -46,7 +46,7 @@
         <Grid ColumnDefinitions="*,Auto,Auto" ColumnSpacing="14">
           <StackPanel Spacing="2">
             <TextBlock Text="VALOR ACTUAL" Classes="caption" />
-            <TextBlock Text="{Binding Tag.DisplayText}" Classes="mono" FontSize="22" FontWeight="SemiBold"
+            <TextBlock Text="{Binding Tag.DetailText}" Classes="mono" FontSize="22" FontWeight="SemiBold"
                        Classes.error="{Binding Tag.IsBad}" TextWrapping="Wrap" />
           </StackPanel>
           <StackPanel Grid.Column="1" Spacing="6" VerticalAlignment="Center" HorizontalAlignment="Right">
@@ -73,7 +73,7 @@
       <Border Classes="card" Padding="20">
         <StackPanel Spacing="12">
           <TextBlock Text="CONFIGURACIÓN" Classes="caption" />
-          <Grid ColumnDefinitions="150,*" RowDefinitions="Auto,Auto,Auto,Auto,Auto,Auto,Auto,Auto,Auto" RowSpacing="10" ColumnSpacing="16">
+          <Grid ColumnDefinitions="150,*" RowDefinitions="Auto,Auto,Auto,Auto,Auto,Auto,Auto,Auto,Auto,Auto" RowSpacing="10" ColumnSpacing="16">
             <TextBlock Text="Nombre" VerticalAlignment="Center" FontWeight="Medium" />
             <TextBox Grid.Column="1" Text="{Binding Name}" />
             <TextBlock Grid.Row="1" Text="Dirección" VerticalAlignment="Center" FontWeight="Medium" />
@@ -114,6 +114,22 @@
                 <ComboBox ItemsSource="{Binding DecimalChoices}" SelectedItem="{Binding SelectedDecimals}" MinWidth="120" />
               </StackPanel>
               <TextBlock Classes="muted" FontSize="12" TextWrapping="Wrap" Text="{Binding DisplayPreview}" />
+            </StackPanel>
+            <TextBlock Grid.Row="9" Text="Escalado" VerticalAlignment="Top" Margin="0,6,0,0" FontWeight="Medium" />
+            <StackPanel Grid.Row="9" Grid.Column="1" Spacing="6">
+              <CheckBox Content="Convertir el valor bruto a unidades de ingeniería" IsChecked="{Binding ScalingEnabled}" />
+              <Grid ColumnDefinitions="Auto,110,Auto,110" RowDefinitions="Auto,Auto" ColumnSpacing="8" RowSpacing="6" IsVisible="{Binding ScalingEnabled}">
+                <TextBlock Text="Bruto de" Classes="muted" VerticalAlignment="Center" />
+                <TextBox Grid.Column="1" Text="{Binding ScaleRawMin}" />
+                <TextBlock Grid.Column="2" Text="a" Classes="muted" VerticalAlignment="Center" />
+                <TextBox Grid.Column="3" Text="{Binding ScaleRawMax}" />
+                <TextBlock Grid.Row="1" Text="Ingeniería de" Classes="muted" VerticalAlignment="Center" />
+                <TextBox Grid.Row="1" Grid.Column="1" Text="{Binding ScaleEngMin}" />
+                <TextBlock Grid.Row="1" Grid.Column="2" Text="a" Classes="muted" VerticalAlignment="Center" />
+                <TextBox Grid.Row="1" Grid.Column="3" Text="{Binding ScaleEngMax}" />
+              </Grid>
+              <CheckBox Content="Limitar al rango de ingeniería" IsChecked="{Binding ScaleClamp}" IsVisible="{Binding ScalingEnabled}" />
+              <TextBlock Classes="muted" FontSize="12" TextWrapping="Wrap" Text="{Binding ScalingPreview}" />
             </StackPanel>
           </Grid>
         </StackPanel>
