@@ -300,9 +300,25 @@ public sealed class AgentDeployerTests : IDisposable
         _progress.ShouldContain("Agente desinstalado");
     }
 
+    /// <summary>
+    /// Bash con el que comprobar los scripts. En Windows el «bash» del PATH suele ser el lanzador de WSL, que sin una
+    /// distribución instalada no funciona: se usa el de Git para Windows. Null si no hay ninguno.
+    /// </summary>
+    private static string? Bash()
+    {
+        if (!OperatingSystem.IsWindows())
+            return "bash";
+        return new[] { Environment.GetEnvironmentVariable("ProgramW6432"), Environment.GetEnvironmentVariable("ProgramFiles") }
+            .Where(p => !string.IsNullOrEmpty(p))
+            .Select(p => Path.Combine(p!, "Git", "bin", "bash.exe"))
+            .FirstOrDefault(File.Exists);
+    }
+
     [Fact]
     public void Generated_linux_scripts_are_valid_bash()
     {
+        var bash = Bash();
+        Assert.SkipWhen(bash is null, "No hay bash (en Windows hace falta Git para Windows)");
         var files = new AgentSecurityFiles(AgentScripts.SettingsJson("ABC", 5311, "clave"), [1, 2, 3]);
         foreach (var script in new[]
                  {
@@ -313,7 +329,7 @@ public sealed class AgentDeployerTests : IDisposable
                      AgentScripts.LinuxStatus,
                  })
         {
-            var check = Process.Start(new ProcessStartInfo("bash", "-n") { RedirectStandardInput = true, RedirectStandardError = true })!;
+            var check = Process.Start(new ProcessStartInfo(bash!, "-n") { RedirectStandardInput = true, RedirectStandardError = true })!;
             check.StandardInput.Write(script);
             check.StandardInput.Close();
             check.WaitForExit();

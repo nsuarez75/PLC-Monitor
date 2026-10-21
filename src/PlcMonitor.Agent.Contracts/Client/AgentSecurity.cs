@@ -9,8 +9,19 @@ public static class AgentSecurity
     /// <summary>Cabecera gRPC con el token: <c>authorization: Bearer &lt;token&gt;</c>.</summary>
     public const string AuthorizationHeader = "authorization";
 
-    /// <summary>Token aleatorio de 256 bits (base64url, 43 caracteres).</summary>
-    public static string NewToken() => Base64Url(RandomNumberGenerator.GetBytes(32));
+    /// <summary>
+    /// Token aleatorio de 256 bits (base64url, 43 caracteres). Nunca empieza por «-»: la CLI tomaría
+    /// <c>--token -abc…</c> por otra opción (pasaba con 1 de cada 64 tokens).
+    /// </summary>
+    public static string NewToken()
+    {
+        while (true)
+        {
+            var token = Base64Url(RandomNumberGenerator.GetBytes(32));
+            if (token[0] != '-')
+                return token;
+        }
+    }
 
     /// <summary>Hash SHA-256 del token en hexadecimal: es lo único que guarda el agente.</summary>
     public static string HashToken(string token)
