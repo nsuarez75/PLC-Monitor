@@ -118,17 +118,37 @@ internal static class AgentScripts
 
     // ---------------- Windows (PowerShell, sesión de administrador) ----------------
 
+    // El servicio figura como detenido antes de que el proceso acabe (aún vuelca el histórico y cierra ficheros) y mientras
+    // tanto su ejecutable sigue bloqueado: se espera a que salga y, si no sale en 30 s, se termina.
+    private const string WindowsWaitForExit = """
+        Get-Process -Name plcmon-agent -ErrorAction SilentlyContinue | Where-Object { $_.Path -eq (Join-Path $D 'plcmon-agent.exe') } | ForEach-Object {
+          if (-not $_.WaitForExit(30000)) { Stop-Process -Id $_.Id -Force; $_.WaitForExit(5000) | Out-Null }
+        }
+        """;
+
     public static string WindowsInstall(string archive, AgentSecurityFiles? security, int port) => $$"""
         $ErrorActionPreference = 'Stop'
         $D = "{{WindowsDirExpression}}"
         $A = '{{archive}}'
         $svc = Get-Service -Name {{WindowsService}} -ErrorAction SilentlyContinue
         if ($svc -and $svc.Status -ne 'Stopped') { Stop-Service -Name {{WindowsService}} -Force; $svc.WaitForStatus('Stopped', '00:00:30') }
+        {{WindowsWaitForExit}}
         New-Item -ItemType Directory -Force -Path $D | Out-Null
         if (-not (Test-Path $A)) { throw 'No llegó el ejecutable del agente' }
         # Se conserva la configuración del equipo, el histórico y los logs; lo demás se sustituye por el ejecutable único.
-        Get-ChildItem -Path $D -Force | Where-Object { $_.Name -notin 'agent.json', 'agent.key', 'agent.settings.json', 'agent.pfx', 'history', 'logs' } | Remove-Item -Recurse -Force
-        Move-Item -Path $A -Destination (Join-Path $D 'plcmon-agent.exe') -Force
+        # Un antivirus o el indexador pueden tener el ejecutable abierto un instante: se reintenta unos segundos.
+        for ($i = 1; ; $i++) {
+          try {
+            Get-ChildItem -Path $D -Force | Where-Object { $_.Name -notin 'agent.json', 'agent.key', 'agent.settings.json', 'agent.pfx', 'history', 'logs' } | Remove-Item -Recurse -Force
+            Move-Item -Path $A -Destination (Join-Path $D 'plcmon-agent.exe') -Force
+            break
+          } catch {
+            if ($i -lt 20) { Start-Sleep -Milliseconds 500; continue }
+            # Si el agente anterior sigue ahí, se vuelve a arrancar: mejor seguir con la versión vieja que quedarse sin agente.
+            if ($svc -and (Test-Path (Join-Path $D 'plcmon-agent.exe'))) { Start-Service -Name {{WindowsService}} -ErrorAction SilentlyContinue; 'Se ha vuelto a arrancar el agente anterior' }
+            throw
+          }
+        }
         {{(security is null ? "" : $"""
         [IO.File]::WriteAllBytes((Join-Path $D 'agent.settings.json'), [Convert]::FromBase64String('{Convert.ToBase64String(Encoding.UTF8.GetBytes(security.SettingsJson))}'))
         [IO.File]::WriteAllBytes((Join-Path $D 'agent.pfx'), [Convert]::FromBase64String('{Convert.ToBase64String(security.Pfx)}'))
@@ -156,6 +176,7 @@ internal static class AgentScripts
           if ($svc.Status -ne 'Stopped') { Stop-Service -Name {{WindowsService}} -Force; $svc.WaitForStatus('Stopped', '00:00:30') }
           sc.exe delete {{WindowsService}} | Out-Null
         }
+        {{WindowsWaitForExit}}
         Get-NetFirewallRule -DisplayName 'PLC-Monitor Agent' -ErrorAction SilentlyContinue | Remove-NetFirewallRule
         {{(keepConfiguration ? """
             if (Test-Path "$D\agent.json") { Copy-Item "$D\agent.json" "$env:ProgramData\PLC-Monitor-agent.json.backup" -Force; "Configuración guardada en $env:ProgramData\PLC-Monitor-agent.json.backup" }
