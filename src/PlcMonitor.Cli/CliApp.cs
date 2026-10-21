@@ -73,6 +73,14 @@ public static class CliApp
                 .WithDescription("Histórico de tags guardado por el agente (tabla o CSV).")
                 .WithExample("agent", "history", "prensa1", "velocidad", "--last", "2h", "-i", "1m", "--agg", "max")
                 .WithExample("agent", "history", "prensa1", "velocidad", "presion", "--from", "2026-10-15 08:00", "--csv", "turno.csv");
+            agent.AddCommand<AgentHistoryDeleteCommand>("history-delete")
+                .WithDescription("Borra el histórico de unos tags en un intervalo (pide confirmación; no se puede deshacer).")
+                .WithExample("agent", "history-delete", "prensa1", "velocidad", "--from", "2026-10-15 08:00", "--to", "2026-10-15 14:00")
+                .WithExample("agent", "history-delete", "prensa1", "velocidad", "presion", "--all", "-y");
+            agent.AddCommand<AgentHistoryRenameCommand>("history-rename")
+                .WithDescription("Lleva el histórico guardado con un nombre a otro (pide confirmación).")
+                .WithExample("agent", "history-rename", "prensa1/vel", "prensa1/velocidad")
+                .WithExample("agent", "history-rename", "prensa1", "prensa2");
             agent.AddCommand<AgentWatchCommand>("watch")
                 .WithDescription("Cambios de valores y de estado en directo (Ctrl+C para salir).")
                 .WithExample("agent", "watch", "prensa1");

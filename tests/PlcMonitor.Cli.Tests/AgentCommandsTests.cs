@@ -366,6 +366,136 @@ public sealed class AgentCommandsTests : IDisposable
         (await RunAsync("agent", "history", "plc1", "velocidad", "--last", "ayer")).ShouldNotBe(0);
     }
 
+    /// <summary>Agente con plc1/velocidad historizado y ya con alguna muestra guardada.</summary>
+    private async Task<AgentFactory> AgentWithHistoryAsync()
+    {
+        var agent = new AgentFactory(Device("plc1"));
+        agent.Driver.Plc("plc1").Values["DB1.DBW0"] = 7;
+        UseAgent(agent);
+        (await RunAsync("agent", "tag", "add", "plc1", "DB1.DBW0", "--name", "velocidad", "-i", "50", "--history", "--history-max", "1h")).ShouldBe(0);
+        await EventuallyAsync(() => PointsAsync(agent, "plc1", "velocidad"), n => n > 0);
+        return agent;
+    }
+
+    private static async Task<int> PointsAsync(AgentFactory agent, string device, string tag)
+    {
+        var request = new HistoryRequest
+        {
+            Device = device,
+            From = Google.Protobuf.WellKnownTypes.Timestamp.FromDateTimeOffset(DateTimeOffset.UtcNow.AddHours(-1)),
+            To = Google.Protobuf.WellKnownTypes.Timestamp.FromDateTimeOffset(DateTimeOffset.UtcNow.AddHours(1)),
+            Tags = { tag },
+        };
+        var reply = await agent.CreateGrpcClient().QueryHistoryAsync(request);
+        return reply.Series.Sum(s => s.Points.Count);
+    }
+
+    [Fact]
+    public async Task History_delete_removes_what_was_saved_in_the_interval()
+    {
+        await using var agent = await AgentWithHistoryAsync();
+
+        (await RunAsync("agent", "history-delete", "plc1", "velocidad", "--last", "1h", "-y")).ShouldBe(0);
+
+        Output.ShouldContain("Borrados");
+        Output.ShouldContain("plc1/velocidad");
+        (await PointsAsync(agent, "plc1", "velocidad")).ShouldBe(0);
+
+        (await RunAsync("agent", "history-delete", "plc1", "velocidad", "--all", "-y")).ShouldBe(0);
+        Output.ShouldContain("No había datos");
+    }
+
+    [Fact]
+    public async Task History_delete_asks_for_confirmation()
+    {
+        await using var agent = await AgentWithHistoryAsync();
+        _console.Interactive();
+        _console.Input.PushTextWithEnter("n");
+
+        (await RunAsync("agent", "history-delete", "plc1", "velocidad", "--all")).ShouldBe(2);
+
+        Output.ShouldContain("todo lo guardado");
+        Output.ShouldContain("Cancelado");
+        (await PointsAsync(agent, "plc1", "velocidad")).ShouldBeGreaterThan(0);
+    }
+
+    [Theory]
+    [InlineData("plc1", "v")]
+    [InlineData("plc1", "v", "--all", "--last", "1h")]
+    [InlineData("plc1", "v", "--from", "2026-10-15 08:00", "--last", "1h")]
+    [InlineData("plc1", "v", "--to", "2026-10-15 08:00")]
+    [InlineData("plc1", "v", "--from", "2026-10-15 08:00", "--to", "2026-10-14 08:00")]
+    [InlineData("plc1", "v", "--last", "ayer")]
+    public async Task History_delete_needs_a_valid_interval(params string[] args)
+    {
+        await using var agent = new AgentFactory(Device("plc1"));
+        UseAgent(agent);
+
+        (await RunAsync(["agent", "history-delete", .. args, "-y"])).ShouldNotBe(0);
+    }
+
+    [Fact]
+    public void History_delete_range_comes_from_last_from_to_or_all()
+    {
+        var now = new DateTimeOffset(2026, 10, 21, 12, 0, 0, TimeSpan.Zero);
+        new AgentHistoryDeleteSettings { Last = "2h" }.Range(now).ShouldBe((now.AddHours(-2), now));
+        new AgentHistoryDeleteSettings { All = true }.Range(now).ShouldBe((DateTimeOffset.UnixEpoch, now.AddDays(1)));
+        var from = new AgentHistoryDeleteSettings { From = "2026-10-15T08:00:00Z" }.Range(now);
+        from.ShouldBe((new DateTimeOffset(2026, 10, 15, 8, 0, 0, TimeSpan.Zero), now));
+    }
+
+    [Fact]
+    public async Task History_rename_moves_the_history_to_the_new_name()
+    {
+        await using var agent = await AgentWithHistoryAsync();
+        var points = await PointsAsync(agent, "plc1", "velocidad");
+
+        (await RunAsync("agent", "history-rename", "plc1/velocidad", "plc1/vel", "-y")).ShouldBe(0);
+
+        Output.ShouldContain("Histórico llevado");
+        Output.ShouldContain("1 tag");
+        (await PointsAsync(agent, "plc1", "vel")).ShouldBeGreaterThanOrEqualTo(points);
+
+        (await RunAsync("agent", "history-rename", "plc9", "plc8", "-y")).ShouldBe(0);
+        Output.ShouldContain("No había histórico de plc9");
+    }
+
+    [Fact]
+    public async Task History_rename_asks_for_confirmation()
+    {
+        await using var agent = await AgentWithHistoryAsync();
+        _console.Interactive();
+        _console.Input.PushTextWithEnter("n");
+
+        (await RunAsync("agent", "history-rename", "plc1/velocidad", "plc1/vel")).ShouldBe(2);
+
+        Output.ShouldContain("Cancelado");
+        (await PointsAsync(agent, "plc1", "vel")).ShouldBe(0);
+    }
+
+    [Theory]
+    [InlineData("plc1/v", "plc2")]
+    [InlineData("plc1", "plc2/v")]
+    [InlineData("plc1/", "plc2/v")]
+    [InlineData("/v", "plc2/v")]
+    [InlineData("plc1/v", "plc1/v")]
+    public async Task History_rename_rejects_mismatched_or_equal_names(string source, string target)
+    {
+        await using var agent = new AgentFactory(Device("plc1"));
+        UseAgent(agent);
+
+        (await RunAsync("agent", "history-rename", source, target, "-y")).ShouldNotBe(0);
+    }
+
+    [Fact]
+    public void History_rename_splits_device_and_tag_at_the_first_slash()
+    {
+        var rename = new AgentHistoryRenameSettings { Source = "plc1/a/b", Target = "plc2/c" }.Rename()!;
+        (rename.FromDevice, rename.FromTag, rename.ToDevice, rename.ToTag).ShouldBe(("plc1", "a/b", "plc2", "c"));
+        var device = new AgentHistoryRenameSettings { Source = "plc1", Target = "plc2" }.Rename()!;
+        (device.FromTag, device.ToTag).ShouldBe(("", ""));
+    }
+
     [Theory]
     [InlineData("500ms", 0.5)]
     [InlineData("30s", 30)]
