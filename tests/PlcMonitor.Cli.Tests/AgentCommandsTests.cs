@@ -103,6 +103,38 @@ public sealed class AgentCommandsTests : IDisposable
     }
 
     [Fact]
+    public async Task Unit_and_decimals_are_set_with_tag_add_and_shown_by_tags_and_watch()
+    {
+        await using var agent = new AgentFactory(Device("plc1"));
+        var plc = agent.Driver.Plc("plc1");
+        plc.Values["REAL0"] = 23.4500007629395;
+        UseAgent(agent);
+        _console.Profile.Width = 200; // que la tabla de tags no parta las celdas
+
+        (await RunAsync("agent", "tag", "add", "plc1", "REAL0", "--name", "presion", "--unit", "bar", "--decimals", "2")).ShouldBe(0);
+        await WaitForGoodValuesAsync(agent);
+        (await RunAsync("agent", "tags", "plc1")).ShouldBe(0);
+        Output.ShouldContain("23.45 bar");
+
+        // Sin --unit ni --decimals se conservan; -1 quita los decimales.
+        (await RunAsync("agent", "tag", "add", "plc1", "REAL0", "--name", "presion", "--decimals", "-1")).ShouldBe(0);
+        var tag = (await agent.CreateGrpcClient().GetDeviceConfigAsync(new DeviceRequest { Device = "plc1" })).ScanGroups.SelectMany(g => g.Tags).Single();
+        (tag.Unit, tag.HasDecimals).ShouldBe(("bar", false));
+        (await RunAsync("agent", "tag", "add", "plc1", "REAL0", "--name", "presion", "--decimals", "12")).ShouldNotBe(0);
+
+        (await RunAsync("agent", "tag", "add", "plc1", "REAL0", "--name", "presion", "--decimals", "1")).ShouldBe(0);
+        await WaitForGoodValuesAsync(agent);
+        using var cts = CancellationTokenSource.CreateLinkedTokenSource(Ct);
+        var run = RunAsync(cts.Token, "agent", "watch", "plc1");
+        await EventuallyAsync(() => Task.FromResult(Output), o => o.Contains("Cambios en directo", StringComparison.Ordinal));
+        plc.Values["REAL0"] = 1.25;
+        await EventuallyAsync(() => Task.FromResult(Output), o => o.Contains("plc1/presion = 1.3 bar", StringComparison.Ordinal));
+        await cts.CancelAsync();
+        (await run).ShouldBe(0);
+        Output.ShouldContain("plc1/presion = 23.5 bar");
+    }
+
+    [Fact]
     public async Task Read_returns_values_and_fails_on_bad_quality()
     {
         await using var agent = new AgentFactory(Device("plc1"));
@@ -266,7 +298,7 @@ public sealed class AgentCommandsTests : IDisposable
         var plc = agent.Driver.Plc("plc1");
         plc.Values["DB1.DBW0"] = 7;
         UseAgent(agent);
-        (await RunAsync("agent", "tag", "add", "plc1", "DB1.DBW0", "--name", "velocidad", "-i", "50", "--history", "--history-max", "1m", "--history-deadband", "2%")).ShouldBe(0);
+        (await RunAsync("agent", "tag", "add", "plc1", "DB1.DBW0", "--name", "velocidad", "-i", "50", "--history", "--history-max", "1m", "--history-deadband", "2%", "--unit", "km/h")).ShouldBe(0);
         var config = await agent.CreateGrpcClient().GetDeviceConfigAsync(new DeviceRequest { Device = "plc1" });
         var history = config.ScanGroups.SelectMany(g => g.Tags).Single().History;
         (history.Enabled, history.MaxIntervalMs, history.Deadband, history.DeadbandPercent).ShouldBe((true, 60000, 2.0, true));
@@ -274,13 +306,14 @@ public sealed class AgentCommandsTests : IDisposable
 
         (await RunAsync("agent", "history", "plc1", "velocidad", "--last", "1h")).ShouldBe(0);
         Output.ShouldContain("plc1/velocidad");
+        Output.ShouldContain("7 km/h");
         Output.ShouldContain("Good");
 
         var csv = Path.Combine(agent.Directory, "historico.csv");
         (await RunAsync("agent", "history", "plc1", "velocidad", "--csv", csv)).ShouldBe(0);
         var lines = await File.ReadAllLinesAsync(csv);
-        lines[0].ShouldBe("device,tag,timestamp,value,quality");
-        lines.ShouldContain(l => l.StartsWith("plc1,velocidad,", StringComparison.Ordinal) && l.EndsWith(",7,Good", StringComparison.Ordinal));
+        lines[0].ShouldBe("device,tag,timestamp,value,quality,unit");
+        lines.ShouldContain(l => l.StartsWith("plc1,velocidad,", StringComparison.Ordinal) && l.EndsWith(",7,Good,km/h", StringComparison.Ordinal));
 
         (await RunAsync("agent", "info")).ShouldBe(0);
         Output.ShouldContain("1 tags");

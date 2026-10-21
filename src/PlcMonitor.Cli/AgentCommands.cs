@@ -104,6 +104,11 @@ public static class AgentRuntime
     public static string ValueText(TagValue? value) =>
         value is null ? string.Empty : value.Quality is Quality.Good or Quality.Uncertain ? value.Text : value.Error;
 
+    /// <summary>Texto del valor con la unidad y los decimales del tag (<paramref name="tag"/> null = tal cual).</summary>
+    public static string ValueText(TagValue? value, Tag? tag) =>
+        tag is null || value is not { Quality: Quality.Good or Quality.Uncertain } ? ValueText(value)
+            : ValueDisplay.Format(value.Text, value.DataType, tag.GetDecimals(), tag.Unit);
+
     public static string Time(Timestamp? timestamp) =>
         timestamp is null ? string.Empty : timestamp.ToDateTime().ToLocalTime().ToString("HH:mm:ss.fff", CultureInfo.InvariantCulture);
 
@@ -186,7 +191,7 @@ public sealed class AgentTagsCommand : AsyncCommand<AgentTagsSettings>
                     Markup.Escape(t.Device),
                     Markup.Escape(t.Name) + (t.Writable ? " [yellow]✎[/]" : string.Empty),
                     Markup.Escape(t.Address),
-                    Markup.Escape(AgentRuntime.ValueText(t.Value)),
+                    Markup.Escape(AgentRuntime.ValueText(t.Value, t)),
                     t.Value?.DataType.ToString() ?? string.Empty,
                     t.Value is null ? string.Empty : AgentRuntime.QualityMarkup(t.Value.Quality),
                     AgentRuntime.Time(t.Value?.Timestamp),
@@ -334,13 +339,14 @@ public sealed class AgentWatchCommand : AsyncCommand<AgentWatchSettings>
             var console = AgentRuntime.Console;
             var request = new SubscribeRequest();
             request.Devices.AddRange(settings.Devices);
+            var tags = new Dictionary<(string Device, string Tag), Tag>();
             while (!cancellationToken.IsCancellationRequested)
             {
                 using var call = client.Subscribe(request, cancellationToken: cancellationToken);
                 try
                 {
                     await foreach (var ev in call.ResponseStream.ReadAllAsync(cancellationToken))
-                        Print(console, ev);
+                        Print(console, ev, tags);
                     console.MarkupLine("[yellow]El agente cerró la suscripción.[/]");
                     return 0;
                 }
@@ -357,20 +363,31 @@ public sealed class AgentWatchCommand : AsyncCommand<AgentWatchSettings>
             return 0;
         });
 
-    internal static void Print(IAnsiConsole console, SubscribeEvent ev)
+    /// <param name="tags">Tags conocidos (para su unidad y decimales): se rellena con la foto inicial y las reconfiguraciones.</param>
+    internal static void Print(IAnsiConsole console, SubscribeEvent ev, Dictionary<(string Device, string Tag), Tag> tags)
     {
         switch (ev.EventCase)
         {
             case SubscribeEvent.EventOneofCase.Snapshot:
+                tags.Clear();
                 foreach (var d in ev.Snapshot.Devices)
                     console.MarkupLine($"[grey]{AgentRuntime.Time(d.Since)}[/]  [bold]{Markup.Escape(d.Name)}[/] {AgentRuntime.StateMarkup(d.State)} {Markup.Escape(d.Detail)}");
                 foreach (var t in ev.Snapshot.Tags)
-                    PrintValue(console, t.Device, t.Name, t.Value);
+                {
+                    tags[(t.Device, t.Name)] = t;
+                    PrintValue(console, t.Device, t.Name, t.Value, t);
+                }
                 console.MarkupLine($"[grey]— {ev.Snapshot.Devices.Count} dispositivos, {ev.Snapshot.Tags.Count} tags. Cambios en directo (Ctrl+C para salir) —[/]");
                 break;
             case SubscribeEvent.EventOneofCase.TagUpdates:
                 foreach (var u in ev.TagUpdates.Updates)
-                    PrintValue(console, u.Device, u.Tag, u.Value);
+                    PrintValue(console, u.Device, u.Tag, u.Value, tags.GetValueOrDefault((u.Device, u.Tag)));
+                break;
+            case SubscribeEvent.EventOneofCase.DeviceConfigured:
+                foreach (var key in tags.Keys.Where(k => k.Device == ev.DeviceConfigured.Device.Name).ToArray())
+                    tags.Remove(key);
+                foreach (var t in ev.DeviceConfigured.Tags)
+                    tags[(t.Device, t.Name)] = t;
                 break;
             case SubscribeEvent.EventOneofCase.DeviceStatus:
                 var s = ev.DeviceStatus;
@@ -381,9 +398,9 @@ public sealed class AgentWatchCommand : AsyncCommand<AgentWatchSettings>
         }
     }
 
-    private static void PrintValue(IAnsiConsole console, string device, string tag, TagValue? value) =>
+    private static void PrintValue(IAnsiConsole console, string device, string tag, TagValue? value, Tag? config) =>
         console.MarkupLine(
-            $"[grey]{AgentRuntime.Time(value?.Timestamp)}[/]  {Markup.Escape(device)}/{Markup.Escape(tag)} = {Markup.Escape(AgentRuntime.ValueText(value))}  {(value is null ? string.Empty : AgentRuntime.QualityMarkup(value.Quality))}");
+            $"[grey]{AgentRuntime.Time(value?.Timestamp)}[/]  {Markup.Escape(device)}/{Markup.Escape(tag)} = {Markup.Escape(AgentRuntime.ValueText(value, config))}  {(value is null ? string.Empty : AgentRuntime.QualityMarkup(value.Quality))}");
 }
 
 public sealed class AgentBrowseSettings : AgentSettings
@@ -591,8 +608,18 @@ public sealed class AgentTagAddSettings : AgentPersistSettings
     [Description("Histórico: banda muerta absoluta, o en % si termina en % (p.ej. 0.5 o 2%).")]
     public string? HistoryDeadband { get; set; }
 
+    [CommandOption("--unit <UNIDAD>")]
+    [Description("Unidad con la que se muestra el valor (p.ej. bar, °C). \"\" la quita. Si no se indica, se conserva la que tuviera.")]
+    public string? Unit { get; set; }
+
+    [CommandOption("--decimals <N>")]
+    [Description("Decimales con los que se muestran los reales (0-9); -1 los quita (valor completo). Si no se indica, se conservan.")]
+    public int? Decimals { get; set; }
+
     public override ValidationResult Validate()
     {
+        if (Decimals is < -1 or > 9)
+            return ValidationResult.Error("--decimals debe estar entre 0 y 9 (o -1 para quitarlos).");
         if (HistoryMin is not null && Durations.Parse(HistoryMin) is null)
             return ValidationResult.Error($"Duración no válida: '{HistoryMin}'.");
         if (HistoryMax is not null && Durations.Parse(HistoryMax) is null)
@@ -648,7 +675,7 @@ public sealed class AgentTagAddCommand : AsyncCommand<AgentTagAddSettings>
             var group = device.ScanGroups.FirstOrDefault(g => string.Equals(g.Name, settings.Group, StringComparison.OrdinalIgnoreCase));
             if (group is null)
                 device.ScanGroups.Add(group = new ScanGroupConfig { Name = settings.Group, IntervalMs = settings.IntervalMs });
-            group.Tags.Add(new TagConfig
+            var tag = new TagConfig
             {
                 Name = settings.Name ?? string.Empty,
                 Address = settings.Address,
@@ -658,7 +685,11 @@ public sealed class AgentTagAddCommand : AsyncCommand<AgentTagAddSettings>
                 // La transformación y el grupo de visualización no se tocan desde aquí: se conservan los que tuviera.
                 Transform = previous?.Transform ?? "",
                 Folder = previous?.Folder ?? "",
-            });
+                Unit = settings.Unit?.Trim() ?? previous?.Unit ?? "",
+            };
+            if ((settings.Decimals ?? previous?.GetDecimals()) is { } decimals and >= 0)
+                tag.Decimals = decimals;
+            group.Tags.Add(tag);
 
             await client.PutDeviceAsync(new PutDeviceRequest { Device = device, Persist = !settings.NoPersist }, cancellationToken: cancellationToken);
             AgentRuntime.Console.MarkupLine($"[green]Tag guardado[/] {Markup.Escape(device.Name)}/{Markup.Escape(name)} en el grupo {Markup.Escape(group.Name)} ({group.IntervalMs} ms)");
@@ -811,19 +842,24 @@ public sealed class AgentHistoryCommand : AsyncCommand<AgentHistorySettings>
             request.Tags.AddRange(settings.Tags);
             var reply = await client.QueryHistoryAsync(request, cancellationToken: cancellationToken);
             var console = AgentRuntime.Console;
+            // Unidad y decimales de los tags que siguen configurados.
+            var tags = (await client.ListTagsAsync(new ListTagsRequest { Device = settings.Device }, cancellationToken: cancellationToken)).Tags
+                .ToDictionary(t => t.Name, StringComparer.Ordinal);
 
             if (settings.Csv is { } path)
             {
+                // El CSV guarda el valor completo; la unidad va en su columna.
                 await using var writer = new StreamWriter(path, append: false, new System.Text.UTF8Encoding(false));
-                await writer.WriteLineAsync("device,tag,timestamp,value,quality");
+                await writer.WriteLineAsync("device,tag,timestamp,value,quality,unit");
                 var rows = 0;
                 foreach (var s in reply.Series)
                 {
+                    var unit = tags.GetValueOrDefault(s.Tag)?.Unit ?? string.Empty;
                     foreach (var p in s.Points)
                     {
                         await writer.WriteLineAsync(string.Join(',', Csv(s.Device), Csv(s.Tag),
                             p.Timestamp.ToDateTimeOffset().ToString("yyyy-MM-ddTHH:mm:ss.fffZ", CultureInfo.InvariantCulture),
-                            Csv(PointText(p)), p.Quality.ToString()));
+                            Csv(PointText(p)), p.Quality.ToString(), Csv(unit)));
                         rows++;
                     }
                 }
@@ -838,7 +874,7 @@ public sealed class AgentHistoryCommand : AsyncCommand<AgentHistorySettings>
                 {
                     table.AddRow(
                         p.Timestamp.ToDateTimeOffset().ToLocalTime().ToString("yyyy-MM-dd HH:mm:ss.fff", CultureInfo.InvariantCulture),
-                        Markup.Escape(PointText(p)),
+                        Markup.Escape(PointText(p, tags.GetValueOrDefault(s.Tag))),
                         AgentRuntime.QualityMarkup(p.Quality));
                 }
                 console.Write(table);
@@ -849,6 +885,15 @@ public sealed class AgentHistoryCommand : AsyncCommand<AgentHistorySettings>
 
     private static string PointText(HistoryPoint p) =>
         p.HasNumber ? p.Number.ToString("G15", CultureInfo.InvariantCulture) : p.Text;
+
+    /// <summary>Punto con la unidad y los decimales del tag (los decimales, si es real o aún no se conoce su tipo).</summary>
+    private static string PointText(HistoryPoint p, Tag? tag)
+    {
+        if (tag is null || !p.HasNumber)
+            return PointText(p);
+        var type = tag.Value?.DataType is { } t && t != DataType.Unknown ? t : DataType.Double;
+        return ValueDisplay.Format(PointText(p), type, tag.GetDecimals(), tag.Unit);
+    }
 
     private static string Csv(string value) =>
         value.IndexOfAny([',', '"', '\n', '\r']) >= 0 ? "\"" + value.Replace("\"", "\"\"", StringComparison.Ordinal) + "\"" : value;
