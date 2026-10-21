@@ -926,3 +926,165 @@ public sealed class AgentHistoryCommand : AsyncCommand<AgentHistorySettings>
     private static string Csv(string value) =>
         value.IndexOfAny([',', '"', '\n', '\r']) >= 0 ? "\"" + value.Replace("\"", "\"\"", StringComparison.Ordinal) + "\"" : value;
 }
+
+public sealed class AgentHistoryDeleteSettings : AgentSettings
+{
+    [CommandArgument(0, "<DISPOSITIVO>")]
+    public string Device { get; set; } = "";
+
+    [CommandArgument(1, "<TAG>")]
+    [Description("Uno o varios tags.")]
+    public string[] Tags { get; set; } = [];
+
+    [CommandOption("--last <DURACION>")]
+    [Description("Borra desde hace este tiempo hasta ahora: 30s, 15m, 2h, 7d...")]
+    public string? Last { get; set; }
+
+    [CommandOption("--from <FECHA>")]
+    [Description("Inicio (hora local), p.ej. \"2026-10-15 08:00\".")]
+    public string? From { get; set; }
+
+    [CommandOption("--to <FECHA>")]
+    [Description("Fin (hora local). Por defecto, ahora.")]
+    public string? To { get; set; }
+
+    [CommandOption("--all")]
+    [Description("Borra todo lo guardado de esos tags.")]
+    public bool All { get; set; }
+
+    [CommandOption("-y|--yes")]
+    [Description("No pedir confirmación.")]
+    public bool Yes { get; set; }
+
+    public override ValidationResult Validate()
+    {
+        if (All && (Last is not null || From is not null || To is not null))
+            return ValidationResult.Error("--all no se combina con --from, --to ni --last.");
+        if (!All && Last is null && From is null)
+            return ValidationResult.Error("Indica el intervalo que se borra: --from (y --to), --last o --all.");
+        if (Last is not null && From is not null)
+            return ValidationResult.Error("Usa --from o --last, no los dos.");
+        if (Last is not null && Durations.Parse(Last) is null)
+            return ValidationResult.Error($"Duración no válida: '{Last}'. Ejemplos: 30s, 15m, 2h, 7d.");
+        if (From is not null && !DateTimeOffset.TryParse(From, CultureInfo.CurrentCulture, DateTimeStyles.AssumeLocal, out _))
+            return ValidationResult.Error($"Fecha no válida: '{From}'.");
+        if (To is not null && !DateTimeOffset.TryParse(To, CultureInfo.CurrentCulture, DateTimeStyles.AssumeLocal, out _))
+            return ValidationResult.Error($"Fecha no válida: '{To}'.");
+        var (from, to) = Range(DateTimeOffset.Now);
+        if (to < from)
+            return ValidationResult.Error("El final del intervalo es anterior al inicio.");
+        return base.Validate();
+    }
+
+    /// <summary>
+    /// Intervalo que se borra. Con --all, de 1970 a mañana: el agente recorre sus ficheros mes a mes desde el inicio, y
+    /// se deja un día de margen por si el reloj del PLC va adelantado.
+    /// </summary>
+    public (DateTimeOffset From, DateTimeOffset To) Range(DateTimeOffset now)
+    {
+        if (All)
+            return (DateTimeOffset.UnixEpoch, now.AddDays(1));
+        var to = To is { } t ? DateTimeOffset.Parse(t, CultureInfo.CurrentCulture, DateTimeStyles.AssumeLocal) : now;
+        var from = From is { } f ? DateTimeOffset.Parse(f, CultureInfo.CurrentCulture, DateTimeStyles.AssumeLocal)
+            : to - (Last is { } last ? Durations.Parse(last) ?? TimeSpan.Zero : TimeSpan.Zero);
+        return (from, to);
+    }
+}
+
+/// <summary>plcmon agent history-delete — borra lo guardado de unos tags en un intervalo (no se puede deshacer).</summary>
+public sealed class AgentHistoryDeleteCommand : AsyncCommand<AgentHistoryDeleteSettings>
+{
+    public override Task<int> ExecuteAsync(CommandContext context, AgentHistoryDeleteSettings settings, CancellationToken cancellationToken) =>
+        AgentRuntime.RunAsync(settings, async client =>
+        {
+            var (from, to) = settings.Range(DateTimeOffset.Now);
+            var tags = string.Join(", ", settings.Tags.Select(t => $"{settings.Device}/{t}"));
+            const string format = "yyyy-MM-dd HH:mm:ss";
+            var when = settings.All ? "todo lo guardado"
+                : $"lo guardado entre el {from.ToLocalTime().ToString(format, CultureInfo.InvariantCulture)} y el {to.ToLocalTime().ToString(format, CultureInfo.InvariantCulture)}";
+            if (!settings.Yes && !await AgentRuntime.Console.ConfirmAsync(
+                    $"¿Borrar {when} de [bold]{Markup.Escape(tags)}[/]? No se puede deshacer.", defaultValue: false, cancellationToken))
+            {
+                AgentRuntime.Console.MarkupLine("[grey]Cancelado.[/]");
+                return 2;
+            }
+
+            var request = new DeleteHistoryRequest
+            {
+                Device = settings.Device,
+                From = Timestamp.FromDateTimeOffset(from),
+                To = Timestamp.FromDateTimeOffset(to),
+            };
+            request.Tags.AddRange(settings.Tags);
+            var reply = await client.DeleteHistoryAsync(request, cancellationToken: cancellationToken);
+            AgentRuntime.Console.MarkupLine(reply.Deleted == 0
+                ? "[yellow]No había datos en ese intervalo.[/]"
+                : $"[green]Borrados[/] {reply.Deleted} datos del histórico de {Markup.Escape(tags)}");
+            return 0;
+        });
+}
+
+public sealed class AgentHistoryRenameSettings : AgentSettings
+{
+    [CommandArgument(0, "<ORIGEN>")]
+    [Description("dispositivo/tag, o solo el dispositivo para llevar todos sus tags.")]
+    public string Source { get; set; } = "";
+
+    [CommandArgument(1, "<DESTINO>")]
+    [Description("dispositivo/tag, o solo el dispositivo si el origen tampoco lleva tag.")]
+    public string Target { get; set; } = "";
+
+    [CommandOption("-y|--yes")]
+    [Description("No pedir confirmación.")]
+    public bool Yes { get; set; }
+
+    public override ValidationResult Validate()
+    {
+        if (Rename() is not { } rename)
+            return ValidationResult.Error("Indica el tag en los dos (dispositivo/tag) o en ninguno (todo el dispositivo).");
+        if (rename.FromDevice == rename.ToDevice && rename.FromTag == rename.ToTag)
+            return ValidationResult.Error("El origen y el destino son el mismo.");
+        return base.Validate();
+    }
+
+    /// <summary>Renombrado pedido; null si falta un dispositivo o solo uno de los dos lleva tag.</summary>
+    public HistoryRename? Rename()
+    {
+        var (fromDevice, fromTag) = Split(Source);
+        var (toDevice, toTag) = Split(Target);
+        if (fromDevice.Length == 0 || toDevice.Length == 0 || (fromTag is null) != (toTag is null) || fromTag?.Length == 0 || toTag?.Length == 0)
+            return null;
+        return new HistoryRename { FromDevice = fromDevice, FromTag = fromTag ?? "", ToDevice = toDevice, ToTag = toTag ?? "" };
+    }
+
+    /// <summary>«dispositivo/tag» por la primera barra: los dispositivos no llevan '/', los tags sí pueden.</summary>
+    private static (string Device, string? Tag) Split(string text)
+    {
+        var slash = text.IndexOf('/', StringComparison.Ordinal);
+        return slash < 0 ? (text.Trim(), null) : (text[..slash].Trim(), text[(slash + 1)..].Trim());
+    }
+}
+
+/// <summary>plcmon agent history-rename — lleva el histórico guardado con un nombre a otro (tras renombrar un tag o un dispositivo).</summary>
+public sealed class AgentHistoryRenameCommand : AsyncCommand<AgentHistoryRenameSettings>
+{
+    public override Task<int> ExecuteAsync(CommandContext context, AgentHistoryRenameSettings settings, CancellationToken cancellationToken) =>
+        AgentRuntime.RunAsync(settings, async client =>
+        {
+            var rename = settings.Rename()!;
+            var from = Markup.Escape(settings.Source.Trim());
+            var to = Markup.Escape(settings.Target.Trim());
+            if (!settings.Yes && !await AgentRuntime.Console.ConfirmAsync(
+                    $"¿Llevar el histórico de [bold]{from}[/] a [bold]{to}[/]? Si el destino ya tiene histórico, se juntan.", defaultValue: false, cancellationToken))
+            {
+                AgentRuntime.Console.MarkupLine("[grey]Cancelado.[/]");
+                return 2;
+            }
+
+            var reply = await client.RenameHistoryAsync(new RenameHistoryRequest { Renames = { rename } }, cancellationToken: cancellationToken);
+            AgentRuntime.Console.MarkupLine(reply.Moved == 0
+                ? $"[yellow]No había histórico de {from}.[/]"
+                : $"[green]Histórico llevado[/] a {to} ({reply.Moved} {(reply.Moved == 1 ? "tag" : "tags")})");
+            return 0;
+        });
+}
