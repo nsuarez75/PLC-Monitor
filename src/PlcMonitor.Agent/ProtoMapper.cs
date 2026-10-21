@@ -52,6 +52,7 @@ internal static class ProtoMapper
             Transform = snapshot.Definition.Transform ?? "",
             Folder = snapshot.Definition.Folder ?? "",
             Unit = snapshot.Definition.Unit ?? "",
+            Scaling = ToProto(snapshot.Definition.Scaling),
         };
         if (snapshot.Definition.Decimals is { } decimals)
             tag.Decimals = decimals;
@@ -74,6 +75,7 @@ internal static class ProtoMapper
             Quality = ToProto(value.Quality),
             Timestamp = Timestamp.FromDateTimeOffset(value.Timestamp),
             Error = value.ErrorDetail ?? "",
+            RawText = value.Raw is { } raw ? ValueFormatter.Format(raw.Value) : "",
         };
         SetTyped(pb, value.Value);
         return pb;
@@ -141,6 +143,7 @@ internal static class ProtoMapper
                 Transform = t.Transform ?? "",
                 Folder = t.Folder ?? "",
                 Unit = t.Unit ?? "",
+                Scaling = ToProto(t.Scaling),
             }, t.Decimals)));
             pb.ScanGroups.Add(g);
         }
@@ -205,11 +208,20 @@ internal static class ProtoMapper
                 Folder = string.IsNullOrWhiteSpace(t.Folder) ? null : t.Folder.Trim(),
                 Unit = string.IsNullOrWhiteSpace(t.Unit) ? null : t.Unit.Trim(),
                 Decimals = t.HasDecimals ? t.Decimals : null,
+                Scaling = FromProto(t.Scaling),
             }));
             device.ScanGroups.Add(group);
         }
         return device;
     }
+
+    public static Api.Scaling? ToProto(TagScaling? scaling) => scaling is null
+        ? null
+        : new Api.Scaling { RawMin = scaling.RawMin, RawMax = scaling.RawMax, EngMin = scaling.EngMin, EngMax = scaling.EngMax, Clamp = scaling.Clamp };
+
+    public static TagScaling? FromProto(Api.Scaling? pb) => pb is null
+        ? null
+        : new TagScaling { RawMin = pb.RawMin, RawMax = pb.RawMax, EngMin = pb.EngMin, EngMax = pb.EngMax, Clamp = pb.Clamp };
 
     public static Api.TransformList ToProto(IEnumerable<ValueTransform> transforms)
     {

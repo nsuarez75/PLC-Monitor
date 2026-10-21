@@ -93,6 +93,49 @@ public class AgentTransformsApiTests
     }
 
     [Fact]
+    public async Task Scaling_of_a_tag_round_trips_and_values_arrive_scaled_with_the_raw_text()
+    {
+        await using var agent = new AgentFactory(Device("plc1", tags: [new Tag { Address = "DB1.DBW0", Name = "presion" }, new Tag { Address = "DB1.DBW4", Name = "contador" }]));
+        agent.Driver.Plc("plc1").Values["DB1.DBW0"] = 13824;
+        agent.Driver.Plc("plc1").Values["DB1.DBW4"] = 7;
+        var client = agent.CreateGrpcClient();
+
+        var device = await client.GetDeviceConfigAsync(new DeviceRequest { Device = "plc1" }, cancellationToken: Ct);
+        device.ScanGroups[0].Tags[0].Scaling.ShouldBeNull();
+        device.ScanGroups[0].Tags[0].Scaling = new Scaling { RawMin = 0, RawMax = 27648, EngMin = 0, EngMax = 10, Clamp = true };
+        await client.PutDeviceAsync(new PutDeviceRequest { Device = device, Persist = true }, cancellationToken: Ct);
+
+        var config = (await client.GetDeviceConfigAsync(new DeviceRequest { Device = "plc1" }, cancellationToken: Ct)).ScanGroups[0].Tags;
+        config[0].Scaling.ShouldBe(new Scaling { RawMin = 0, RawMax = 27648, EngMin = 0, EngMax = 10, Clamp = true });
+        config[1].Scaling.ShouldBeNull();
+        var tags = await EventuallyAsync(
+            async () => await client.ListTagsAsync(new ListTagsRequest(), cancellationToken: Ct),
+            t => t.Tags.Single(x => x.Name == "presion").Value.Text == "5");
+        var scaled = tags.Tags.Single(t => t.Name == "presion");
+        scaled.Scaling.EngMax.ShouldBe(10);
+        (scaled.Value.DoubleValue, scaled.Value.DataType, scaled.Value.RawText).ShouldBe((5.0, DataType.Double, "13824"));
+        var plain = tags.Tags.Single(t => t.Name == "contador");
+        (plain.Scaling, plain.Value.RawText).ShouldBe((null, ""));
+        var file = (await ConfigurationFile.LoadAsync(agent.ConfigPath, Ct)).Devices[0].ScanGroups[0].Tags;
+        file[0].Scaling.ShouldBe(new TagScaling { RawMin = 0, RawMax = 27648, EngMin = 0, EngMax = 10, Clamp = true });
+        file[1].Scaling.ShouldBeNull();
+    }
+
+    [Fact]
+    public async Task Invalid_scaling_gives_invalid_argument()
+    {
+        await using var agent = new AgentFactory(Device("plc1", enabled: false, tags: [new Tag { Address = "DB1.DBW0", Name = "presion" }]));
+        var client = agent.CreateGrpcClient();
+        var device = await client.GetDeviceConfigAsync(new DeviceRequest { Device = "plc1" }, cancellationToken: Ct);
+        device.ScanGroups[0].Tags[0].Scaling = new Scaling { RawMin = 100, RawMax = 100, EngMin = 0, EngMax = 10 };
+
+        var ex = await Should.ThrowAsync<RpcException>(() => client.PutDeviceAsync(new PutDeviceRequest { Device = device }, cancellationToken: Ct).ResponseAsync);
+
+        ex.StatusCode.ShouldBe(StatusCode.InvalidArgument);
+        ex.Status.Detail.ShouldContain("el bruto mínimo y el máximo no pueden ser iguales");
+    }
+
+    [Fact]
     public async Task Invalid_decimals_give_invalid_argument()
     {
         await using var agent = new AgentFactory(Device("plc1", enabled: false, tags: [new Tag { Address = "DB1.DBD0", Name = "presion" }]));
