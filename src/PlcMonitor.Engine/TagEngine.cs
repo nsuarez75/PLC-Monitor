@@ -219,26 +219,26 @@ public sealed class TagEngine : IAsyncDisposable, IEngineSink
             var previous = supervisor.Tags.ToDictionary(t => t.Key);
             var next = DeviceSupervisor.BuildTags(copy);
             // Tags que desaparecen: si otro nuevo lee la misma dirección (un tag renombrado), hereda su valor.
-            var removed = new Dictionary<(string Address, TagDataType? Type), TagValue>();
+            var removed = new Dictionary<(string Address, TagDataType? Type, TagScaling? Scaling), TagValue>();
             foreach (var key in previous.Keys.Except(next.Select(t => t.Key)))
             {
-                removed.TryAdd((previous[key].Address, previous[key].DataType), _values[key].Value);
+                removed.TryAdd((previous[key].Address, previous[key].DataType, previous[key].Scaling), _values[key].Value);
                 _values.Remove(key);
             }
             var pending = TagValue.Bad(QualityCode.BadNotConnected, _time.GetUtcNow(),
                 supervisor.Status.State == ConnectionState.Connected ? "Esperando la primera lectura" : supervisor.Status.Detail ?? DeviceSupervisor.DisabledDetail);
             foreach (var tag in next)
             {
-                // Un tag que sigue leyendo la misma dirección conserva su valor; si no, espera a la próxima lectura.
+                // Un tag que sigue leyendo la misma dirección con el mismo escalado conserva su valor; si no, espera a la próxima lectura.
                 if (previous.TryGetValue(tag.Key, out var old))
                 {
-                    _values[tag.Key] = old.Address == tag.Address && old.DataType == tag.DataType
+                    _values[tag.Key] = old.Address == tag.Address && old.DataType == tag.DataType && old.Scaling == tag.Scaling
                         ? _values[tag.Key] with { Definition = tag }
                         : new TagSnapshot(tag, pending);
                 }
                 else
                 {
-                    _values[tag.Key] = removed.Remove((tag.Address, tag.DataType), out var inherited)
+                    _values[tag.Key] = removed.Remove((tag.Address, tag.DataType, tag.Scaling), out var inherited)
                         ? new TagSnapshot(tag, inherited)
                         : new TagSnapshot(tag, pending);
                 }

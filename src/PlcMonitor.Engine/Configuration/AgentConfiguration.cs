@@ -226,5 +226,36 @@ public sealed class TagConfiguration
     /// <summary>Decimales con los que los clientes muestran los reales; null = el valor completo. No cambia lo que se guarda.</summary>
     public int? Decimals { get; set; }
 
+    /// <summary>Escalado del valor bruto a unidades de ingeniería; null = el valor tal como lo lee el driver.</summary>
+    public TagScaling? Scaling { get; set; }
+
     internal string EffectiveName => string.IsNullOrWhiteSpace(Name) ? Address : Name;
+}
+
+/// <summary>
+/// Escalado lineal por dos puntos del valor bruto a unidades de ingeniería (p.ej. una entrada analógica 0–27648 a
+/// 0–10 bar). Lo aplica el agente al leer, así que el histórico, las bandas muertas y los disparos ven el valor escalado.
+/// </summary>
+public sealed record TagScaling
+{
+    public double RawMin { get; set; }
+
+    public double RawMax { get; set; }
+
+    public double EngMin { get; set; }
+
+    public double EngMax { get; set; }
+
+    /// <summary>Limitar el valor escalado al rango de ingeniería y rechazar escrituras fuera de él.</summary>
+    public bool Clamp { get; set; }
+
+    public double ToEngineering(double raw)
+    {
+        var value = (raw - RawMin) / (RawMax - RawMin) * (EngMax - EngMin) + EngMin;
+        return Clamp ? Math.Clamp(value, Math.Min(EngMin, EngMax), Math.Max(EngMin, EngMax)) : value;
+    }
+
+    public double ToRaw(double engineering) => (engineering - EngMin) / (EngMax - EngMin) * (RawMax - RawMin) + RawMin;
+
+    public bool IsInRange(double engineering) => engineering >= Math.Min(EngMin, EngMax) && engineering <= Math.Max(EngMin, EngMax);
 }

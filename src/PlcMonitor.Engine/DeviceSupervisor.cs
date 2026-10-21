@@ -67,6 +67,7 @@ internal sealed class DeviceSupervisor : IAsyncDisposable
             Folder = string.IsNullOrWhiteSpace(t.Folder) ? null : t.Folder,
             Unit = string.IsNullOrWhiteSpace(t.Unit) ? null : t.Unit,
             Decimals = t.Decimals,
+            Scaling = t.Scaling,
         }))
         .ToArray();
 
@@ -199,8 +200,9 @@ internal sealed class DeviceSupervisor : IAsyncDisposable
             return new WriteResult(tag.Address, QualityCode.BadNotConnected, "No conectado");
 
         var type = tag.DataType ?? TagDataType.Unknown;
+        // El valor actual de un tag escalado es Double: el tipo que se escribe es el del bruto.
         if (type == TagDataType.Unknown)
-            type = current.DataType;
+            type = (current.Raw ?? current).DataType;
         if (type == TagDataType.Unknown)
             type = connection.ValidateAddress(tag.Address).DataType;
         if (type == TagDataType.Unknown)
@@ -208,6 +210,12 @@ internal sealed class DeviceSupervisor : IAsyncDisposable
         if (type == TagDataType.Unknown)
             return new WriteResult(tag.Address, QualityCode.BadTypeMismatch, "No se conoce el tipo del tag; indica dataType en la configuración.");
 
+        if (tag.Scaling is { } scaling && ValueScaling.IsNumeric(type))
+        {
+            if (!ValueScaling.TryToRaw(scaling, text, type, out var rawText, out var scalingError))
+                return new WriteResult(tag.Address, QualityCode.BadTypeMismatch, scalingError);
+            text = rawText;
+        }
         if (!ValueParser.TryParse(text, type, out var value, out var error))
             return new WriteResult(tag.Address, QualityCode.BadTypeMismatch, error);
         return (await connection.WriteAsync([new WriteRequest(tag.Address, value)], cancellationToken))[0];
@@ -361,7 +369,7 @@ internal sealed class DeviceSupervisor : IAsyncDisposable
             foreach (var change in changes)
             {
                 foreach (var key in group.KeysByAddress[change.Address])
-                    updates.Add(new TagUpdate(key, change.Value));
+                    updates.Add(new TagUpdate(key, ValueScaling.Apply(group.Scaling.GetValueOrDefault(key), change.Value)));
             }
             _sink.Publish(updates);
         }
@@ -375,6 +383,8 @@ internal sealed class DeviceSupervisor : IAsyncDisposable
         foreach (var group in Tags.GroupBy(t => t.Group))
         {
             var keysByAddress = new Dictionary<string, List<TagKey>>(StringComparer.Ordinal);
+            // Dos tags pueden leer la misma dirección con escalados distintos: se escala por tag, no por dirección.
+            var scaling = new Dictionary<TagKey, TagScaling>();
             foreach (var tag in group)
             {
                 var validation = connection.ValidateAddress(tag.Address);
@@ -387,6 +397,8 @@ internal sealed class DeviceSupervisor : IAsyncDisposable
                 if (!keysByAddress.TryGetValue(tag.Address, out var keys))
                     keysByAddress[tag.Address] = keys = [];
                 keys.Add(tag.Key);
+                if (tag.Scaling is { } s)
+                    scaling[tag.Key] = s;
             }
             if (keysByAddress.Count > 0)
             {
@@ -394,7 +406,8 @@ internal sealed class DeviceSupervisor : IAsyncDisposable
                     group.Key,
                     group.First().Interval,
                     [.. keysByAddress.Keys],
-                    keysByAddress.ToDictionary(kv => kv.Key, kv => (IReadOnlyList<TagKey>)kv.Value, StringComparer.Ordinal)));
+                    keysByAddress.ToDictionary(kv => kv.Key, kv => (IReadOnlyList<TagKey>)kv.Value, StringComparer.Ordinal),
+                    scaling));
             }
         }
         if (invalid.Count > 0)
@@ -424,5 +437,10 @@ internal sealed class DeviceSupervisor : IAsyncDisposable
         _sink.Publish(status);
     }
 
-    private sealed record ScanGroup(string Name, TimeSpan Interval, string[] Addresses, IReadOnlyDictionary<string, IReadOnlyList<TagKey>> KeysByAddress);
+    private sealed record ScanGroup(
+        string Name,
+        TimeSpan Interval,
+        string[] Addresses,
+        IReadOnlyDictionary<string, IReadOnlyList<TagKey>> KeysByAddress,
+        IReadOnlyDictionary<TagKey, TagScaling> Scaling);
 }

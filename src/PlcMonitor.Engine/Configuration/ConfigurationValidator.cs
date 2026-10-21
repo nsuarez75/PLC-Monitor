@@ -90,6 +90,19 @@ public static class ConfigurationValidator
             errors.Add($"{where}: reconnect.multiplier debe ser 1 o mayor.");
     }
 
+    private static void ValidateScaling(TagScaling scaling, TagConfiguration tag, string where, List<string> errors)
+    {
+        if (!double.IsFinite(scaling.RawMin) || !double.IsFinite(scaling.RawMax) || !double.IsFinite(scaling.EngMin) || !double.IsFinite(scaling.EngMax))
+            errors.Add($"{where}: los puntos del escalado deben ser números finitos.");
+        if (scaling.RawMin == scaling.RawMax)
+            errors.Add($"{where}: en el escalado, el bruto mínimo y el máximo no pueden ser iguales.");
+        // Con los dos iguales todo valor daría lo mismo y la escritura no tendría inversa.
+        if (scaling.EngMin == scaling.EngMax)
+            errors.Add($"{where}: en el escalado, el mínimo y el máximo de ingeniería no pueden ser iguales.");
+        if (!string.IsNullOrWhiteSpace(tag.Transform))
+            errors.Add($"{where}: un tag escalado no puede tener transformación.");
+    }
+
     private static void ValidateGroups(DeviceConfiguration device, string where, HashSet<string> transforms, List<string> errors)
     {
         var groupNames = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
@@ -120,6 +133,8 @@ public static class ConfigurationValidator
                     errors.Add($"{groupWhere}, tag '{tag.EffectiveName}': los decimales deben estar entre 0 y {MaxDecimals}.");
                 if (tag.Unit is { Length: > MaxUnitLength })
                     errors.Add($"{groupWhere}, tag '{tag.EffectiveName}': la unidad no puede tener más de {MaxUnitLength} caracteres.");
+                if (tag.Scaling is { } s)
+                    ValidateScaling(s, tag, $"{groupWhere}, tag '{tag.EffectiveName}'", errors);
                 if (tag.History is { } h)
                 {
                     var tagWhere = $"{groupWhere}, tag '{tag.EffectiveName}'";

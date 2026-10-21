@@ -30,6 +30,9 @@ public sealed record TagDefinition(TagKey Key, string Address, string Group, Tim
 
     /// <summary>Decimales con los que los clientes muestran los reales; null = el valor completo.</summary>
     public int? Decimals { get; init; }
+
+    /// <summary>Escalado a unidades de ingeniería que el motor aplica al leer y, a la inversa, al escribir; null = ninguno.</summary>
+    public Configuration.TagScaling? Scaling { get; init; }
 }
 
 /// <summary>Definición de un tag con su último valor conocido.</summary>

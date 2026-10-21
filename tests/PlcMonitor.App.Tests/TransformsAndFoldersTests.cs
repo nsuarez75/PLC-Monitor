@@ -117,6 +117,72 @@ public sealed class TransformsAndFoldersTests : IDisposable
     }
 
     [Fact]
+    public async Task Scaling_is_edited_in_the_tag_details_and_the_raw_value_is_shown()
+    {
+        await using var agent = Agent(new Tag { Address = "DB1.DBW0", Name = "presion", Unit = "bar", Decimals = 2 });
+        agent.Driver.Plc("plc1").Values["DB1.DBW0"] = 13824;
+        await using var vm = await ConnectAsync(agent);
+        await Wait.UntilAsync(() => _ui.Read(() => TagOf(vm, "presion").DisplayText) == "13824 bar", "valor bruto");
+        _ui.Read(() => TagOf(vm, "presion").DetailText).ShouldBe("13824 bar");
+
+        await vm.OpenTagDetailsCommand.ExecuteAsync(TagOf(vm, "presion"));
+        var details = _dialogs.TagDetails.Single();
+        details.ScalingEnabled.ShouldBeFalse();
+        details.ScalingPreview.ShouldBe("El valor se usa tal como lo lee el PLC.");
+        details.ScalingEnabled = true;
+        details.ScaleEngMax = "10";
+        details.ScalingPreview.ShouldStartWith("Bruto 13824 → 5.00 bar.");
+        details.ScaleRawMax = "0";
+        details.ScalingPreview.ShouldBe("El bruto mínimo y el máximo no pueden ser iguales.");
+        await details.SaveCommand.ExecuteAsync(null);
+        details.Errors.ShouldBe("El bruto mínimo y el máximo no pueden ser iguales.");
+        details.ScaleRawMax = "27648";
+        details.ScaleClamp = true;
+        await details.SaveCommand.ExecuteAsync(null);
+        details.Errors.ShouldBeEmpty();
+        _dialogs.Questions.ShouldBeEmpty(); // sin histórico no hay nada que avisar
+
+        await Wait.UntilAsync(() => _ui.Read(() => TagOf(vm, "presion").DetailText) == "5.00 bar (bruto 13824)", "valor escalado con el bruto");
+        _ui.Read(() => TagOf(vm, "presion").DisplayText).ShouldBe("5.00 bar");
+        var saved = (await agent.CreateGrpcClient().GetDeviceConfigAsync(new DeviceRequest { Device = "plc1" })).ScanGroups[0].Tags.Single();
+        saved.Scaling.ShouldBe(new Scaling { RawMin = 0, RawMax = 27648, EngMin = 0, EngMax = 10, Clamp = true });
+
+        // Al volver a abrirlo se ven sus puntos; quitarlo vuelve al bruto.
+        _dialogs.TagDetails.Clear();
+        await vm.OpenTagDetailsCommand.ExecuteAsync(TagOf(vm, "presion"));
+        details = _dialogs.TagDetails.Single();
+        (details.ScalingEnabled, details.ScaleRawMax, details.ScaleEngMax, details.ScaleClamp).ShouldBe((true, "27648", "10", true));
+        details.ScalingPreview.ShouldStartWith("Bruto 13824 → 5.00 bar.");
+        details.ScalingEnabled = false;
+        await details.SaveCommand.ExecuteAsync(null);
+        await Wait.UntilAsync(() => _ui.Read(() => TagOf(vm, "presion").DetailText) == "13824 bar", "sin escalado");
+    }
+
+    [Fact]
+    public async Task Changing_the_scaling_of_a_historized_tag_asks_first()
+    {
+        await using var agent = Agent(new Tag { Address = "DB1.DBW0", Name = "presion", History = new TagHistorySettings { Enabled = true } });
+        agent.Driver.Plc("plc1").Values["DB1.DBW0"] = 100;
+        await using var vm = await ConnectAsync(agent);
+        await Wait.UntilAsync(() => _ui.Read(() => TagOf(vm, "presion").IsGood), "primer valor");
+
+        await vm.OpenTagDetailsCommand.ExecuteAsync(TagOf(vm, "presion"));
+        var details = _dialogs.TagDetails.Single();
+        details.ScalingEnabled = true;
+        _dialogs.Answer = false;
+        await details.SaveCommand.ExecuteAsync(null);
+
+        _dialogs.Questions.ShouldHaveSingleItem().ShouldContain("seguirá con la escala anterior");
+        details.Saved.ShouldBeFalse();
+        (await agent.CreateGrpcClient().GetDeviceConfigAsync(new DeviceRequest { Device = "plc1" })).ScanGroups[0].Tags.Single().Scaling.ShouldBeNull();
+
+        _dialogs.Answer = true;
+        await details.SaveCommand.ExecuteAsync(null);
+        details.Saved.ShouldBeTrue();
+        (await agent.CreateGrpcClient().GetDeviceConfigAsync(new DeviceRequest { Device = "plc1" })).ScanGroups[0].Tags.Single().Scaling.ShouldNotBeNull();
+    }
+
+    [Fact]
     public async Task Tags_are_grouped_in_folders_that_collapse_and_remember_it()
     {
         await using var agent = Agent(T("DB1.DBW0", "a", folder: "Horno"), T("DB1.DBW2", "b"), T("DB1.DBW4", "c", folder: "Cinta 1"), T("DB1.DBW6", "d", folder: "horno"));
