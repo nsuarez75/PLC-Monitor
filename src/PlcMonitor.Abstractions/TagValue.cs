@@ -19,6 +19,9 @@ public sealed record TagValue(
     public static TagValue Bad(QualityCode quality, DateTimeOffset timestamp, string? detail = null) =>
         new(null, TagDataType.Unknown, quality, timestamp, detail);
 
+    /// <summary>Valor tal como lo leyó el dispositivo cuando este es el resultado de escalarlo; null = sin escalar.</summary>
+    public TagValue? Raw { get; init; }
+
     /// <summary>Compara valor y calidad, sin la marca de tiempo. Sirve para detectar cambios.</summary>
     public bool HasSameValueAndQuality(TagValue? other)
     {
