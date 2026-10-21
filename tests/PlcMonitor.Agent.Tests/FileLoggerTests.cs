@@ -19,6 +19,13 @@ public sealed class FileLoggerTests : IDisposable
 
     private string File(string day) => Path.Combine(_dir, $"plcmon-agent-{day}.log");
 
+    // El fichero del día sigue abierto para escribir: en Windows solo se puede leer compartiéndolo (File.ReadAllText no).
+    private static string ReadShared(string path)
+    {
+        using var reader = new StreamReader(new FileStream(path, FileMode.Open, FileAccess.Read, FileShare.ReadWrite | FileShare.Delete));
+        return reader.ReadToEnd();
+    }
+
     [Fact]
     public void Lines_go_to_the_file_of_the_day_and_can_be_read_while_open()
     {
@@ -55,8 +62,8 @@ public sealed class FileLoggerTests : IDisposable
         logger.LogInformation("mañana");
 
         System.IO.File.Exists(File("20261011")).ShouldBeFalse();
-        System.IO.File.ReadAllText(File("20261018")).ShouldContain("mañana");
-        System.IO.File.ReadAllText(File("20261017")).ShouldNotContain("mañana");
+        ReadShared(File("20261018")).ShouldContain("mañana");
+        ReadShared(File("20261017")).ShouldNotContain("mañana");
     }
 
     [Fact]

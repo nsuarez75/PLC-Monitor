@@ -330,7 +330,27 @@ public sealed class AgentCommandsTests : IDisposable
 
         (await RunAsync("agent", "info")).ShouldBe(1);
         Output.ShouldContain("rechaza el token");
-        (await RunAsync("agent", "info", "--token", token)).ShouldBe(0);
+        (await RunAsync("agent", "info", "--token", token)).ShouldBe(0, Output);
+    }
+
+    [Fact]
+    public async Task Generated_tokens_never_start_with_a_dash_and_old_ones_that_do_work_with_equals()
+    {
+        // Un token que empieza por «-» se tomaba por otra opción de la línea de órdenes.
+        Enumerable.Range(0, 2000).Select(_ => PlcMonitor.Agent.Contracts.Client.AgentSecurity.NewToken()).ShouldAllBe(t => t[0] != '-' && t.Length == 43);
+
+        var token = "-" + PlcMonitor.Agent.Contracts.Client.AgentSecurity.NewToken()[1..];
+        await using var agent = new AgentFactory();
+        agent.Settings["Agent:Security:TokenSha256"] = PlcMonitor.Agent.Contracts.Client.AgentSecurity.HashToken(token);
+        AgentRuntime.ChannelFactory = e => GrpcChannel.ForAddress(agent.Server.BaseAddress, new GrpcChannelOptions
+        {
+            HttpHandler = agent.Server.CreateHandler(),
+            Credentials = e.Token is null ? null : Grpc.Core.ChannelCredentials.Create(Grpc.Core.ChannelCredentials.Insecure,
+                Grpc.Core.CallCredentials.FromInterceptor((_, m) => { m.Add("authorization", $"Bearer {e.Token}"); return Task.CompletedTask; })),
+            UnsafeUseInsecureChannelCallCredentials = true,
+        });
+
+        (await RunAsync("agent", "info", $"--token={token}")).ShouldBe(0, Output);
     }
 
     [Fact]

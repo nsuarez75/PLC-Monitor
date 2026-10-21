@@ -29,8 +29,10 @@ public sealed class HistorianServiceTests : IAsyncDisposable
             NullLogger<HistorianService>.Instance, h.Time);
         _owned.Add(historian);
         _owned.Add(h);
-        await h.Engine.StartAsync();
+        // El historiador escucha antes de que el motor arranque: si no, con la máquina cargada el dispositivo puede
+        // haber leído ya y se perdería el estado inicial (sin conectar) de los tags.
         await historian.StartAsync();
+        await h.Engine.StartAsync();
         return (h, historian);
     }
 
