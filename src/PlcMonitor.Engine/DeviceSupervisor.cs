@@ -65,6 +65,8 @@ internal sealed class DeviceSupervisor : IAsyncDisposable
             History = t.History,
             Transform = string.IsNullOrWhiteSpace(t.Transform) ? null : t.Transform,
             Folder = string.IsNullOrWhiteSpace(t.Folder) ? null : t.Folder,
+            Unit = string.IsNullOrWhiteSpace(t.Unit) ? null : t.Unit,
+            Decimals = t.Decimals,
         }))
         .ToArray();
 

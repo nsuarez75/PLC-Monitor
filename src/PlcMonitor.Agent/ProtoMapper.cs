@@ -37,19 +37,26 @@ internal static class ProtoMapper
         return device;
     }
 
-    public static Api.Tag ToProto(TagSnapshot snapshot) => new()
+    public static Api.Tag ToProto(TagSnapshot snapshot)
     {
-        Device = snapshot.Definition.Key.Device,
-        Name = snapshot.Definition.Key.Tag,
-        Address = snapshot.Definition.Address,
-        Group = snapshot.Definition.Group,
-        IntervalMs = (int)snapshot.Definition.Interval.TotalMilliseconds,
-        Writable = snapshot.Definition.Writable,
-        Value = ToProto(snapshot.Value),
-        Historized = snapshot.Definition.IsHistorized,
-        Transform = snapshot.Definition.Transform ?? "",
-        Folder = snapshot.Definition.Folder ?? "",
-    };
+        var tag = new Api.Tag
+        {
+            Device = snapshot.Definition.Key.Device,
+            Name = snapshot.Definition.Key.Tag,
+            Address = snapshot.Definition.Address,
+            Group = snapshot.Definition.Group,
+            IntervalMs = (int)snapshot.Definition.Interval.TotalMilliseconds,
+            Writable = snapshot.Definition.Writable,
+            Value = ToProto(snapshot.Value),
+            Historized = snapshot.Definition.IsHistorized,
+            Transform = snapshot.Definition.Transform ?? "",
+            Folder = snapshot.Definition.Folder ?? "",
+            Unit = snapshot.Definition.Unit ?? "",
+        };
+        if (snapshot.Definition.Decimals is { } decimals)
+            tag.Decimals = decimals;
+        return tag;
+    }
 
     public static Api.TagUpdate ToProto(TagUpdate update) => new()
     {
@@ -112,7 +119,7 @@ internal static class ProtoMapper
         foreach (var group in device.ScanGroups)
         {
             var g = new Api.ScanGroupConfig { Name = group.Name, IntervalMs = group.IntervalMs };
-            g.Tags.AddRange(group.Tags.Select(t => new Api.TagConfig
+            g.Tags.AddRange(group.Tags.Select(t => WithDecimals(new Api.TagConfig
             {
                 Name = t.Name ?? "",
                 Address = t.Address,
@@ -133,10 +140,18 @@ internal static class ProtoMapper
                     : null,
                 Transform = t.Transform ?? "",
                 Folder = t.Folder ?? "",
-            }));
+                Unit = t.Unit ?? "",
+            }, t.Decimals)));
             pb.ScanGroups.Add(g);
         }
         return pb;
+    }
+
+    private static Api.TagConfig WithDecimals(Api.TagConfig tag, int? decimals)
+    {
+        if (decimals is { } d)
+            tag.Decimals = d;
+        return tag;
     }
 
     /// <summary>Convierte la configuración recibida. Lanza <see cref="ArgumentException"/> si los ajustes no son JSON válido.</summary>
@@ -188,6 +203,8 @@ internal static class ProtoMapper
                     : null,
                 Transform = string.IsNullOrWhiteSpace(t.Transform) ? null : t.Transform.Trim(),
                 Folder = string.IsNullOrWhiteSpace(t.Folder) ? null : t.Folder.Trim(),
+                Unit = string.IsNullOrWhiteSpace(t.Unit) ? null : t.Unit.Trim(),
+                Decimals = t.HasDecimals ? t.Decimals : null,
             }));
             device.ScanGroups.Add(group);
         }

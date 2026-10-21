@@ -8,6 +8,11 @@ public static class ConfigurationValidator
     /// <summary>Intervalo mínimo de un grupo de escaneo, para no saturar los PLC.</summary>
     public const int MinIntervalMs = 50;
 
+    /// <summary>Decimales máximos con los que se puede mostrar un tag.</summary>
+    public const int MaxDecimals = 9;
+
+    public const int MaxUnitLength = 16;
+
     public static IReadOnlyList<string> Validate(AgentConfiguration configuration, DriverRegistry registry)
     {
         ArgumentNullException.ThrowIfNull(configuration);
@@ -111,6 +116,10 @@ public static class ConfigurationValidator
                     errors.Add($"{groupWhere}: tag '{tag.EffectiveName}' repetido en el dispositivo.");
                 if (!string.IsNullOrWhiteSpace(tag.Transform) && !transforms.Contains(tag.Transform))
                     errors.Add($"{groupWhere}, tag '{tag.EffectiveName}': la transformación '{tag.Transform}' no existe.");
+                if (tag.Decimals is < 0 or > MaxDecimals)
+                    errors.Add($"{groupWhere}, tag '{tag.EffectiveName}': los decimales deben estar entre 0 y {MaxDecimals}.");
+                if (tag.Unit is { Length: > MaxUnitLength })
+                    errors.Add($"{groupWhere}, tag '{tag.EffectiveName}': la unidad no puede tener más de {MaxUnitLength} caracteres.");
                 if (tag.History is { } h)
                 {
                     var tagWhere = $"{groupWhere}, tag '{tag.EffectiveName}'";
