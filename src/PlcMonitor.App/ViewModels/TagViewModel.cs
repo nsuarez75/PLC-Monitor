@@ -3,6 +3,7 @@ using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using Grpc.Core;
 using PlcMonitor.Agent.Contracts;
+using PlcMonitor.Agent.Contracts.Client;
 using PlcMonitor.App.Charts;
 
 namespace PlcMonitor.App.ViewModels;
@@ -24,6 +25,8 @@ public sealed partial class TagViewModel : ObservableObject
         Historized = tag.Historized;
         Transform = tag.Transform;
         Folder = tag.Folder;
+        Unit = tag.Unit;
+        Decimals = tag.GetDecimals();
         if (tag.Value is not null)
             Apply(tag.Value);
     }
@@ -47,6 +50,21 @@ public sealed partial class TagViewModel : ObservableObject
     /// <summary>Grupo de visualización (carpeta plegable de la tabla); vacío = sin grupo.</summary>
     public string Folder { get; }
 
+    /// <summary>Unidad con la que se muestra el valor; vacío = ninguna.</summary>
+    public string Unit { get; }
+
+    /// <summary>Decimales con los que se muestran los reales; null = el valor completo.</summary>
+    public int? Decimals { get; }
+
+    /// <summary>Nombre con la unidad, para leyendas y cabeceras: «presion [bar]».</summary>
+    public string Label => ValueDisplay.Label(Name, Unit);
+
+    /// <summary>Unidad y decimales para las gráficas (los decimales, solo si el tag es real o aún no se sabe).</summary>
+    public SeriesFormat SeriesFormat => new(Unit, _type is Agent.Contracts.DataType.Unknown || ValueDisplay.IsReal(_type) ? Decimals : null);
+
+    /// <summary>Tipo del último valor recibido.</summary>
+    private DataType _type;
+
     /// <summary>La tabla muestra el tag debajo de la cabecera de su grupo (va sangrado).</summary>
     [ObservableProperty]
     public partial bool IsInFolder { get; internal set; }
@@ -54,7 +72,10 @@ public sealed partial class TagViewModel : ObservableObject
     /// <summary>Valor entero actual (booleanos como 0/1) para la transformación; null si no hay o no es entero.</summary>
     private long? _integer;
 
-    /// <summary>Valor tal como se muestra: con transformación, «Marcha (1)»; si no, el mismo que <see cref="ValueText"/>.</summary>
+    /// <summary>
+    /// Valor tal como se muestra: con transformación, «Marcha (1)»; si no, <see cref="ValueText"/> con los decimales y la
+    /// unidad del tag («23.45 bar»).
+    /// </summary>
     [ObservableProperty]
     public partial string DisplayText { get; private set; } = "";
 
@@ -122,6 +143,7 @@ public sealed partial class TagViewModel : ObservableObject
         ArgumentNullException.ThrowIfNull(value);
         Quality = value.Quality;
         ValueText = value.Quality is Quality.Good or Quality.Uncertain ? value.Text : value.Error;
+        _type = value.DataType;
         DataType = value.DataType == Agent.Contracts.DataType.Unknown ? "" : value.DataType.ToString();
         Time = value.Timestamp?.ToDateTime().ToLocalTime().ToString("HH:mm:ss.fff", CultureInfo.InvariantCulture) ?? "";
         _integer = value.Quality is not (Quality.Good or Quality.Uncertain) ? null : value.TypedCase switch
@@ -139,8 +161,11 @@ public sealed partial class TagViewModel : ObservableObject
     public void RefreshDisplay()
     {
         var entry = _integer is { } n && Transform.Length > 0 ? _context.FindTransform(Transform)?.Entries.FirstOrDefault(e => e.Value == n) : null;
-        DisplayText = entry is null ? ValueText : $"{entry.Text} ({ValueText})";
+        DisplayText = entry is not null ? $"{entry.Text} ({ValueText})" : HasValue ? FormatText(ValueText) : ValueText;
     }
+
+    /// <summary>Texto de un valor de este tag con sus decimales y su unidad.</summary>
+    public string FormatText(string text) => ValueDisplay.Format(text, _type, Decimals, Unit);
 
     private void AddTrendPoint(TagValue value)
     {

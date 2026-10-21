@@ -20,8 +20,21 @@ public sealed partial class HistoryTagOption(string name) : ObservableObject
 }
 
 /// <summary>Fila del resultado (formato largo: una fila por punto y tag).</summary>
+/// <param name="Value">Valor completo, tal como lo guarda el agente (es el que se exporta).</param>
 public sealed record HistoryRowViewModel(DateTimeOffset Timestamp, string Tag, string Value, Quality Quality)
 {
+    private readonly string? _displayValue;
+
+    /// <summary>Valor como se ve en la tabla: con los decimales y la unidad del tag.</summary>
+    public string DisplayValue
+    {
+        get => _displayValue ?? Value;
+        init => _displayValue = value;
+    }
+
+    /// <summary>Unidad del tag; vacío = ninguna.</summary>
+    public string Unit { get; init; } = "";
+
     public string Time => Timestamp.ToLocalTime().ToString("yyyy-MM-dd HH:mm:ss.fff", CultureInfo.InvariantCulture);
 
     public bool IsGood => Quality == Quality.Good;
@@ -163,19 +176,22 @@ public sealed partial class HistoryViewModel(IAgentContext context, Func<DeviceV
             };
             request.Tags.AddRange(tags);
             var reply = await client.QueryHistoryAsync(request);
+            var known = target.Tags.ToDictionary(t => t.Name, StringComparer.Ordinal);
             Rows.Clear();
             foreach (var row in reply.Series
-                         .SelectMany(s => s.Points.Select(p => new HistoryRowViewModel(p.Timestamp.ToDateTimeOffset(), s.Tag, Text(p), p.Quality)))
+                         .SelectMany(s => s.Points.Select(p => Row(p, s.Tag, known.GetValueOrDefault(s.Tag))))
                          .OrderByDescending(r => r.Timestamp))
                 Rows.Add(row);
-            var types = target.Tags.ToDictionary(t => t.Name, t => t.IsBoolean, StringComparer.Ordinal);
             Chart.SetData(
                 reply.Series.Select(s => new ChartSeriesData(
                     s.Tag,
                     s.Points.Select(p => new ChartPoint(p.Timestamp.ToDateTimeOffset(),
                         p.HasNumber && p.Quality is Quality.Good or Quality.Uncertain ? p.Number : null)).ToArray(),
                     Step: Aggregate.Value is null,
-                    IsBoolean: types.GetValueOrDefault(s.Tag))).ToArray(),
+                    IsBoolean: known.GetValueOrDefault(s.Tag)?.IsBoolean == true)
+                {
+                    Display = known.GetValueOrDefault(s.Tag)?.SeriesFormat ?? SeriesFormat.None,
+                }).ToArray(),
                 request.From.ToDateTimeOffset(), request.To.ToDateTimeOffset());
             var truncated = reply.Series.Any(s => s.Truncated);
             Summary = $"{Rows.Count} puntos de {tags.Length} tags · {Range.Text.ToLowerInvariant()}" +
@@ -321,18 +337,27 @@ public sealed partial class HistoryViewModel(IAgentContext context, Func<DeviceV
         var path = await context.Dialogs.SaveFileAsync("Exportar histórico", $"{target.Name}-{DateTime.Now:yyyyMMdd-HHmm}.csv", "csv");
         if (path is null)
             return;
-        var csv = new StringBuilder("device,tag,timestamp,value,quality\n");
+        var csv = new StringBuilder(HistoryCsv.Header).Append('\n');
         foreach (var row in Rows.OrderBy(r => r.Timestamp))
         {
             csv.Append(Escape(target.Name)).Append(',').Append(Escape(row.Tag)).Append(',')
                .Append(row.Timestamp.UtcDateTime.ToString("yyyy-MM-ddTHH:mm:ss.fffZ", CultureInfo.InvariantCulture)).Append(',')
-               .Append(Escape(row.Value)).Append(',').Append(row.Quality).Append('\n');
+               .Append(Escape(row.Value)).Append(',').Append(row.Quality).Append(',').Append(Escape(row.Unit)).Append('\n');
         }
         await File.WriteAllTextAsync(path, csv.ToString(), new UTF8Encoding(false));
         context.Report($"Histórico guardado en {path} ({Rows.Count} filas)");
     }
 
-    private static string Text(HistoryPoint p) => p.HasNumber ? p.Number.ToString("G15", CultureInfo.InvariantCulture) : p.Text;
+    /// <summary>Fila de un punto: en la tabla, los números con la unidad y los decimales del tag (si se conoce y no es booleano).</summary>
+    private static HistoryRowViewModel Row(HistoryPoint p, string tagName, TagViewModel? tag)
+    {
+        var value = p.HasNumber ? p.Number.ToString("G15", CultureInfo.InvariantCulture) : p.Text;
+        return new HistoryRowViewModel(p.Timestamp.ToDateTimeOffset(), tagName, value, p.Quality)
+        {
+            DisplayValue = p.HasNumber && tag is { IsBoolean: false } ? tag.SeriesFormat.Format(p.Number) : value,
+            Unit = tag?.Unit ?? "",
+        };
+    }
 
     private static string Escape(string value) =>
         value.IndexOfAny([',', '"', '\n', '\r']) >= 0 ? "\"" + value.Replace("\"", "\"\"", StringComparison.Ordinal) + "\"" : value;

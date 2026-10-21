@@ -262,7 +262,7 @@ public sealed class XYChart : Control
             var last = latest.Points.LastOrDefault(p => p.Y is not null).Y;
             var color = Brush($"App.Chart{group.Key.ColorIndex % TrendChart.PaletteSize}", Brushes.SteelBlue);
             var name = Text(group.Key.Name, muted, 12);
-            var value = Text(last is not { } v ? "—" : latest.IsBoolean ? (v >= 0.5 ? "true" : "false") : ChartAxis.FormatValue(v), text, 12, FontWeight.SemiBold);
+            var value = Text(last is not { } v ? "—" : latest.IsBoolean ? (v >= 0.5 ? "true" : "false") : latest.Display.Format(v), text, 12, FontWeight.SemiBold);
             var itemWidth = 14 + 6 + name.Width + 6 + value.Width + 18;
             if (x + itemWidth > width && x > 4)
             {

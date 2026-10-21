@@ -220,5 +220,11 @@ public sealed class TagConfiguration
     /// <summary>Grupo de visualización (carpeta plegable en la tabla de los clientes); null = sin grupo.</summary>
     public string? Folder { get; set; }
 
+    /// <summary>Unidad con la que los clientes muestran el valor (bar, °C...); null = ninguna.</summary>
+    public string? Unit { get; set; }
+
+    /// <summary>Decimales con los que los clientes muestran los reales; null = el valor completo. No cambia lo que se guarda.</summary>
+    public int? Decimals { get; set; }
+
     internal string EffectiveName => string.IsNullOrWhiteSpace(Name) ? Address : Name;
 }

@@ -78,6 +78,45 @@ public sealed class TransformsAndFoldersTests : IDisposable
     }
 
     [Fact]
+    public async Task Unit_and_decimals_show_in_the_table_and_are_edited_in_the_tag_details()
+    {
+        await using var agent = Agent(
+            new Tag { Address = "REAL0", Name = "presion", Unit = "bar", Decimals = 2 },
+            new Tag { Address = "DB1.DBW2", Name = "contador", Unit = "piezas", Decimals = 2 });
+        var plc = agent.Driver.Plc("plc1");
+        plc.Values["REAL0"] = 23.4500007629395;
+        plc.Values["DB1.DBW2"] = 5;
+        await using var vm = await ConnectAsync(agent);
+
+        await Wait.UntilAsync(() => _ui.Read(() => TagOf(vm, "presion").DisplayText) == "23.45 bar", "real con unidad y decimales");
+        _ui.Read(() => TagOf(vm, "contador").DisplayText).ShouldBe("5 piezas"); // los enteros no llevan decimales
+        _ui.Read(() => TagOf(vm, "contador").SeriesFormat).ShouldBe(new PlcMonitor.App.Charts.SeriesFormat("piezas", null));
+        _ui.Read(() => TagOf(vm, "presion").Label).ShouldBe("presion [bar]");
+
+        await vm.OpenTagDetailsCommand.ExecuteAsync(TagOf(vm, "presion"));
+        var details = _dialogs.TagDetails.Single();
+        (details.Unit, details.SelectedDecimals).ShouldBe(("bar", "2"));
+        details.DisplayPreview.ShouldStartWith("Se verá como 23.45 bar.");
+        details.Unit = " °C ";
+        details.SelectedDecimals = "1";
+        details.DisplayPreview.ShouldStartWith("Se verá como 23.5 °C.");
+        await details.SaveCommand.ExecuteAsync(null);
+        details.Errors.ShouldBeEmpty();
+
+        await Wait.UntilAsync(() => _ui.Read(() => TagOf(vm, "presion").DisplayText) == "23.5 °C", "unidad y decimales nuevos");
+        _ui.Read(() => TagOf(vm, "presion").SeriesFormat).ShouldBe(new PlcMonitor.App.Charts.SeriesFormat("°C", 1));
+        var saved = (await agent.CreateGrpcClient().GetDeviceConfigAsync(new DeviceRequest { Device = "plc1" })).ScanGroups[0].Tags.Single(t => t.Name == "presion");
+        (saved.Unit, saved.Decimals).ShouldBe(("°C", 1));
+
+        _dialogs.TagDetails.Clear();
+        await vm.OpenTagDetailsCommand.ExecuteAsync(TagOf(vm, "presion"));
+        details = _dialogs.TagDetails.Single();
+        details.SelectedDecimals = TagDetailsViewModel.AllDecimals;
+        await details.SaveCommand.ExecuteAsync(null);
+        await Wait.UntilAsync(() => _ui.Read(() => TagOf(vm, "presion").DisplayText) == "23.4500007629395 °C", "valor completo sin decimales fijos");
+    }
+
+    [Fact]
     public async Task Tags_are_grouped_in_folders_that_collapse_and_remember_it()
     {
         await using var agent = Agent(T("DB1.DBW0", "a", folder: "Horno"), T("DB1.DBW2", "b"), T("DB1.DBW4", "c", folder: "Cinta 1"), T("DB1.DBW6", "d", folder: "horno"));

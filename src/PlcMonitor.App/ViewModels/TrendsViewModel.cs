@@ -659,6 +659,11 @@ public sealed partial class TrendsViewModel : ObservableObject, IDisposable
             IsLoading = false;
         }
         var points = sources.Values.Sum(s => s.Points.Count);
+        foreach (var (key, source) in sources.ToArray())
+        {
+            if (_main.FindTag(key.Device, key.Tag) is { } tag)
+                sources[key] = source with { Display = tag.SeriesFormat };
+        }
         var live = new LiveTrendViewModel(
             () => view.Tags.Select(t => (t.ToString(), sources.GetValueOrDefault(t))).ToArray(),
             trigger,
@@ -693,7 +698,7 @@ public sealed partial class TrendsViewModel : ObservableObject, IDisposable
         {
             var series = content.Series[i];
             sources[new TrendTagRef(content.Keys[i].Device, content.Keys[i].Tag)] =
-                new TrendSource(series.Points as List<ChartPoint> ?? series.Points.ToList(), series.IsBoolean, series.Step);
+                new TrendSource(series.Points as List<ChartPoint> ?? series.Points.ToList(), series.IsBoolean, series.Step) { Display = series.Display };
         }
         var file = Path.GetFileName(view.CsvPath!);
         if (view.Kind == ChartKind.Bars)

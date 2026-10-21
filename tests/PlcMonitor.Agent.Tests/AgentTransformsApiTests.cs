@@ -71,6 +71,42 @@ public class AgentTransformsApiTests
     }
 
     [Fact]
+    public async Task Unit_and_decimals_of_a_tag_round_trip_and_reach_the_tag_list()
+    {
+        await using var agent = new AgentFactory(Device("plc1", enabled: false, tags: [new Tag { Address = "DB1.DBD0", Name = "presion" }, new Tag { Address = "DB1.DBW4", Name = "contador" }]));
+        var client = agent.CreateGrpcClient();
+
+        var device = await client.GetDeviceConfigAsync(new DeviceRequest { Device = "plc1" }, cancellationToken: Ct);
+        device.ScanGroups[0].Tags[0].HasDecimals.ShouldBeFalse();
+        device.ScanGroups[0].Tags[0].Unit = " bar ";
+        device.ScanGroups[0].Tags[0].Decimals = 0;
+        await client.PutDeviceAsync(new PutDeviceRequest { Device = device, Persist = true }, cancellationToken: Ct);
+
+        var config = (await client.GetDeviceConfigAsync(new DeviceRequest { Device = "plc1" }, cancellationToken: Ct)).ScanGroups[0].Tags;
+        (config[0].Unit, config[0].HasDecimals, config[0].Decimals).ShouldBe(("bar", true, 0));
+        (config[1].Unit, config[1].HasDecimals).ShouldBe(("", false));
+        var listed = (await client.ListTagsAsync(new ListTagsRequest(), cancellationToken: Ct)).Tags.Single(t => t.Name == "presion");
+        (listed.Unit, listed.HasDecimals, listed.Decimals).ShouldBe(("bar", true, 0));
+        var file = (await ConfigurationFile.LoadAsync(agent.ConfigPath, Ct)).Devices[0].ScanGroups[0].Tags;
+        (file[0].Unit, file[0].Decimals).ShouldBe(("bar", 0));
+        file[1].Decimals.ShouldBeNull();
+    }
+
+    [Fact]
+    public async Task Invalid_decimals_give_invalid_argument()
+    {
+        await using var agent = new AgentFactory(Device("plc1", enabled: false, tags: [new Tag { Address = "DB1.DBD0", Name = "presion" }]));
+        var client = agent.CreateGrpcClient();
+        var device = await client.GetDeviceConfigAsync(new DeviceRequest { Device = "plc1" }, cancellationToken: Ct);
+        device.ScanGroups[0].Tags[0].Decimals = 42;
+
+        var ex = await Should.ThrowAsync<RpcException>(() => client.PutDeviceAsync(new PutDeviceRequest { Device = device }, cancellationToken: Ct).ResponseAsync);
+
+        ex.StatusCode.ShouldBe(StatusCode.InvalidArgument);
+        ex.Status.Detail.ShouldContain("los decimales deben estar entre 0");
+    }
+
+    [Fact]
     public async Task Invalid_transforms_give_invalid_argument()
     {
         await using var agent = new AgentFactory(Device("plc1", enabled: false, tags: [new Tag { Address = "DB1.DBW0", Name = "motor" }]));

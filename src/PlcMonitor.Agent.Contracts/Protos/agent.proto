@@ -209,6 +209,10 @@ message Tag {
   string transform = 9;
   // Grupo de visualización (carpeta plegable en la tabla); vacío = sin grupo.
   string folder = 10;
+  // Unidad con la que se muestra el valor (bar, °C...); vacío = ninguna.
+  string unit = 11;
+  // Decimales con los que se muestran los reales; ausente = el valor completo.
+  optional int32 decimals = 12;
 }
 
 message ListTagsRequest {
@@ -329,6 +333,10 @@ message TagConfig {
   string transform = 6;
   // Grupo de visualización (carpeta plegable en la tabla); vacío = sin grupo.
   string folder = 7;
+  // Unidad con la que se muestra el valor (bar, °C...); vacío = ninguna.
+  string unit = 8;
+  // Decimales con los que se muestran los reales; ausente = el valor completo. Solo afecta a la presentación.
+  optional int32 decimals = 9;
 }
 
 message HistoryConfig {

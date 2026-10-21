@@ -109,6 +109,34 @@ public sealed class ChartTests
     }
 
     [Fact]
+    public void Csv_unit_column_reaches_the_series()
+    {
+        var csv = """
+            device,tag,timestamp,value,quality,unit
+            plc1,presion,2026-10-17T10:00:00.000Z,2.5000001,Good,bar
+            plc1,presion,2026-10-17T10:00:01.000Z,2.75,Good,bar
+            plc1,contador,2026-10-17T10:00:00.000Z,3,Good,
+            """;
+
+        var content = HistoryCsv.Parse(new StringReader(csv));
+
+        var pressure = content.Series.Single(s => s.Name == "presion");
+        pressure.Display.Unit.ShouldBe("bar");
+        pressure.Points.Select(p => p.Value).ShouldBe([2.5000001, 2.75]); // el CSV guarda el valor completo
+        content.Series.Single(s => s.Name == "contador").Display.Unit.ShouldBe("");
+    }
+
+    [Fact]
+    public void Series_format_applies_decimals_and_unit()
+    {
+        new SeriesFormat("bar", 2).Format(2.5000001).ShouldBe("2.50 bar");
+        new SeriesFormat("", null).Format(2.5000001).ShouldBe(ChartAxis.FormatValue(2.5000001));
+        var series = new ChartSeries("presion", []) { Display = new SeriesFormat("bar", 1) };
+        series.Format(1.25).ShouldBe("1.3 bar");
+        series.Format(null).ShouldBe("—");
+    }
+
+    [Fact]
     public void Csv_with_several_devices_names_series_by_device()
     {
         var csv = "device,tag,timestamp,value,quality\nA,t,2026-10-17T10:00:00Z,1,Good\nB,t,2026-10-17T10:00:00Z,2,Good\n";

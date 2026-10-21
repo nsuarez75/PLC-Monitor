@@ -20,10 +20,18 @@ public sealed partial class ChartSeriesOption(string name, int colorIndex) : Obs
     internal bool Step { get; set; } = true;
 
     internal bool IsBoolean { get; set; }
+
+    internal SeriesFormat Display { get; set; } = SeriesFormat.None;
+
+    /// <summary>Serie para dibujar con los datos y el formato de esta opción.</summary>
+    internal ChartSeries ToSeries() => new(Name, Points, Step) { IsBoolean = IsBoolean, ColorIndex = ColorIndex, Display = Display };
 }
 
 /// <summary>Datos de una serie para cargar en la gráfica.</summary>
-public sealed record ChartSeriesData(string Name, IReadOnlyList<ChartPoint> Points, bool Step = true, bool IsBoolean = false);
+public sealed record ChartSeriesData(string Name, IReadOnlyList<ChartPoint> Points, bool Step = true, bool IsBoolean = false)
+{
+    public SeriesFormat Display { get; init; } = SeriesFormat.None;
+}
 
 /// <summary>
 /// Estado de una gráfica (la misma para la tendencia en vivo, el histórico y el visor de CSV): qué tags se ven, la
@@ -213,6 +221,7 @@ public sealed partial class ChartViewModel : ObservableObject
                 Points = d.Points,
                 Step = d.Step,
                 IsBoolean = d.IsBoolean,
+                Display = d.Display,
                 IsSelected = keepSelection ? selected.Contains(d.Name) : Options.Count < selectFirst,
             };
             option.PropertyChanged += OnOptionChanged;
@@ -288,7 +297,7 @@ public sealed partial class ChartViewModel : ObservableObject
     private void Rebuild()
     {
         Series = Options.Where(o => o.IsSelected)
-            .Select(o => new ChartSeries(o.Name, o.Points, o.Step) { IsBoolean = o.IsBoolean, ColorIndex = o.ColorIndex })
+            .Select(o => o.ToSeries())
             .ToArray();
         Revision++;
     }

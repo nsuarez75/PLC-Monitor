@@ -24,6 +24,12 @@ public sealed record TagDefinition(TagKey Key, string Address, string Group, Tim
 
     /// <summary>Grupo de visualización; null = sin grupo.</summary>
     public string? Folder { get; init; }
+
+    /// <summary>Unidad con la que los clientes muestran el valor; null = ninguna.</summary>
+    public string? Unit { get; init; }
+
+    /// <summary>Decimales con los que los clientes muestran los reales; null = el valor completo.</summary>
+    public int? Decimals { get; init; }
 }
 
 /// <summary>Definición de un tag con su último valor conocido.</summary>
