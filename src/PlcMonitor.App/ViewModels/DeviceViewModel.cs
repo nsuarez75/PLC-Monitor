@@ -78,7 +78,10 @@ public sealed partial class DeviceViewModel : ObservableObject
     {
         Rows.Clear();
         _folders.Clear();
-        if (Tags.All(t => t.Folder.Length == 0))
+        var plain = Tags.All(t => t.Folder.Length == 0);
+        foreach (var tag in Tags)
+            tag.IsInFolder = !plain;
+        if (plain)
         {
             foreach (var tag in Tags)
                 Rows.Add(tag);
@@ -134,7 +137,7 @@ public sealed partial class DeviceViewModel : ObservableObject
         {
             var names = tags.Select(t => t.Name).ToHashSet(StringComparer.Ordinal);
             var device = await client.GetDeviceConfigAsync(new DeviceRequest { Device = Name });
-            foreach (var tag in device.ScanGroups.SelectMany(g => g.Tags).Where(t => names.Contains(string.IsNullOrEmpty(t.Name) ? t.Address : t.Name)))
+            foreach (var tag in device.ScanGroups.SelectMany(g => g.Tags).Where(t => names.Contains(EffectiveName(t))))
                 tag.Folder = folder;
             await client.PutDeviceAsync(new PutDeviceRequest { Device = device, Persist = true });
             var what = tags.Count == 1 ? $"{tags[0].Name}" : $"{tags.Count} tags";
@@ -144,6 +147,22 @@ public sealed partial class DeviceViewModel : ObservableObject
         {
             _context.Report(_context.Describe(ex), isError: true);
         }
+    }
+
+    /// <summary>
+    /// Grupo al que van los tags que se sueltan sobre una fila de la tabla: el de la cabecera, o el del tag si la tabla
+    /// está agrupada. Null si ahí no se puede soltar (tabla sin grupos) o si ningún tag cambiaría de grupo.
+    /// </summary>
+    public static string? DropFolder(object? row, IReadOnlyList<TagViewModel> dragged)
+    {
+        ArgumentNullException.ThrowIfNull(dragged);
+        var folder = row switch
+        {
+            TagFolderViewModel f => f.Name,
+            TagViewModel { IsInFolder: true } t => t.Folder,
+            _ => null,
+        };
+        return folder is not null && dragged.Any(t => !string.Equals(t.Folder, folder, StringComparison.CurrentCultureIgnoreCase)) ? folder : null;
     }
 
     /// <summary>Pide el nombre de un grupo nuevo y mueve a él los tags.</summary>
@@ -156,6 +175,72 @@ public sealed partial class DeviceViewModel : ObservableObject
         if (!string.IsNullOrWhiteSpace(name))
             await MoveToFolderAsync(tags, name);
     }
+
+    /// <summary>
+    /// Pide un nombre nuevo para un grupo de visualización y pasa a él todos sus tags (si ya existe otro grupo con ese
+    /// nombre, se juntan). Si estaba plegado, sigue plegado.
+    /// </summary>
+    public async Task RenameFolderAsync(TagFolderViewModel folder)
+    {
+        ArgumentNullException.ThrowIfNull(folder);
+        if (folder.Name.Length == 0)
+            return;
+        var name = (await _context.Dialogs.PromptAsync("Renombrar grupo", $"Nombre nuevo del grupo «{folder.Name}»:", folder.Name))?.Trim();
+        if (string.IsNullOrEmpty(name) || name == folder.Name)
+            return;
+        if (!folder.IsExpanded)
+        {
+            _context.SetFolderCollapsed(Name, folder.Name, false);
+            _context.SetFolderCollapsed(Name, name, true);
+        }
+        var tags = Tags.Where(t => string.Equals(t.Folder, folder.Name, StringComparison.CurrentCultureIgnoreCase)).ToArray();
+        await MoveToFolderAsync(tags, name);
+    }
+
+    /// <summary>
+    /// Quita tags del dispositivo tras confirmarlo, todos en un solo cambio de configuración. Los disparos de histórico
+    /// de otros tags que dependen de los quitados se quitan también (el agente no admite un disparo que no existe).
+    /// El agente rehace los grupos de escaneo sin cerrar la conexión: una lectura en curso termina y su resultado para
+    /// los tags quitados se descarta.
+    /// </summary>
+    public async Task RemoveTagsAsync(IReadOnlyList<TagViewModel> tags)
+    {
+        ArgumentNullException.ThrowIfNull(tags);
+        if (_context.Client is not { } client || tags.Count == 0)
+            return;
+        try
+        {
+            var names = tags.Select(t => t.Name).ToHashSet(StringComparer.Ordinal);
+            var device = await client.GetDeviceConfigAsync(new DeviceRequest { Device = Name });
+            var dependents = device.ScanGroups.SelectMany(g => g.Tags)
+                .Where(t => !names.Contains(EffectiveName(t)) && t.History?.Trigger is { } trigger && names.Contains(trigger.Tag))
+                .ToArray();
+            var what = tags.Count == 1 ? $"el tag {tags[0].Name} ({tags[0].Address})" : $"{tags.Count} tags ({string.Join(", ", tags.Take(5).Select(t => t.Name))}{(tags.Count > 5 ? "…" : "")})";
+            var message = $"¿Quitar {what} de {Name}?";
+            if (dependents.Length > 0)
+                message += $"\nTambién se quita el disparo del histórico de {string.Join(", ", dependents.Select(EffectiveName))}.";
+            if (!await _context.Dialogs.ConfirmAsync(tags.Count == 1 ? "Quitar tag" : "Quitar tags", message))
+                return;
+            foreach (var group in device.ScanGroups.ToArray())
+            {
+                foreach (var t in group.Tags.Where(t => names.Contains(EffectiveName(t))).ToArray())
+                    group.Tags.Remove(t);
+                if (group.Tags.Count == 0)
+                    device.ScanGroups.Remove(group);
+            }
+            foreach (var dependent in dependents)
+                dependent.History.Trigger = null;
+            await client.PutDeviceAsync(new PutDeviceRequest { Device = device, Persist = true });
+            _context.Report(tags.Count == 1 ? $"Tag {Name}/{tags[0].Name} quitado" : $"{tags.Count} tags quitados de {Name}");
+        }
+        catch (RpcException ex)
+        {
+            _context.Report(_context.Describe(ex), isError: true);
+        }
+    }
+
+    /// <summary>Nombre con el que el agente conoce un tag configurado (si no tiene nombre, su dirección).</summary>
+    internal static string EffectiveName(TagConfig tag) => string.IsNullOrEmpty(tag.Name) ? tag.Address : tag.Name;
 
     /// <summary>Pliega o despliega todos los grupos.</summary>
     [RelayCommand]

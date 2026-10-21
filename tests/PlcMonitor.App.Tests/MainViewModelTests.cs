@@ -457,7 +457,7 @@ public sealed class MainViewModelTests : IDisposable
         await using var agent = new AgentFactory(Device("plc1", enabled: false, tags: [T("DB1.DBW0", "a"), T("DB1.DBW2", "b")]), Device("plc2", enabled: false));
         await using var vm = await ConnectAsync(agent);
 
-        await TagOf(vm, "plc1", "a").RemoveCommand.ExecuteAsync(null);
+        await _ui.Read(() => vm.Devices[0]).RemoveTagsAsync([TagOf(vm, "plc1", "a")]);
         await Wait.UntilAsync(() => _ui.Read(() => vm.Devices[0].Tags.Count) == 1, "tag quitado");
 
         _ui.Post(() => vm.SelectedDevice = vm.Devices.Single(d => d.Name == "plc2"));

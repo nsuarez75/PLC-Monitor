@@ -47,6 +47,10 @@ public sealed partial class TagViewModel : ObservableObject
     /// <summary>Grupo de visualización (carpeta plegable de la tabla); vacío = sin grupo.</summary>
     public string Folder { get; }
 
+    /// <summary>La tabla muestra el tag debajo de la cabecera de su grupo (va sangrado).</summary>
+    [ObservableProperty]
+    public partial bool IsInFolder { get; internal set; }
+
     /// <summary>Valor entero actual (booleanos como 0/1) para la transformación; null si no hay o no es entero.</summary>
     private long? _integer;
 
@@ -191,32 +195,6 @@ public sealed partial class TagViewModel : ObservableObject
             {
                 _context.Report($"No se escribió {Device}/{Name} ({reply.Quality}): {reply.Error}", isError: true);
             }
-        }
-        catch (RpcException ex)
-        {
-            _context.Report(_context.Describe(ex), isError: true);
-        }
-    }
-
-    [RelayCommand]
-    private async Task RemoveAsync()
-    {
-        if (_context.Client is not { } client)
-            return;
-        if (!await _context.Dialogs.ConfirmAsync("Quitar tag", $"¿Quitar el tag {Name} ({Address}) de {Device}?"))
-            return;
-        try
-        {
-            var device = await client.GetDeviceConfigAsync(new DeviceRequest { Device = Device });
-            foreach (var group in device.ScanGroups.ToArray())
-            {
-                foreach (var t in group.Tags.Where(t => (string.IsNullOrEmpty(t.Name) ? t.Address : t.Name) == Name).ToArray())
-                    group.Tags.Remove(t);
-                if (group.Tags.Count == 0)
-                    device.ScanGroups.Remove(group);
-            }
-            await client.PutDeviceAsync(new PutDeviceRequest { Device = device, Persist = true });
-            _context.Report($"Tag {Device}/{Name} quitado");
         }
         catch (RpcException ex)
         {

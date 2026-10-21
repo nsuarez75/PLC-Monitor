@@ -124,6 +124,16 @@ public sealed partial class HistoryViewModel(IAgentContext context, Func<DeviceV
         OnPropertyChanged(nameof(HasHistorizedTags));
     }
 
+    /// <summary>Deja marcado solo <paramref name="tag"/> (si es un tag historizado del dispositivo).</summary>
+    public bool SelectOnly(string tag)
+    {
+        if (!Tags.Any(t => t.Name == tag))
+            return false;
+        foreach (var option in Tags)
+            option.IsSelected = option.Name == tag;
+        return true;
+    }
+
     private bool CanQuery() => !IsBusy;
 
     [RelayCommand(CanExecute = nameof(CanQuery))]

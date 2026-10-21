@@ -352,6 +352,9 @@ internal sealed class DeviceSupervisor : IAsyncDisposable
     {
         await foreach (var changes in TagPoller.WatchAsync(connection, group.Addresses, group.Interval, _time, token))
         {
+            // Una lectura que estaba en curso al cambiar los tags (el driver no siempre la corta) es de la configuración
+            // anterior: un tag quitado o que ahora lee otra dirección no debe recibir su valor.
+            token.ThrowIfCancellationRequested();
             var updates = new List<TagUpdate>(changes.Count);
             foreach (var change in changes)
             {

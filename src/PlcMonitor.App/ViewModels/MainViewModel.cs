@@ -435,6 +435,32 @@ public sealed partial class MainViewModel : ObservableObject, IAgentContext, IAs
         }
     }
 
+    /// <summary>Pestaña elegida del dispositivo: 0 = Tags, 1 = Histórico, 2 = Explorar.</summary>
+    [ObservableProperty]
+    public partial int DeviceTab { get; set; }
+
+    public const int HistoryTab = 1;
+
+    /// <summary>Abre la pestaña Histórico con solo este tag marcado y lo consulta (menú del tag).</summary>
+    [RelayCommand]
+    private async Task OpenTagHistoryAsync(TagViewModel? tag)
+    {
+        if (tag is null)
+            return;
+        if (!tag.Historized)
+        {
+            Report($"{tag.Name} no se guarda en el histórico: actívalo en su detalle (doble clic → Histórico).");
+            return;
+        }
+        if (SelectedDevice?.Name != tag.Device)
+            SelectedDevice = Find(tag.Device);
+        History.RefreshTags();
+        if (!History.SelectOnly(tag.Name))
+            return;
+        DeviceTab = HistoryTab;
+        await History.QueryCommand.ExecuteAsync(null);
+    }
+
     [RelayCommand(CanExecute = nameof(CanEditDevice))]
     private async Task DeleteDeviceAsync()
     {

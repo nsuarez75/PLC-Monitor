@@ -336,9 +336,24 @@ public sealed partial class TagDetailsViewModel : ObservableObject
             });
             foreach (var empty in device.ScanGroups.Where(g => g.Tags.Count == 0).ToArray())
                 device.ScanGroups.Remove(empty);
+            // Los tags que historizan con este como disparo lo siguen usando con el nombre nuevo.
+            var retargeted = 0;
+            if (name != _originalName)
+            {
+                foreach (var other in device.ScanGroups.SelectMany(g => g.Tags).Where(t => t.History?.Trigger?.Tag == _originalName && EffectiveName(t) != name))
+                {
+                    other.History.Trigger.Tag = name;
+                    retargeted++;
+                }
+            }
 
             await client.PutDeviceAsync(new PutDeviceRequest { Device = device, Persist = true });
-            _context.Report($"Tag {Device}/{name} guardado");
+            _context.Report($"Tag {Device}/{name} guardado" + retargeted switch
+            {
+                0 => "",
+                1 => " (1 tag sigue disparándose con él)",
+                _ => $" ({retargeted} tags siguen disparándose con él)",
+            });
             if (name != _originalName && HistorianEnabled && (Tag.Historized || HistoryEnabled))
             {
                 await HistoryMover.OfferAsync(_context, client,
