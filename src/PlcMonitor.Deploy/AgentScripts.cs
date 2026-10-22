@@ -4,7 +4,7 @@ using System.Text;
 namespace PlcMonitor.Deploy;
 
 /// <summary>Material de seguridad que se deja en el equipo (agent.settings.json y agent.pfx).</summary>
-/// <param name="SettingsJson">Contenido de agent.settings.json (puerto, certificado y hash del token).</param>
+/// <param name="SettingsJson">Contenido de agent.settings.json (puerto, certificado y hashes de los tokens).</param>
 /// <param name="Pfx">Certificado TLS con su clave.</param>
 public sealed record AgentSecurityFiles(string SettingsJson, byte[] Pfx);
 
@@ -16,9 +16,10 @@ internal static class AgentScripts
     public const string WindowsService = "PLCMonitorAgent";
     public const string WindowsDirExpression = @"$env:ProgramFiles\PLC-Monitor\agent";
 
-    public static string SettingsJson(string tokenSha256, int port, string pfxPassword) => $$"""
+    /// <summary>agent.settings.json: token completo, token de solo lectura (opcional) y escucha https con el certificado propio.</summary>
+    public static string SettingsJson(string tokenSha256, int port, string pfxPassword, string? readOnlyTokenSha256 = null) => $$"""
         {
-          "Agent": { "Security": { "TokenSha256": "{{tokenSha256}}" } },
+          "Agent": { "Security": { "TokenSha256": "{{tokenSha256}}"{{(readOnlyTokenSha256 is null ? "" : $", \"ReadOnlyTokenSha256\": \"{readOnlyTokenSha256}\"")}} } },
           "Kestrel": {
             "Endpoints": {
               "Grpc": {
@@ -87,6 +88,20 @@ internal static class AgentScripts
         systemctl is-active {{LinuxService}}
         """;
 
+    /// <summary>Solo cambia las credenciales (agent.settings.json y agent.pfx) y reinicia el servicio, sin tocar el ejecutable.</summary>
+    public static string LinuxRenew(AgentSecurityFiles security) => $$"""
+        set -e
+        D={{LinuxDir}}
+        [ -x "$D/plcmon-agent" ] || { echo "El agente no está instalado en este equipo" >&2; exit 3; }
+        echo '{{Convert.ToBase64String(Encoding.UTF8.GetBytes(security.SettingsJson))}}' | base64 -d > "$D/agent.settings.json"
+        echo '{{Convert.ToBase64String(security.Pfx)}}' | base64 -d > "$D/agent.pfx"
+        chown plcmon:plcmon "$D/agent.settings.json" "$D/agent.pfx"
+        chmod 600 "$D/agent.settings.json" "$D/agent.pfx"
+        systemctl restart {{LinuxService}}
+        for i in $(seq 1 30); do systemctl is-active --quiet {{LinuxService}} && break; sleep 1; done
+        systemctl is-active {{LinuxService}}
+        """;
+
     public static string LinuxHasSecurity => $"test -f {LinuxDir}/agent.settings.json && echo yes || echo no";
 
     public static string LinuxUninstall(bool keepConfiguration, int port) => $$"""
@@ -126,6 +141,16 @@ internal static class AgentScripts
         }
         """;
 
+    // La seguridad del agente (hash del token, certificado con su clave y la contraseña del PFX) solo la leen el servicio
+    // (SYSTEM) y los administradores: en Program Files, por herencia, la podría leer cualquier usuario del equipo. Se aplica
+    // también al actualizar, para los agentes instalados antes.
+    private const string WindowsRestrictSecurity = """
+        foreach ($f in 'agent.settings.json', 'agent.pfx') {
+          $p = Join-Path $D $f
+          if (Test-Path $p) { icacls $p /inheritance:r /grant:r '*S-1-5-18:F' '*S-1-5-32-544:F' | Out-Null }
+        }
+        """;
+
     public static string WindowsInstall(string archive, AgentSecurityFiles? security, int port) => $$"""
         $ErrorActionPreference = 'Stop'
         $D = "{{WindowsDirExpression}}"
@@ -153,6 +178,7 @@ internal static class AgentScripts
         [IO.File]::WriteAllBytes((Join-Path $D 'agent.settings.json'), [Convert]::FromBase64String('{Convert.ToBase64String(Encoding.UTF8.GetBytes(security.SettingsJson))}'))
         [IO.File]::WriteAllBytes((Join-Path $D 'agent.pfx'), [Convert]::FromBase64String('{Convert.ToBase64String(security.Pfx)}'))
         """)}}
+        {{WindowsRestrictSecurity}}
         if (-not $svc) {
           New-Service -Name {{WindowsService}} -DisplayName 'PLC-Monitor Agent' -Description 'Agente de PLC-Monitor' -BinaryPathName ('"' + (Join-Path $D 'plcmon-agent.exe') + '"') -StartupType Automatic | Out-Null
           sc.exe failure {{WindowsService}} reset= 86400 actions= restart/5000/restart/5000/restart/30000 | Out-Null
@@ -162,6 +188,19 @@ internal static class AgentScripts
           'Firewall: abierto el puerto {{port}}/tcp'
         }
         Start-Service -Name {{WindowsService}}
+        (Get-Service -Name {{WindowsService}}).WaitForStatus('Running', '00:00:30')
+        'active'
+        """;
+
+    /// <summary>Solo cambia las credenciales (agent.settings.json y agent.pfx) y reinicia el servicio, sin tocar el ejecutable.</summary>
+    public static string WindowsRenew(AgentSecurityFiles security) => $$"""
+        $ErrorActionPreference = 'Stop'
+        $D = "{{WindowsDirExpression}}"
+        if (-not (Test-Path (Join-Path $D 'plcmon-agent.exe'))) { throw 'El agente no está instalado en este equipo' }
+        [IO.File]::WriteAllBytes((Join-Path $D 'agent.settings.json'), [Convert]::FromBase64String('{{Convert.ToBase64String(Encoding.UTF8.GetBytes(security.SettingsJson))}}'))
+        [IO.File]::WriteAllBytes((Join-Path $D 'agent.pfx'), [Convert]::FromBase64String('{{Convert.ToBase64String(security.Pfx)}}'))
+        {{WindowsRestrictSecurity}}
+        Restart-Service -Name {{WindowsService}} -Force
         (Get-Service -Name {{WindowsService}}).WaitForStatus('Running', '00:00:30')
         'active'
         """;
