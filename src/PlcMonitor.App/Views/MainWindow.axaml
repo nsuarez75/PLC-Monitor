@@ -64,7 +64,7 @@
         <Button Classes="ghost tab" Classes.on="{Binding IsTagsPage}" Command="{Binding ShowTagsCommand}" ToolTip.Tip="Dispositivos y sus tags en vivo, histórico y explorador">
           <StackPanel Orientation="Horizontal" Spacing="6">
             <c:Icon Kind="list" Width="16" Height="16" />
-            <TextBlock Text="Tags" Classes="barlabel" />
+            <TextBlock Text="Dispositivos" Classes="barlabel" />
           </StackPanel>
         </Button>
         <Button Classes="ghost tab" Classes.on="{Binding IsTrendsPage}" Command="{Binding OpenTrendsCommand}" ToolTip.Tip="Gráficas de tags de cualquier dispositivo o de un CSV: en vivo, del histórico o del fichero">
