@@ -8,13 +8,8 @@ TestResults/
 *.trx
 coverage*/
 
-# Material de investigación que NO se versiona:
-# - código descompilado y binarios propietarios de Ignition/AGLink
-# - capturas de red, claves TLS y cachés de símbolos de PLCs reales
-research/module/
-research/decompiled/
-research/tools/
-research/captures/
+# Material que NO se versiona: capturas de red, claves TLS y cachés de símbolos de PLCs reales
+research/
 key_*.log
 *.pcap
 *.pcapng
