@@ -273,6 +273,79 @@ public sealed class AgentsViewModelTests : IDisposable
     }
 
     [Fact]
+    public async Task Credentials_are_renewed_without_reinstalling_and_the_read_only_token_is_shown_once()
+    {
+        var ssh = Linux(hasSecurity: true);
+        var (_, agents) = Create(ssh);
+        agents.SshHost = "pc";
+        agents.SshUser = "tecnico";
+        agents.SshPassword = "clave";
+        await agents.InstallCommand.ExecuteAsync(null);
+        var old = (agents.Selected!.Token, agents.Selected.CertificateThumbprint);
+
+        _dialogs.Answer = false;
+        agents.SshPassword = "clave";
+        await agents.RenewCredentialsCommand.ExecuteAsync(null);
+        (agents.Selected.Token, agents.Selected.CertificateThumbprint).ShouldBe(old);
+
+        _dialogs.Answer = true;
+        agents.SshPassword = "clave";
+        agents.CreateReadOnlyToken = true;
+        await agents.RenewCredentialsCommand.ExecuteAsync(null);
+
+        _dialogs.Questions.Last().ShouldContain("Se crea un token de solo lectura nuevo.");
+        agents.Selected.Token.ShouldNotBeNullOrEmpty();
+        agents.Selected.Token.ShouldNotBe(old.Token);
+        agents.Selected.CertificateThumbprint.ShouldNotBe(old.CertificateThumbprint);
+        ssh.Uploads.Count.ShouldBe(1); // solo el de la instalación
+        var index = agents.Log.IndexOf("Token de solo lectura (cópialo ahora: la app no lo guarda):");
+        index.ShouldBeGreaterThanOrEqualTo(0);
+        var reader = agents.Log[index + 1];
+        reader.Length.ShouldBe(43);
+        reader.ShouldNotBe(agents.Selected.Token);
+        File.ReadAllText(ProfilesPath).ShouldNotContain(reader);
+        agents.CreateReadOnlyToken.ShouldBeFalse();
+        agents.SshPassword.ShouldBeEmpty();
+        agents.Log.Last().ShouldBe("✔ Hecho");
+    }
+
+    [Fact]
+    public async Task Fresh_install_can_create_the_read_only_token()
+    {
+        var (_, agents) = Create(Linux());
+        agents.SshHost = "pc";
+        agents.SshUser = "tecnico";
+        agents.SshPassword = "clave";
+        agents.CreateReadOnlyToken = true;
+
+        await agents.InstallCommand.ExecuteAsync(null);
+
+        agents.Log.ShouldContain("Token de solo lectura (cópialo ahora: la app no lo guarda):");
+    }
+
+    [Fact]
+    public async Task Read_only_token_connects_but_does_not_offer_writes()
+    {
+        var full = AgentSecurity.NewToken();
+        var reader = AgentSecurity.NewToken();
+        await using var agent = new AgentFactory(AgentFactory.Device("plc1", writesEnabled: true,
+            tags: [new PlcMonitor.Engine.Configuration.TagConfiguration { Address = "DB1.DBW2", Name = "consigna", Writable = true }]));
+        agent.Settings["Agent:Security:TokenSha256"] = AgentSecurity.HashToken(full);
+        agent.Settings["Agent:Security:ReadOnlyTokenSha256"] = AgentSecurity.HashToken(reader);
+        var ui = new LockingDispatcher();
+        await using var main = new MainViewModel(new TokenAwareConnector(agent), ui, _dialogs, new AppSettings(), Path.Combine(_dir, "app.json"), ProfilesPath);
+
+        main.SelectedProfile!.Token = reader;
+        await main.ConnectCommand.ExecuteAsync(null);
+
+        main.IsConnected.ShouldBeTrue(main.Message);
+        main.ReadOnlyAccess.ShouldBeTrue();
+        main.AgentDescription.ShouldEndWith(" · solo lectura");
+        await Wait.UntilAsync(() => ui.Read(() => main.AllTags.Any()), "tags");
+        ui.Read(() => main.AllTags.Single().Writable).ShouldBeFalse();
+    }
+
+    [Fact]
     public async Task Removing_a_profile_does_not_touch_the_host()
     {
         var ssh = new FakeSsh();

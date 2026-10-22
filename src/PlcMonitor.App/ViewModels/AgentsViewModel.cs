@@ -51,7 +51,7 @@ public sealed partial class AgentsViewModel : ObservableObject
 
     [ObservableProperty]
     [NotifyPropertyChangedFor(nameof(IsManaged))]
-    [NotifyCanExecuteChangedFor(nameof(InstallCommand), nameof(UninstallCommand), nameof(StatusCommand), nameof(LogsCommand))]
+    [NotifyCanExecuteChangedFor(nameof(InstallCommand), nameof(UninstallCommand), nameof(StatusCommand), nameof(LogsCommand), nameof(RenewCredentialsCommand))]
     public partial string SshHost { get; set; } = "";
 
     [ObservableProperty]
@@ -60,11 +60,11 @@ public sealed partial class AgentsViewModel : ObservableObject
     /// <summary>Gestionar el agente de este equipo sin SSH.</summary>
     [ObservableProperty]
     [NotifyPropertyChangedFor(nameof(IsManaged), nameof(IsSsh), nameof(ShowSudoPassword), nameof(MachineHelp), nameof(SudoPlaceholder))]
-    [NotifyCanExecuteChangedFor(nameof(InstallCommand), nameof(UninstallCommand), nameof(StatusCommand), nameof(LogsCommand))]
+    [NotifyCanExecuteChangedFor(nameof(InstallCommand), nameof(UninstallCommand), nameof(StatusCommand), nameof(LogsCommand), nameof(RenewCredentialsCommand))]
     public partial bool LocalMachine { get; set; }
 
     [ObservableProperty]
-    [NotifyCanExecuteChangedFor(nameof(InstallCommand), nameof(UninstallCommand), nameof(StatusCommand), nameof(LogsCommand))]
+    [NotifyCanExecuteChangedFor(nameof(InstallCommand), nameof(UninstallCommand), nameof(StatusCommand), nameof(LogsCommand), nameof(RenewCredentialsCommand))]
     public partial string SshUser { get; set; } = "";
 
     [ObservableProperty]
@@ -84,6 +84,10 @@ public sealed partial class AgentsViewModel : ObservableObject
     [ObservableProperty]
     public partial bool RegenerateCredentials { get; set; }
 
+    /// <summary>Al generar credenciales (instalación nueva, regenerar o renovar), crear también un token de solo lectura.</summary>
+    [ObservableProperty]
+    public partial bool CreateReadOnlyToken { get; set; }
+
     [ObservableProperty]
     public partial bool KeepConfiguration { get; set; } = true;
 
@@ -95,7 +99,7 @@ public sealed partial class AgentsViewModel : ObservableObject
     public partial string Info { get; set; } = "";
 
     [ObservableProperty]
-    [NotifyCanExecuteChangedFor(nameof(InstallCommand), nameof(UninstallCommand), nameof(StatusCommand), nameof(LogsCommand), nameof(SaveCommand))]
+    [NotifyCanExecuteChangedFor(nameof(InstallCommand), nameof(UninstallCommand), nameof(StatusCommand), nameof(LogsCommand), nameof(SaveCommand), nameof(RenewCredentialsCommand))]
     public partial bool IsBusy { get; set; }
 
     public bool IsManaged => LocalMachine || !string.IsNullOrWhiteSpace(SshHost);
@@ -124,6 +128,7 @@ public sealed partial class AgentsViewModel : ObservableObject
         SshPassword = "";
         SudoPassword = "";
         RegenerateCredentials = false;
+        CreateReadOnlyToken = false;
         LoadForm(value);
     }
 
@@ -187,7 +192,7 @@ public sealed partial class AgentsViewModel : ObservableObject
         var folders = string.IsNullOrWhiteSpace(PackageFolder) ? AgentPackages.DefaultFolders().ToArray() : [PackageFolder.Trim()];
         var result = await deployer.InstallAsync(
             LocalMachine ? "127.0.0.1" : SshHost.Trim(),
-            new InstallOptions(folders, AgentPort, RegenerateCredentials, NullIfEmpty(SudoPassword)),
+            new InstallOptions(folders, AgentPort, RegenerateCredentials, NullIfEmpty(SudoPassword), CreateReadOnlyToken),
             NullIfEmpty(SshPassword),
             ct);
         profile.Url = result.Url;
@@ -203,8 +208,45 @@ public sealed partial class AgentsViewModel : ObservableObject
         profile.Platform = result.Platform.Description;
         profile.InstalledAt = DateTimeOffset.Now;
         RegenerateCredentials = false;
+        ShowReadOnlyToken(result.ReadOnlyToken);
         _main.Report($"Agente instalado en {TargetName} ({result.Url})");
     });
+
+    /// <summary>
+    /// Token y certificado nuevos sin reinstalar el agente: los anteriores dejan de valer (para revocar un token que se ha
+    /// dado a alguien). El token de lectura se crea si está marcado; si no, el que hubiera queda revocado.
+    /// </summary>
+    [RelayCommand(CanExecute = nameof(CanUseSsh))]
+    private async Task RenewCredentialsAsync()
+    {
+        if (!await _main.Dialogs.ConfirmAsync("Renovar credenciales",
+                $"¿Renovar el token y el certificado del agente de {TargetName}?\nLos anteriores dejan de valer: los demás equipos y la CLI que los usen "
+                + $"perderán el acceso.{(CreateReadOnlyToken ? "\nSe crea un token de solo lectura nuevo." : "\nSi había token de solo lectura, también deja de valer.")}"))
+            return;
+        await RunSshAsync("Renovando credenciales", async (deployer, profile, ct) =>
+        {
+            var result = await deployer.RenewCredentialsAsync(
+                LocalMachine ? "127.0.0.1" : SshHost.Trim(),
+                new RenewOptions(AgentPort, CreateReadOnlyToken, NullIfEmpty(SudoPassword)),
+                NullIfEmpty(SshPassword),
+                ct);
+            profile.Url = result.Url;
+            profile.Token = result.Token;
+            profile.CertificateThumbprint = result.CertificateThumbprint;
+            ShowReadOnlyToken(result.ReadOnlyToken);
+            CreateReadOnlyToken = false;
+            _main.Report($"Credenciales del agente de {TargetName} renovadas");
+        });
+    }
+
+    /// <summary>El token de lectura no se guarda en la app (ella usa el completo): se enseña una vez para copiarlo.</summary>
+    private void ShowReadOnlyToken(string? token)
+    {
+        if (token is null)
+            return;
+        AddLog("Token de solo lectura (cópialo ahora: la app no lo guarda):");
+        AddLog(token);
+    }
 
     [RelayCommand(CanExecute = nameof(CanUseSsh))]
     private Task StatusAsync() => RunSshAsync("Consultando", async (deployer, profile, ct) =>

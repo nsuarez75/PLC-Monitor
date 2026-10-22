@@ -216,13 +216,25 @@ public class MainWindowTests
         agents.Log.Add("Equipo: Linux x86_64 (paquete linux-x64)");
         agents.Log.Add("Subiendo plcmon-agent-1.0.0-linux-x64 (49 MB)…");
         agents.Log.Add("Agente en marcha: https://192.168.0.20:5311");
+        agents.Log.Add("Token de solo lectura (cópialo ahora: la app no lo guarda):");
+        agents.Log.Add("q8Zt0VbS3nKp1xWm7RcY2uLf9HdA4gJe6TsN5oBiEkM");
         agents.Log.Add("✔ Hecho");
         window.UpdateLayout();
 
         var texts = window.GetVisualDescendants().OfType<TextBlock>().Select(t => t.Text).ToList();
         texts.ShouldContain("EQUIPO");
         texts.ShouldContain("Este equipo (sin SSH)");
+        texts.ShouldContain("Renovar credenciales");
+        texts.ShouldContain("Crear token de solo lectura");
         Capture(window, "agents.png");
+
+        // Abajo: opciones de la operación, «Renovar credenciales» y el token de lectura en la actividad.
+        var height = window.Height;
+        window.Height = 1500;
+        window.UpdateLayout();
+        Capture(window, "agents-actions.png");
+        window.Height = height;
+        window.UpdateLayout();
 
         // Este equipo: sin campos de SSH.
         agents.LocalMachine = true;

@@ -21,7 +21,8 @@ public sealed partial class TagViewModel : ObservableObject
         Name = tag.Name;
         Address = tag.Address;
         Group = $"{tag.Group} ({tag.IntervalMs} ms)";
-        Writable = tag.Writable;
+        // Con el token de lectura el agente rechazaría la escritura: no se ofrece.
+        Writable = tag.Writable && !context.ReadOnlyAccess;
         Historized = tag.Historized;
         Transform = tag.Transform;
         Folder = tag.Folder;

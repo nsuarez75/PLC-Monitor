@@ -92,10 +92,12 @@
                   <TextBlock Grid.Row="2" Text="Carpeta del agente" VerticalAlignment="Center" />
                   <TextBox Grid.Row="2" Grid.Column="1" Text="{Binding PackageFolder}" Classes="mono" PlaceholderText="(por defecto el agente incluido en la app)" />
                 </Grid>
-                <StackPanel Orientation="Horizontal" Spacing="20">
-                  <CheckBox Content="Regenerar token y certificado" IsChecked="{Binding RegenerateCredentials}" />
-                  <CheckBox Content="Conservar agent.json al desinstalar" IsChecked="{Binding KeepConfiguration}" />
-                </StackPanel>
+                <WrapPanel Orientation="Horizontal">
+                  <CheckBox Content="Regenerar token y certificado" IsChecked="{Binding RegenerateCredentials}" Margin="0,0,20,4" />
+                  <CheckBox Content="Crear token de solo lectura" IsChecked="{Binding CreateReadOnlyToken}" Margin="0,0,20,4"
+                            ToolTip.Tip="Para quien solo debe ver: leer, tendencias e histórico, sin escribir ni configurar. Se crea al generar credenciales (instalación nueva, regenerar o renovar)." />
+                  <CheckBox Content="Conservar agent.json al desinstalar" IsChecked="{Binding KeepConfiguration}" Margin="0,0,20,4" />
+                </WrapPanel>
               </StackPanel>
             </Border>
 
@@ -104,6 +106,13 @@
                 <StackPanel Orientation="Horizontal" Spacing="6">
                   <c:Icon Kind="server" />
                   <TextBlock Text="Instalar / actualizar" />
+                </StackPanel>
+              </Button>
+              <Button Classes="secondary" Command="{Binding RenewCredentialsCommand}" Margin="0,0,8,8"
+                      ToolTip.Tip="Token y certificado nuevos sin reinstalar: los anteriores dejan de valer.">
+                <StackPanel Orientation="Horizontal" Spacing="6">
+                  <c:Icon Kind="refresh" />
+                  <TextBlock Text="Renovar credenciales" />
                 </StackPanel>
               </Button>
               <Button Classes="secondary" Command="{Binding StatusCommand}" Margin="0,0,8,8">
