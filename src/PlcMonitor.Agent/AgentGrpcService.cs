@@ -11,9 +11,12 @@ using Api = PlcMonitor.Agent.Contracts;
 namespace PlcMonitor.Agent;
 
 /// <summary>Implementación de la API gRPC sobre el motor.</summary>
-public sealed class AgentGrpcService(EngineHost host, DriverRegistry registry, IHostApplicationLifetime lifetime, ILogger<AgentGrpcService> logger)
+public sealed class AgentGrpcService(EngineHost host, DriverRegistry registry, IHostApplicationLifetime lifetime, ILogger<AgentGrpcService> logger, ILoggerFactory loggerFactory)
     : Api.AgentService.AgentServiceBase
 {
+    /// <summary>Cambios de configuración y de histórico: al mismo log de auditoría que las escrituras.</summary>
+    private readonly ILogger _audit = loggerFactory.CreateLogger("PlcMonitor.Audit");
+
     private TagEngine Engine => host.Engine;
 
     public override Task<Api.AgentInfo> GetInfo(Empty request, ServerCallContext context)
@@ -25,6 +28,7 @@ public sealed class AgentGrpcService(EngineHost host, DriverRegistry registry, I
             Os = RuntimeInformation.OSDescription,
             Started = Timestamp.FromDateTimeOffset(host.Started),
             ConfigPath = host.ConfigPath,
+            Access = AgentCaller.From(context).Access == AgentAccess.Full ? Api.AccessLevel.Full : Api.AccessLevel.Read,
         };
         var stats = host.Historian.GetStats();
         info.Historian = new Api.HistorianInfo
@@ -59,6 +63,7 @@ public sealed class AgentGrpcService(EngineHost host, DriverRegistry registry, I
         var status = await Guard(() => Engine.SetDeviceEnabledAsync(request.Device, request.Enabled));
         if (request.Persist)
             await host.SaveConfigurationAsync(context.CancellationToken);
+        _audit.LogInformation("Dispositivo {Device} {State} por {User}", status.Device, request.Enabled ? "activado" : "desactivado", AgentCaller.Describe(context));
         return ToProto(status);
     }
 
@@ -91,7 +96,7 @@ public sealed class AgentGrpcService(EngineHost host, DriverRegistry registry, I
 
     public override async Task<Api.WriteReply> Write(Api.WriteRequest request, ServerCallContext context)
     {
-        var user = string.IsNullOrWhiteSpace(request.User) ? $"anónimo@{context.Peer}" : $"{request.User}@{context.Peer}";
+        var user = AgentCaller.Describe(context, request.User);
         var result = await Guard(() => Engine.WriteAsync(request.Device, request.Tag, request.Value, user, context.CancellationToken));
         return ProtoMapper.ToProto(result);
     }
@@ -192,7 +197,8 @@ public sealed class AgentGrpcService(EngineHost host, DriverRegistry registry, I
         var status = await Guard(() => Engine.PutDeviceAsync(device, string.IsNullOrWhiteSpace(request.OriginalName) ? null : request.OriginalName));
         if (request.Persist)
             await host.SaveConfigurationAsync(context.CancellationToken);
-        logger.LogInformation("Configuración de {Device} cambiada desde {Peer}", status.Device, context.Peer);
+        _audit.LogInformation("Configuración de {Device} cambiada por {User} (escrituras {Writes})", status.Device, AgentCaller.Describe(context),
+            status.WritesEnabled ? "activadas" : "desactivadas");
         return ToProto(status);
     }
 
@@ -205,7 +211,7 @@ public sealed class AgentGrpcService(EngineHost host, DriverRegistry registry, I
         });
         if (request.Persist)
             await host.SaveConfigurationAsync(context.CancellationToken);
-        logger.LogInformation("Dispositivo {Device} dado de baja desde {Peer}", request.Device, context.Peer);
+        _audit.LogInformation("Dispositivo {Device} dado de baja por {User}", request.Device, AgentCaller.Describe(context));
         return new Empty();
     }
 
@@ -236,7 +242,7 @@ public sealed class AgentGrpcService(EngineHost host, DriverRegistry registry, I
         var transforms = await Guard(() => Engine.SetTransformsAsync(request.Transforms.Select(ProtoMapper.FromProto).ToArray()));
         if (request.Persist)
             await host.SaveConfigurationAsync(context.CancellationToken);
-        logger.LogInformation("Transformaciones cambiadas desde {Peer}", context.Peer);
+        _audit.LogInformation("Transformaciones cambiadas por {User}", AgentCaller.Describe(context));
         return ProtoMapper.ToProto(transforms);
     }
 
@@ -246,7 +252,7 @@ public sealed class AgentGrpcService(EngineHost host, DriverRegistry registry, I
             r.FromDevice.Trim(), string.IsNullOrWhiteSpace(r.FromTag) ? null : r.FromTag.Trim(),
             r.ToDevice.Trim(), string.IsNullOrWhiteSpace(r.ToTag) ? null : r.ToTag.Trim())).ToArray();
         var moved = await Guard(() => host.Historian.RenameAsync(renames, context.CancellationToken));
-        logger.LogInformation("Histórico renombrado desde {Peer}: {Moved} tags", context.Peer, moved);
+        _audit.LogInformation("Histórico renombrado por {User}: {Moved} tags", AgentCaller.Describe(context), moved);
         return new Api.RenameHistoryReply { Moved = moved };
     }
 
@@ -258,7 +264,7 @@ public sealed class AgentGrpcService(EngineHost host, DriverRegistry registry, I
             throw new RpcException(new Status(StatusCode.InvalidArgument, "Indica el inicio y el final del intervalo que se borra."));
         var keys = request.Tags.Select(t => new TagKey(request.Device.Trim(), t.Trim())).ToArray();
         var deleted = await Guard(() => host.Historian.DeleteAsync(keys, request.From.ToDateTimeOffset(), request.To.ToDateTimeOffset(), context.CancellationToken));
-        logger.LogInformation("Histórico borrado desde {Peer}: {Deleted} muestras de {Device}/{Tags}", context.Peer, deleted, request.Device, string.Join(", ", request.Tags));
+        _audit.LogInformation("Histórico borrado por {User}: {Deleted} muestras de {Device}/{Tags}", AgentCaller.Describe(context), deleted, request.Device, string.Join(", ", request.Tags));
         return new Api.DeleteHistoryReply { Deleted = deleted };
     }
 

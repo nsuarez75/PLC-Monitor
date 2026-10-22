@@ -131,6 +131,12 @@ public sealed class AgentInfoCommand : AsyncCommand<AgentSettings>
             table.AddRow("Arrancado", AgentRuntime.DateTimeText(info.Started));
             table.AddRow("Configuración", Markup.Escape(info.ConfigPath));
             table.AddRow("Drivers", Markup.Escape(string.Join(", ", info.Drivers.Select(d => d.Id))));
+            table.AddRow("Acceso", info.Access switch
+            {
+                AccessLevel.Read => "[yellow]solo lectura[/]",
+                AccessLevel.Full => "completo",
+                _ => "completo (agente anterior a los roles)",
+            });
             if (info.Historian is { } h)
             {
                 table.AddRow("Historiador", h.Enabled

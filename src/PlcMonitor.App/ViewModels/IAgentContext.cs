@@ -14,6 +14,9 @@ public interface IAgentContext
     /// <summary>Muestra un mensaje en la barra de estado.</summary>
     void Report(string message, bool isError = false);
 
+    /// <summary>Se entró con el token de solo lectura: no se puede escribir ni cambiar nada en el agente.</summary>
+    bool ReadOnlyAccess => false;
+
     /// <summary>Nombre del agente para la cabecera de las imágenes exportadas («Agente planta»).</summary>
     string AgentTitle => "";
 

@@ -8,13 +8,21 @@ namespace PlcMonitor.Deploy;
 /// <param name="Port">Puerto TLS del agente.</param>
 /// <param name="RegenerateCredentials">Genera token y certificado nuevos aunque el equipo ya los tenga.</param>
 /// <param name="SudoPassword">Contraseña de sudo (Linux) si difiere de la SSH o se entra con clave.</param>
-public sealed record InstallOptions(IReadOnlyList<string> PackageFolders, int Port = 5311, bool RegenerateCredentials = false, string? SudoPassword = null);
+/// <param name="ReadOnlyToken">Si se generan credenciales, crea también un token de solo lectura.</param>
+public sealed record InstallOptions(IReadOnlyList<string> PackageFolders, int Port = 5311, bool RegenerateCredentials = false, string? SudoPassword = null, bool ReadOnlyToken = false);
+
+/// <summary>Opciones para renovar las credenciales de un agente instalado (sin reinstalarlo).</summary>
+/// <param name="Port">Puerto TLS del agente.</param>
+/// <param name="ReadOnlyToken">Crea un token de solo lectura; si no, el que hubiera queda revocado.</param>
+/// <param name="SudoPassword">Contraseña de sudo (Linux) si difiere de la SSH o se entra con clave.</param>
+public sealed record RenewOptions(int Port = 5311, bool ReadOnlyToken = false, string? SudoPassword = null);
 
 /// <summary>Resultado de una instalación.</summary>
 /// <param name="Url">URL del agente (https).</param>
 /// <param name="Token">Token nuevo, o null si se conservaron las credenciales que ya tenía el equipo.</param>
 /// <param name="CertificateThumbprint">Huella del certificado nuevo, o null si se conservó.</param>
-public sealed record InstallResult(RemotePlatform Platform, string Url, string? Token, string? CertificateThumbprint, string HostKeyFingerprint);
+/// <param name="ReadOnlyToken">Token de solo lectura nuevo, o null si no se pidió (o se conservaron las credenciales).</param>
+public sealed record InstallResult(RemotePlatform Platform, string Url, string? Token, string? CertificateThumbprint, string HostKeyFingerprint, string? ReadOnlyToken = null);
 
 /// <summary>Estado del agente en el equipo.</summary>
 public sealed record AgentStatus(RemotePlatform Platform, bool Installed, string ServiceState, string? Since)
@@ -56,19 +64,9 @@ public sealed class AgentDeployer(ISshSession session, IProgress<string>? progre
             ?? throw new DeployException($"No se encuentra el ejecutable del agente para {platform.Rid} ({AgentPackages.FileName(platform.Rid)}) en: {string.Join(", ", options.PackageFolders)}");
 
         var hasSecurity = (await RunPlatformAsync(platform, platform.Os == RemoteOs.Linux ? AgentScripts.LinuxHasSecurity : AgentScripts.WindowsHasSecurity, password, options.SudoPassword, elevated: !session.IsLocal, cancellationToken)).Output.Trim() == "yes";
-        string? token = null;
-        string? thumbprint = null;
-        AgentSecurityFiles? security = null;
+        NewCredentials? credentials = null;
         if (!hasSecurity || options.RegenerateCredentials)
-        {
-            Report("Generando token de acceso y certificado TLS…");
-            var hostName = (await session.RunAsync("hostname", cancellationToken: cancellationToken)).Output.Trim();
-            token = AgentSecurity.NewToken();
-            var pfxPassword = Convert.ToHexString(RandomNumberGenerator.GetBytes(16));
-            var (pfx, print) = AgentSecurity.CreateCertificate("plcmon-agent", [host, hostName, "localhost"], pfxPassword);
-            thumbprint = print;
-            security = new AgentSecurityFiles(AgentScripts.SettingsJson(AgentSecurity.HashToken(token), options.Port, pfxPassword), pfx);
-        }
+            credentials = await CreateCredentialsAsync(host, options.Port, options.ReadOnlyToken, cancellationToken);
         else
         {
             Report("El equipo ya tiene credenciales: se conservan (actualización).");
@@ -77,8 +75,8 @@ public sealed class AgentDeployer(ISshSession session, IProgress<string>? progre
         var remoteArchive = await UploadAsync(platform, package, password, cancellationToken);
         Report("Instalando el servicio…");
         var script = platform.Os == RemoteOs.Linux
-            ? AgentScripts.LinuxInstall(remoteArchive, security, options.Port)
-            : AgentScripts.WindowsInstall(remoteArchive.TrimStart('/').Replace('/', '\\'), security, options.Port);
+            ? AgentScripts.LinuxInstall(remoteArchive, credentials?.Files, options.Port)
+            : AgentScripts.WindowsInstall(remoteArchive.TrimStart('/').Replace('/', '\\'), credentials?.Files, options.Port);
         var result = await RunPlatformAsync(platform, script, password, options.SudoPassword, elevated: true, cancellationToken);
         foreach (var line in result.Output.Split('\n', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries).Where(l => l != "active"))
             Report(line);
@@ -86,7 +84,43 @@ public sealed class AgentDeployer(ISshSession session, IProgress<string>? progre
             throw new DeployException($"La instalación falló: {result.Detail}");
         var url = $"https://{host}:{options.Port}";
         Report($"Agente en marcha: {url}");
-        return new InstallResult(platform, url, token, thumbprint, session.HostKeyFingerprint);
+        return new InstallResult(platform, url, credentials?.Token, credentials?.Thumbprint, session.HostKeyFingerprint, credentials?.ReadOnlyToken);
+    }
+
+    /// <summary>
+    /// Renueva las credenciales de un agente instalado sin reinstalarlo: token y certificado nuevos (los anteriores dejan de
+    /// valer) y, si se pide, token de solo lectura (si no, el que hubiera queda revocado). Reinicia el servicio.
+    /// </summary>
+    public async Task<InstallResult> RenewCredentialsAsync(string host, RenewOptions options, string? password, CancellationToken cancellationToken = default)
+    {
+        ArgumentNullException.ThrowIfNull(options);
+        var platform = await DetectPlatformAsync(cancellationToken);
+        var credentials = await CreateCredentialsAsync(host, options.Port, options.ReadOnlyToken, cancellationToken);
+        Report("Cambiando las credenciales y reiniciando el agente…");
+        var script = platform.Os == RemoteOs.Linux ? AgentScripts.LinuxRenew(credentials.Files) : AgentScripts.WindowsRenew(credentials.Files);
+        var result = await RunPlatformAsync(platform, script, password, options.SudoPassword, elevated: true, cancellationToken);
+        if (!result.Success || !result.Output.Contains("active", StringComparison.Ordinal))
+            throw new DeployException($"No se pudieron renovar las credenciales: {result.Detail}");
+        var url = $"https://{host}:{options.Port}";
+        Report(credentials.ReadOnlyToken is null
+            ? "Credenciales renovadas: las anteriores ya no valen (sin token de lectura)."
+            : "Credenciales renovadas: las anteriores ya no valen; hay un token de lectura nuevo.");
+        return new InstallResult(platform, url, credentials.Token, credentials.Thumbprint, session.HostKeyFingerprint, credentials.ReadOnlyToken);
+    }
+
+    /// <summary>Credenciales recién generadas y los ficheros que se dejan en el equipo.</summary>
+    private sealed record NewCredentials(string Token, string? ReadOnlyToken, string Thumbprint, AgentSecurityFiles Files);
+
+    private async Task<NewCredentials> CreateCredentialsAsync(string host, int port, bool readOnlyToken, CancellationToken cancellationToken)
+    {
+        Report(readOnlyToken ? "Generando tokens de acceso (completo y de lectura) y certificado TLS…" : "Generando token de acceso y certificado TLS…");
+        var hostName = (await session.RunAsync("hostname", cancellationToken: cancellationToken)).Output.Trim();
+        var token = AgentSecurity.NewToken();
+        var reader = readOnlyToken ? AgentSecurity.NewToken() : null;
+        var pfxPassword = Convert.ToHexString(RandomNumberGenerator.GetBytes(16));
+        var (pfx, thumbprint) = AgentSecurity.CreateCertificate("plcmon-agent", [host, hostName, "localhost"], pfxPassword);
+        var settings = AgentScripts.SettingsJson(AgentSecurity.HashToken(token), port, pfxPassword, reader is null ? null : AgentSecurity.HashToken(reader));
+        return new NewCredentials(token, reader, thumbprint, new AgentSecurityFiles(settings, pfx));
     }
 
     public async Task UninstallAsync(bool keepConfiguration, string? password, string? sudoPassword = null, int port = 5311, CancellationToken cancellationToken = default)

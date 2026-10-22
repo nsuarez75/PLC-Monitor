@@ -116,7 +116,98 @@ public sealed class AgentDeployerTests : IDisposable
         var ssh = Linux(hasSecurity: true);
         var result = await Deployer(ssh).InstallAsync("pc", Options(regenerate: true), "secreto", Ct);
         result.Token.ShouldNotBeNull();
+        result.ReadOnlyToken.ShouldBeNull();
         InstallScript(ssh).ShouldContain("agent.settings.json\"");
+        Security(InstallScript(ssh)).TryGetProperty("ReadOnlyTokenSha256", out _).ShouldBeFalse();
+    }
+
+    [Fact]
+    public async Task Install_can_create_a_read_only_token_too()
+    {
+        var ssh = Linux();
+
+        var result = await Deployer(ssh).InstallAsync("pc", Options() with { ReadOnlyToken = true }, "secreto", Ct);
+
+        var security = Security(InstallScript(ssh));
+        AgentSecurity.Matches(result.Token, security.GetProperty("TokenSha256").GetString()!).ShouldBeTrue();
+        AgentSecurity.Matches(result.ReadOnlyToken.ShouldNotBeNull(), security.GetProperty("ReadOnlyTokenSha256").GetString()!).ShouldBeTrue();
+        result.ReadOnlyToken.ShouldNotBe(result.Token);
+    }
+
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public async Task Linux_credentials_are_renewed_without_reinstalling(bool readOnlyToken)
+    {
+        var ssh = Linux();
+
+        var result = await Deployer(ssh).RenewCredentialsAsync("192.168.0.20", new RenewOptions(5311, readOnlyToken), "secreto", Ct);
+
+        ssh.Uploads.ShouldBeEmpty();
+        var script = InstallScript(ssh);
+        script.ShouldNotContain("useradd");
+        script.ShouldNotContain("install -m 0755");
+        script.ShouldContain("chmod 600 \"$D/agent.settings.json\" \"$D/agent.pfx\"");
+        var security = Security(script);
+        AgentSecurity.Matches(result.Token, security.GetProperty("TokenSha256").GetString()!).ShouldBeTrue();
+        result.CertificateThumbprint.ShouldNotBeNull();
+        result.Url.ShouldBe("https://192.168.0.20:5311");
+        if (readOnlyToken)
+            AgentSecurity.Matches(result.ReadOnlyToken.ShouldNotBeNull(), security.GetProperty("ReadOnlyTokenSha256").GetString()!).ShouldBeTrue();
+        else
+        {
+            result.ReadOnlyToken.ShouldBeNull();
+            security.TryGetProperty("ReadOnlyTokenSha256", out _).ShouldBeFalse();
+        }
+    }
+
+    [Fact]
+    public async Task Windows_credentials_are_renewed_and_only_admins_can_read_them()
+    {
+        var ssh = Windows(script => script switch
+        {
+            _ when script.Contains("Restart-Service", StringComparison.Ordinal) => Ok("active"),
+            _ => Fail("script no previsto"),
+        }).On("hostname", Ok("PC-WIN\r\n"));
+
+        var result = await Deployer(ssh).RenewCredentialsAsync("pc-win", new RenewOptions(ReadOnlyToken: true), null, Ct);
+
+        result.ReadOnlyToken.ShouldNotBeNull();
+        var renew = ssh.PowerShellScripts.Single(s => s.Contains("Restart-Service", StringComparison.Ordinal));
+        renew.ShouldContain("icacls $p /inheritance:r /grant:r '*S-1-5-18:F' '*S-1-5-32-544:F'");
+        renew.ShouldNotContain("New-Service");
+        ssh.Uploads.ShouldBeEmpty();
+    }
+
+    [Fact]
+    public async Task Renewal_failure_is_reported()
+    {
+        var ssh = new FakeSsh()
+            .On("uname -sm", Ok("Linux x86_64\n"))
+            .On("hostname", Ok("pc\n"))
+            .On("id -u", Ok("0\n"))
+            .On(c => c.EndsWith("bash -s", StringComparison.Ordinal), (_, _) => Fail("El agente no está instalado en este equipo"));
+
+        (await Should.ThrowAsync<DeployException>(() => Deployer(ssh).RenewCredentialsAsync("pc", new RenewOptions(), null, Ct)))
+            .Message.ShouldContain("El agente no está instalado");
+    }
+
+    [Fact]
+    public void Windows_install_restricts_the_security_files_also_when_updating()
+    {
+        foreach (var script in new[] { AgentScripts.WindowsInstall(@"C:\Temp\a.exe", null, 5311), AgentScripts.WindowsInstall(@"C:\Temp\a.exe", new AgentSecurityFiles("{}", [1]), 5311) })
+        {
+            script.ShouldContain("foreach ($f in 'agent.settings.json', 'agent.pfx')");
+            script.ShouldContain("icacls $p /inheritance:r");
+            script.IndexOf("icacls $p", StringComparison.Ordinal).ShouldBeLessThan(script.LastIndexOf("Start-Service", StringComparison.Ordinal));
+        }
+    }
+
+    /// <summary>La sección Agent:Security del agent.settings.json que deja el script.</summary>
+    private static JsonElement Security(string script)
+    {
+        using var json = JsonDocument.Parse(Decode(script, "agent.settings.json"));
+        return json.RootElement.GetProperty("Agent").GetProperty("Security").Clone();
     }
 
     [Theory]
@@ -240,11 +331,12 @@ public sealed class AgentDeployerTests : IDisposable
     public void Generated_windows_scripts_are_valid_powershell()
     {
         var shell = OperatingSystem.IsWindows() ? "powershell" : "pwsh";
-        var files = new AgentSecurityFiles(AgentScripts.SettingsJson("ABC", 5311, "clave"), [1, 2, 3]);
+        var files = new AgentSecurityFiles(AgentScripts.SettingsJson("ABC", 5311, "clave", "DEF"), [1, 2, 3]);
         foreach (var script in new[]
                  {
                      AgentScripts.WindowsInstall(@"C:\Temp\a.exe", files, 5311),
                      AgentScripts.WindowsInstall(@"C:\Temp\a.exe", null, 5311),
+                     AgentScripts.WindowsRenew(files),
                      AgentScripts.WindowsUninstall(true),
                      AgentScripts.WindowsUninstall(false),
                      AgentScripts.WindowsStatus,
@@ -319,11 +411,12 @@ public sealed class AgentDeployerTests : IDisposable
     {
         var bash = Bash();
         Assert.SkipWhen(bash is null, "No hay bash (en Windows hace falta Git para Windows)");
-        var files = new AgentSecurityFiles(AgentScripts.SettingsJson("ABC", 5311, "clave"), [1, 2, 3]);
+        var files = new AgentSecurityFiles(AgentScripts.SettingsJson("ABC", 5311, "clave", "DEF"), [1, 2, 3]);
         foreach (var script in new[]
                  {
                      AgentScripts.LinuxInstall("/tmp/x", files, 5311),
                      AgentScripts.LinuxInstall("/tmp/x", null, 5311),
+                     AgentScripts.LinuxRenew(files),
                      AgentScripts.LinuxUninstall(true, 5311),
                      AgentScripts.LinuxUninstall(false, 5311),
                      AgentScripts.LinuxStatus,

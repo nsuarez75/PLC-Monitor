@@ -266,6 +266,10 @@ public sealed partial class MainViewModel : ObservableObject, IAgentContext, IAs
     [ObservableProperty]
     public partial string AgentDescription { get; set; } = "";
 
+    /// <summary>Conectado con el token de solo lectura: no se ofrece escribir en los tags.</summary>
+    [ObservableProperty]
+    public partial bool ReadOnlyAccess { get; set; }
+
     [ObservableProperty]
     [NotifyCanExecuteChangedFor(nameof(EditDeviceCommand), nameof(DeleteDeviceCommand))]
     public partial DeviceViewModel? SelectedDevice { get; set; }
@@ -436,6 +440,7 @@ public sealed partial class MainViewModel : ObservableObject, IAgentContext, IAs
         SetTransforms([]);
         SelectedDevice = null;
         AgentDescription = "";
+        ReadOnlyAccess = false;
         TagsChanged?.Invoke(this, EventArgs.Empty);
         Report("Desconectado");
     }
@@ -625,7 +630,9 @@ public sealed partial class MainViewModel : ObservableObject, IAgentContext, IAs
     {
         Drivers = [.. info.Drivers];
         HistorianEnabled = info.Historian?.Enabled ?? false;
-        AgentDescription = $"{info.Machine} · {info.Os} · v{info.Version.Split('+')[0]}";
+        // Un agente anterior a los roles no dice nada (UNSPECIFIED): su único token es de acceso completo.
+        ReadOnlyAccess = info.Access == AccessLevel.Read;
+        AgentDescription = $"{info.Machine} · {info.Os} · v{info.Version.Split('+')[0]}{(ReadOnlyAccess ? " · solo lectura" : "")}";
     }
 
     // La información del agente se acaba de leer al conectar: la primera foto no hace falta que la vuelva a pedir.

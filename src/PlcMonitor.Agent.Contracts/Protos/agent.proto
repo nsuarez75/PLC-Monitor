@@ -11,7 +11,10 @@ import "google/protobuf/empty.proto";
 import "google/protobuf/timestamp.proto";
 
 service AgentService {
-  // Versión del agente, máquina y drivers disponibles.
+  // Versión del agente, máquina, drivers disponibles y acceso de quien llama.
+  // Seguridad: si el agente tiene token, todas las llamadas lo exigen (UNAUTHENTICATED si falta). Con el token de solo
+  // lectura, SetDeviceEnabled, Write, PutDevice, DeleteDevice, PutTransforms, RenameHistory y DeleteHistory devuelven
+  // PERMISSION_DENIED.
   rpc GetInfo(google.protobuf.Empty) returns (AgentInfo);
 
   // Dispositivos configurados con su estado de conexión.
@@ -122,6 +125,17 @@ message AgentInfo {
   string config_path = 5;
   repeated Driver drivers = 6;
   HistorianInfo historian = 7;
+  // Acceso de quien llama, según el token con el que entró.
+  AccessLevel access = 8;
+}
+
+enum AccessLevel {
+  // Agente anterior a los roles (1.11 o antes): un solo token, acceso completo.
+  ACCESS_LEVEL_UNSPECIFIED = 0;
+  // Token de solo lectura: leer, suscribirse, explorar, ver la configuración y el histórico. Lo demás: PERMISSION_DENIED.
+  ACCESS_LEVEL_READ = 1;
+  // Token completo (o agente local sin token): además escribir, configurar y borrar o renombrar histórico.
+  ACCESS_LEVEL_FULL = 2;
 }
 
 message HistorianInfo {

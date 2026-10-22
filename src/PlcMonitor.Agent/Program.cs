@@ -50,8 +50,17 @@ builder.Services.AddGrpc(o => o.Interceptors.Add<TokenAuthInterceptor>());
 
 var app = builder.Build();
 
+// Sin token solo se escucha en este equipo: si la configuración abre la API a la red sin protección, no se arranca.
+if (ListenGuard.Problem(app.Configuration, app.Services.GetRequiredService<Microsoft.Extensions.Options.IOptions<AgentSecurityOptions>>().Value) is { } problem)
+{
+    app.Logger.LogCritical("{Problem}", problem);
+    await app.DisposeAsync();
+    return 1;
+}
+
 app.MapGrpcService<AgentGrpcService>();
 await app.RunAsync();
+return 0;
 
 /// <summary>Punto de entrada (público para las pruebas con WebApplicationFactory).</summary>
 public partial class Program;
