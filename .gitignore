@@ -26,3 +26,6 @@ key_*.log
 *.db-shm
 
 artifacts/
+
+# Configuración local de Claude Code (permisos)
+.claude/
