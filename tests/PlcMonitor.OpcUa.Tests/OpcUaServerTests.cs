@@ -172,6 +172,33 @@ public class OpcUaServerTests
     }
 
     [Fact]
+    public async Task Only_published_devices_and_tags_are_exposed_and_the_keys_apply_live()
+    {
+        await using var f = new OpcUaFixture(devices:
+        [
+            Device("visible", tags: [Tag("DB1.DBW0", "si"), Tag("DB1.DBW2", "oculto", published: false)]),
+            Device("privado", published: false, writesEnabled: false, Tag("DB1.DBW0", "x")),
+        ]);
+        await f.StartAsync();
+        var session = await f.ConnectAsync();
+
+        (await ExistsAsync(session, Node(session, "visible/si"))).ShouldBeTrue();
+        (await ExistsAsync(session, Node(session, "visible/oculto"))).ShouldBeFalse();
+        (await ExistsAsync(session, Node(session, "dispositivo:privado"))).ShouldBeFalse();
+        (await ExistsAsync(session, Node(session, "privado/x"))).ShouldBeFalse();
+
+        await f.Engine.PutDeviceAsync(Device("privado", published: true, writesEnabled: false, Tag("DB1.DBW0", "x")));
+        await f.Engine.PutDeviceAsync(Device("visible", tags: [Tag("DB1.DBW0", "si", published: false), Tag("DB1.DBW2", "oculto")]));
+
+        await EventuallyAsync(() => ExistsAsync(session, Node(session, "privado/x")), e => e);
+        await EventuallyAsync(() => ExistsAsync(session, Node(session, "visible/oculto")), e => e);
+        await EventuallyAsync(() => ExistsAsync(session, Node(session, "visible/si")), e => !e);
+
+        await f.Engine.PutDeviceAsync(Device("visible", published: false, writesEnabled: false, Tag("DB1.DBW2", "oculto")));
+        await EventuallyAsync(() => ExistsAsync(session, Node(session, "dispositivo:visible")), e => !e);
+    }
+
+    [Fact]
     public async Task History_of_historized_tags_can_be_read()
     {
         await using var f = new OpcUaFixture(historian: true, Device("plc1", tags: [Tag("DB1.DBW0", "nivel", historized: true)]));

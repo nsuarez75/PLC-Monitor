@@ -182,6 +182,8 @@ message Device {
   // Próximo intento de conexión cuando está esperando para reconectar.
   google.protobuf.Timestamp next_retry = 8;
   int32 tag_count = 9;
+  // Primera llave de publicación en el servidor OPC UA del agente.
+  bool opc_ua_published = 10;
 }
 
 message DeviceList {
@@ -370,6 +372,9 @@ message TagConfig {
   optional int32 decimals = 9;
   // Escalado a unidades de ingeniería: el agente lo aplica al leer y a la inversa al escribir; ausente = ninguno.
   Scaling scaling = 10;
+  // Segunda llave de publicación en OPC UA, al revés: true = no se publica aunque el dispositivo sí. Así, lo que no
+  // envía un cliente anterior (false) deja el tag publicado, que es el valor por defecto.
+  bool opc_ua_hidden = 11;
 }
 
 message HistoryConfig {
@@ -460,6 +465,8 @@ message DeviceConfig {
   string settings_json = 5;
   ReconnectConfig reconnect = 6;
   repeated ScanGroupConfig scan_groups = 7;
+  // Primera llave de publicación en OPC UA: sin ella el dispositivo no aparece en el servidor OPC UA.
+  bool opc_ua_published = 8;
 }
 
 message Configuration {

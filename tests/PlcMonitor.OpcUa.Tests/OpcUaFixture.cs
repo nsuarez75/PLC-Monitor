@@ -49,22 +49,26 @@ internal sealed class OpcUaFixture : IAsyncDisposable
 
     public string Url => $"opc.tcp://localhost:{Port}";
 
-    public static DeviceConfiguration Device(string name, bool writesEnabled = false, params TagConfiguration[] tags) => new()
+    public static DeviceConfiguration Device(string name, bool writesEnabled = false, params TagConfiguration[] tags) => Device(name, true, writesEnabled, tags);
+
+    public static DeviceConfiguration Device(string name, bool published, bool writesEnabled, params TagConfiguration[] tags) => new()
     {
         Name = name,
         Driver = FakeDriverFactory.Id,
         Enabled = true,
         WritesEnabled = writesEnabled,
+        OpcUaPublished = published,
         Settings = FakeDriverFactory.Settings(),
         Reconnect = new ReconnectSettings { InitialDelayMs = 100, MaxDelayMs = 200 },
         ScanGroups = { new ScanGroupConfiguration { Name = "g", IntervalMs = 50, Tags = [.. tags] } },
     };
 
-    public static TagConfiguration Tag(string address, string name, bool writable = false, string? folder = null, bool historized = false) => new()
+    public static TagConfiguration Tag(string address, string name, bool writable = false, string? folder = null, bool historized = false, bool published = true) => new()
     {
         Address = address,
         Name = name,
         Writable = writable,
+        OpcUaPublished = published,
         Folder = folder,
         History = historized ? new TagHistorySettings { Enabled = true } : null,
     };

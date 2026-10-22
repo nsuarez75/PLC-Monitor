@@ -8,6 +8,33 @@ public class ProtoMapperTests
     private static readonly DateTimeOffset Now = new(2026, 10, 14, 12, 0, 0, TimeSpan.Zero);
 
     [Fact]
+    public void Opc_ua_keys_round_trip_and_tags_without_the_field_stay_published()
+    {
+        var device = new PlcMonitor.Engine.Configuration.DeviceConfiguration
+        {
+            Name = "plc1",
+            Driver = "fake",
+            OpcUaPublished = true,
+            ScanGroups = { new PlcMonitor.Engine.Configuration.ScanGroupConfiguration { Name = "g", IntervalMs = 100, Tags = [
+                new PlcMonitor.Engine.Configuration.TagConfiguration { Address = "DB1.DBW0", OpcUaPublished = false },
+                new PlcMonitor.Engine.Configuration.TagConfiguration { Address = "DB1.DBW2" },
+            ] } },
+        };
+
+        var pb = ProtoMapper.ToProto(device);
+
+        pb.OpcUaPublished.ShouldBeTrue();
+        pb.ScanGroups[0].Tags.Select(t => t.OpcUaHidden).ShouldBe([true, false]);
+        var back = ProtoMapper.FromProto(pb);
+        back.OpcUaPublished.ShouldBeTrue();
+        back.ScanGroups[0].Tags.Select(t => t.OpcUaPublished).ShouldBe([false, true]);
+        // Un cliente anterior no manda los campos: dispositivo sin publicar y tags publicados.
+        var old = ProtoMapper.FromProto(new Api.DeviceConfig { Name = "plc2", Driver = "fake", ScanGroups = { new Api.ScanGroupConfig { Name = "g", IntervalMs = 100, Tags = { new Api.TagConfig { Address = "DB1.DBW0" } } } } });
+        old.OpcUaPublished.ShouldBeFalse();
+        old.ScanGroups[0].Tags[0].OpcUaPublished.ShouldBeTrue();
+    }
+
+    [Fact]
     public void Every_quality_has_a_proto_equivalent()
     {
         foreach (var quality in Enum.GetValues<QualityCode>())

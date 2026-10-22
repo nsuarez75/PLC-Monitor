@@ -50,7 +50,7 @@ internal sealed class DeviceSupervisor : IAsyncDisposable
         _sink = sink;
         Tags = BuildTags(config);
         _status = new DeviceStatus(config.Name, config.Driver, Enabled: false, config.WritesEnabled,
-            ConnectionState.Disconnected, DisabledDetail, time.GetUtcNow());
+            ConnectionState.Disconnected, DisabledDetail, time.GetUtcNow(), OpcUaPublished: config.OpcUaPublished);
     }
 
     public string Name => _config.Name;
@@ -68,11 +68,12 @@ internal sealed class DeviceSupervisor : IAsyncDisposable
             Unit = string.IsNullOrWhiteSpace(t.Unit) ? null : t.Unit,
             Decimals = t.Decimals,
             Scaling = t.Scaling,
+            OpcUaPublished = t.OpcUaPublished,
         }))
         .ToArray();
 
     /// <summary>
-    /// Cambia en caliente los grupos, los tags y la llave de escritura sin tocar la conexión: los grupos de escaneo se
+    /// Cambia en caliente los grupos, los tags y las llaves de escritura y de OPC UA sin tocar la conexión: los grupos de escaneo se
     /// rehacen y siguen leyendo con la misma sesión. Solo vale si driver, ajustes de conexión y reconexión no cambian.
     /// </summary>
     public void Reconfigure(DeviceConfiguration config)
@@ -84,7 +85,7 @@ internal sealed class DeviceSupervisor : IAsyncDisposable
             Tags = BuildTags(config);
             regroup = _regroup;
         }
-        SetStatus(s => s with { WritesEnabled = config.WritesEnabled });
+        SetStatus(s => s with { WritesEnabled = config.WritesEnabled, OpcUaPublished = config.OpcUaPublished });
         try
         {
             regroup?.Cancel();

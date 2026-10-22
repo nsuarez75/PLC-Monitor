@@ -211,6 +211,12 @@ public sealed class DeviceConfiguration
     /// <summary>Primera llave de escritura: si es false no se escribe en ningún tag del dispositivo.</summary>
     public bool WritesEnabled { get; set; }
 
+    /// <summary>
+    /// Primera llave de publicación en OPC UA: si es false el dispositivo no aparece en el servidor OPC UA (desactivada
+    /// por defecto). Sus tags se publican si además tienen <see cref="TagConfiguration.OpcUaPublished"/>.
+    /// </summary>
+    public bool OpcUaPublished { get; set; }
+
     /// <summary>Ajustes propios del driver (los mismos que acepta su factoría).</summary>
     public JsonElement Settings { get; set; }
 
@@ -251,6 +257,9 @@ public sealed class TagConfiguration
 
     /// <summary>Segunda llave de escritura: el tag se puede escribir solo si además el dispositivo tiene WritesEnabled.</summary>
     public bool Writable { get; set; }
+
+    /// <summary>Segunda llave de publicación en OPC UA (activada por defecto): vale si el dispositivo también se publica.</summary>
+    public bool OpcUaPublished { get; set; } = true;
 
     /// <summary>Tipo para interpretar los valores escritos cuando el driver no lo deduce de la dirección.</summary>
     public TagDataType? DataType { get; set; }

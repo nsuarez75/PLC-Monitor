@@ -33,6 +33,9 @@ public sealed record TagDefinition(TagKey Key, string Address, string Group, Tim
 
     /// <summary>Escalado a unidades de ingeniería que el motor aplica al leer y, a la inversa, al escribir; null = ninguno.</summary>
     public Configuration.TagScaling? Scaling { get; init; }
+
+    /// <summary>Segunda llave de publicación en OPC UA (la primera es la del dispositivo).</summary>
+    public bool OpcUaPublished { get; init; } = true;
 }
 
 /// <summary>Definición de un tag con su último valor conocido.</summary>
@@ -47,6 +50,7 @@ public sealed record TagSnapshot(TagDefinition Definition, TagValue Value);
 /// <param name="Detail">Motivo del último error o cambio.</param>
 /// <param name="Timestamp">Momento del cambio de estado.</param>
 /// <param name="NextRetry">Próximo intento de conexión, si está esperando para reconectar.</param>
+/// <param name="OpcUaPublished">Primera llave de publicación en OPC UA.</param>
 public sealed record DeviceStatus(
     string Device,
     string Driver,
@@ -55,7 +59,8 @@ public sealed record DeviceStatus(
     ConnectionState State,
     string? Detail,
     DateTimeOffset Timestamp,
-    DateTimeOffset? NextRetry = null);
+    DateTimeOffset? NextRetry = null,
+    bool OpcUaPublished = false);
 
 /// <summary>Evento que el motor difunde a sus suscriptores.</summary>
 public abstract record EngineEvent;

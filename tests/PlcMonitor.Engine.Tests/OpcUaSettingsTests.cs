@@ -66,6 +66,37 @@ public class OpcUaSettingsTests
     }
 
     [Fact]
+    public void Devices_are_not_published_by_default_but_their_tags_are()
+    {
+        var configuration = ConfigurationFile.Parse("""{ "devices": [ { "name": "plc1", "driver": "fake", "scanGroups": [ { "name": "g", "tags": [ { "address": "DB1.DBW0" } ] } ] } ] }""");
+
+        var device = configuration.Devices.ShouldHaveSingleItem();
+        device.OpcUaPublished.ShouldBeFalse();
+        device.ScanGroups[0].Tags.ShouldHaveSingleItem().OpcUaPublished.ShouldBeTrue();
+    }
+
+    [Fact]
+    public async Task Publishing_keys_are_applied_without_reconnecting()
+    {
+        var published = Device("plc1", tags: [Tag("DB1.DBW0", "a")]);
+        await using var h = new EngineHarness(published);
+        var plc = h.Driver.Plc("plc1");
+        plc.Values["DB1.DBW0"] = 1;
+        await h.Engine.StartAsync();
+        await WaitUntilAsync(() => h.Value("plc1", "a").Quality == PlcMonitor.Abstractions.QualityCode.Good);
+        h.Engine.GetDevice("plc1").OpcUaPublished.ShouldBeFalse();
+
+        var next = Device("plc1", tags: [Tag("DB1.DBW0", "a")]);
+        next.OpcUaPublished = true;
+        next.ScanGroups[0].Tags[0].OpcUaPublished = false;
+        await h.Engine.PutDeviceAsync(next);
+
+        h.Engine.GetDevice("plc1").OpcUaPublished.ShouldBeTrue();
+        h.Engine.GetTags("plc1").Single().Definition.OpcUaPublished.ShouldBeFalse();
+        plc.ConnectCount.ShouldBe(1);
+    }
+
+    [Fact]
     public void Older_configurations_without_opc_ua_load_with_the_defaults()
     {
         var configuration = ConfigurationFile.Parse("""{ "devices": [] }""");
