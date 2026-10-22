@@ -1,0 +1,17 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:ch="using:PlcMonitor.App.Charts"
+             xmlns:v="using:PlcMonitor.App.Views"
+             x:Class="PlcMonitor.App.Views.ChartImage"
+             x:DataType="ch:ChartViewModel">
+  <!-- Lo que va en el PNG: título, periodo y origen, y la gráfica (con su propia leyenda). -->
+  <DockPanel>
+    <StackPanel DockPanel.Dock="Top" Spacing="2" Margin="0,0,0,10">
+      <TextBlock x:Name="TitleText" FontSize="16" FontWeight="SemiBold" TextTrimming="CharacterEllipsis" />
+      <TextBlock x:Name="SubtitleText" Classes="muted" FontSize="12" TextTrimming="CharacterEllipsis" />
+    </StackPanel>
+    <TextBlock DockPanel.Dock="Bottom" Classes="muted" FontSize="11" FontWeight="SemiBold" Margin="2,4,0,0" Text="{Binding Caption}"
+               IsVisible="{Binding Caption, Converter={x:Static StringConverters.IsNotNullOrEmpty}}" />
+    <v:ChartCanvas />
+  </DockPanel>
+</UserControl>

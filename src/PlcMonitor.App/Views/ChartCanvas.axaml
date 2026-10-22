@@ -1,0 +1,32 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:ch="using:PlcMonitor.App.Charts"
+             xmlns:c="using:PlcMonitor.App.Controls"
+             x:Class="PlcMonitor.App.Views.ChartCanvas"
+             x:DataType="ch:ChartViewModel">
+  <!-- La gráfica del tipo elegido (la misma en pantalla y en la imagen exportada). -->
+  <Panel>
+    <c:TrendChart x:Name="Chart" MinHeight="220" IsVisible="{Binding IsTrend}"
+                  Series="{Binding Series}" From="{Binding From}" To="{Binding To}"
+                  YMin="{Binding YMin}" YMax="{Binding YMax}" Revision="{Binding Revision}" EmptyText="{Binding EmptyText}"
+                  SeparateAxes="{Binding SeparateAxes}" CursorsEnabled="{Binding ShowCursors}"
+                  CursorA="{Binding CursorA}" CursorB="{Binding CursorB}" />
+    <c:StateChart x:Name="States" MinHeight="220" IsVisible="{Binding IsStates}"
+                  Series="{Binding Series}" From="{Binding From}" To="{Binding To}"
+                  Revision="{Binding Revision}" EmptyText="{Binding EmptyText}" />
+    <c:XYChart MinHeight="220" IsVisible="{Binding IsXY}"
+               Curves="{Binding Curves}" Bands="{Binding Bands}" XLabel="{Binding XLabel}" ZeroLine="{Binding IsCycles}"
+               YMin="{Binding YMin}" YMax="{Binding YMax}" Revision="{Binding Revision}" EmptyText="{Binding EmptyText}" />
+    <c:HistogramChart MinHeight="220" IsVisible="{Binding IsHistogram}"
+                      Series="{Binding Series}" From="{Binding From}" To="{Binding To}"
+                      LowLimit="{Binding LowLimit}" HighLimit="{Binding HighLimit}" XMin="{Binding YMin}" XMax="{Binding YMax}"
+                      Revision="{Binding Revision}" EmptyText="{Binding EmptyText}" />
+    <c:GaugePanel MinHeight="220" IsVisible="{Binding IsGauges}"
+                  Series="{Binding Series}" From="{Binding From}" To="{Binding To}" StyleKind="{Binding GaugeStyle}"
+                  LowLimit="{Binding LowLimit}" HighLimit="{Binding HighLimit}" ScaleMin="{Binding YMin}" ScaleMax="{Binding YMax}"
+                  Revision="{Binding Revision}" EmptyText="{Binding EmptyText}" />
+    <c:BarChart MinHeight="220" IsVisible="{Binding IsBars}"
+                Series="{Binding Series}" Period="{Binding BarPeriod}" ShiftStartHour="{Binding ShiftStartHour}"
+                YMin="{Binding YMin}" YMax="{Binding YMax}" Revision="{Binding Revision}" EmptyText="{Binding EmptyText}" />
+  </Panel>
+</UserControl>

@@ -91,7 +91,7 @@ public sealed partial class ChartViewModel : ObservableObject
 
     /// <summary>Tipo de gráfica: la tendencia y el cronograma usan <see cref="Series"/>; ciclos y X-Y, <see cref="Curves"/>.</summary>
     [ObservableProperty]
-    [NotifyPropertyChangedFor(nameof(IsTrend), nameof(IsStates), nameof(IsXY), nameof(IsCycles), nameof(IsHistogram), nameof(IsGauges), nameof(IsBars), nameof(HasYAxis), nameof(Hint), nameof(CanSeparateAxes), nameof(AxisText))]
+    [NotifyPropertyChangedFor(nameof(IsTrend), nameof(IsStates), nameof(IsXY), nameof(IsCycles), nameof(IsHistogram), nameof(IsGauges), nameof(IsBars), nameof(HasYAxis), nameof(Hint), nameof(CanSeparateAxes), nameof(AxisText), nameof(CanShowStats), nameof(StatsVisible))]
     public partial ChartKind Kind { get; set; } = ChartKind.Trend;
 
     public bool IsTrend => Kind == ChartKind.Trend;
@@ -155,6 +155,49 @@ public sealed partial class ChartViewModel : ObservableObject
 
     [ObservableProperty]
     public partial int ShiftStartHour { get; set; } = 6;
+
+    /// <summary>Título de la imagen exportada (el nombre de la vista o de lo que se consulta).</summary>
+    [ObservableProperty]
+    public partial string Title { get; set; } = "";
+
+    /// <summary>De dónde salen los datos, para la cabecera de la imagen (el agente o el CSV).</summary>
+    [ObservableProperty]
+    public partial string Source { get; set; } = "";
+
+    /// <summary>Tabla de estadísticas bajo la gráfica (solo en las de tiempo: tendencia y cronograma).</summary>
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(StatsVisible))]
+    public partial bool ShowStats { get; set; }
+
+    public bool CanShowStats => Kind is ChartKind.Trend or ChartKind.States;
+
+    public bool StatsVisible => ShowStats && CanShowStats;
+
+    /// <summary>Estadísticas de los tags marcados en la ventana visible (vacía si no se muestran).</summary>
+    [ObservableProperty]
+    public partial IReadOnlyList<SeriesStatsRow> Stats { get; private set; } = [];
+
+    partial void OnShowStatsChanged(bool value) => RefreshStats();
+
+    partial void OnFromChanged(DateTimeOffset? value) => RefreshStats();
+
+    partial void OnToChanged(DateTimeOffset? value) => RefreshStats();
+
+    partial void OnRevisionChanged(int value) => RefreshStats();
+
+    partial void OnKindChanged(ChartKind value) => RefreshStats();
+
+    /// <summary>Recalcula <see cref="Stats"/> si se ven (con la ventana visible, zoom incluido).</summary>
+    public void RefreshStats()
+    {
+        if (!StatsVisible || From is not { } from || To is not { } to)
+        {
+            if (Stats.Count > 0)
+                Stats = [];
+            return;
+        }
+        Stats = Series.Select(s => SeriesStats.Compute(s, from, to)).ToArray();
+    }
 
     /// <summary>Gráfica con eje X numérico (ciclos superpuestos o X-Y).</summary>
     public bool IsXY => Kind is ChartKind.Cycles or ChartKind.XY;

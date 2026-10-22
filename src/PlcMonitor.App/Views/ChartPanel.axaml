@@ -2,9 +2,14 @@
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
              xmlns:ch="using:PlcMonitor.App.Charts"
              xmlns:c="using:PlcMonitor.App.Controls"
+             xmlns:v="using:PlcMonitor.App.Views"
              x:Class="PlcMonitor.App.Views.ChartPanel"
              x:DataType="ch:ChartViewModel">
-  <!-- Gráfica con sus controles: tags a mostrar, límites del eje Y y zoom (arrastrar sobre la gráfica; «Ajustar» lo quita). -->
+  <!-- Gráfica con sus controles: tags a mostrar, límites del eje Y, zoom (arrastrar sobre la gráfica; «Ajustar» lo quita),
+       estadísticas de la ventana y exportar la imagen. -->
+  <Panel>
+  <!-- Aquí se monta un momento la imagen que se exporta (tamaño cero: no se ve). -->
+  <Canvas x:Name="ExportHost" Width="0" Height="0" ClipToBounds="True" HorizontalAlignment="Left" VerticalAlignment="Top" />
   <DockPanel>
     <Grid DockPanel.Dock="Top" ColumnDefinitions="*,Auto" ColumnSpacing="16" Margin="0,0,0,8">
       <ItemsControl ItemsSource="{Binding Options}" VerticalAlignment="Center">
@@ -46,35 +51,80 @@
             <TextBlock Text="Ajustar" />
           </StackPanel>
         </Button>
+        <CheckBox Content="Estadísticas" IsChecked="{Binding ShowStats}" IsVisible="{Binding CanShowStats}"
+                  ToolTip.Tip="Mín, máx, media ponderada en el tiempo, σ y más de cada tag en la ventana que se ve (con el zoom)" />
+        <Button x:Name="SavePng" Classes="ghost" ToolTip.Tip="Exportar la gráfica a PNG (con título, periodo y leyenda, fondo blanco)">
+          <c:Icon Kind="image" />
+        </Button>
+        <Button x:Name="CopyPng" Classes="ghost" ToolTip.Tip="Copiar la imagen de la gráfica al portapapeles">
+          <c:Icon Kind="copy" />
+        </Button>
       </StackPanel>
     </Grid>
     <Grid DockPanel.Dock="Bottom" ColumnDefinitions="*,Auto" ColumnSpacing="12" Margin="2,4,0,0">
       <TextBlock Classes="muted" FontSize="11" Text="{Binding Hint}" TextTrimming="CharacterEllipsis" />
       <TextBlock Grid.Column="1" Classes="muted" Classes.error="{Binding CaptionAlarm}" FontSize="11" FontWeight="SemiBold" Text="{Binding Caption}" />
     </Grid>
-    <Panel>
-      <c:TrendChart x:Name="Chart" MinHeight="220" IsVisible="{Binding IsTrend}"
-                    Series="{Binding Series}" From="{Binding From}" To="{Binding To}"
-                    YMin="{Binding YMin}" YMax="{Binding YMax}" Revision="{Binding Revision}" EmptyText="{Binding EmptyText}"
-                    SeparateAxes="{Binding SeparateAxes}" CursorsEnabled="{Binding ShowCursors}"
-                    CursorA="{Binding CursorA}" CursorB="{Binding CursorB}" />
-      <c:StateChart x:Name="States" MinHeight="220" IsVisible="{Binding IsStates}"
-                    Series="{Binding Series}" From="{Binding From}" To="{Binding To}"
-                    Revision="{Binding Revision}" EmptyText="{Binding EmptyText}" />
-      <c:XYChart MinHeight="220" IsVisible="{Binding IsXY}"
-                 Curves="{Binding Curves}" Bands="{Binding Bands}" XLabel="{Binding XLabel}" ZeroLine="{Binding IsCycles}"
-                 YMin="{Binding YMin}" YMax="{Binding YMax}" Revision="{Binding Revision}" EmptyText="{Binding EmptyText}" />
-      <c:HistogramChart MinHeight="220" IsVisible="{Binding IsHistogram}"
-                        Series="{Binding Series}" From="{Binding From}" To="{Binding To}"
-                        LowLimit="{Binding LowLimit}" HighLimit="{Binding HighLimit}" XMin="{Binding YMin}" XMax="{Binding YMax}"
-                        Revision="{Binding Revision}" EmptyText="{Binding EmptyText}" />
-      <c:GaugePanel MinHeight="220" IsVisible="{Binding IsGauges}"
-                    Series="{Binding Series}" From="{Binding From}" To="{Binding To}" StyleKind="{Binding GaugeStyle}"
-                    LowLimit="{Binding LowLimit}" HighLimit="{Binding HighLimit}" ScaleMin="{Binding YMin}" ScaleMax="{Binding YMax}"
-                    Revision="{Binding Revision}" EmptyText="{Binding EmptyText}" />
-      <c:BarChart MinHeight="220" IsVisible="{Binding IsBars}"
-                  Series="{Binding Series}" Period="{Binding BarPeriod}" ShiftStartHour="{Binding ShiftStartHour}"
-                  YMin="{Binding YMin}" YMax="{Binding YMax}" Revision="{Binding Revision}" EmptyText="{Binding EmptyText}" />
-    </Panel>
+    <!-- Estadísticas de los tags marcados en la ventana visible -->
+    <Border DockPanel.Dock="Bottom" Classes="card" Margin="0,8,0,0" Padding="0,0,0,6" IsVisible="{Binding StatsVisible}">
+      <DockPanel>
+        <Grid DockPanel.Dock="Top" ColumnDefinitions="*,Auto" Margin="12,8,8,4">
+          <TextBlock Text="ESTADÍSTICAS DE LA VENTANA VISIBLE" Classes="muted" FontSize="11" FontWeight="SemiBold" VerticalAlignment="Center" />
+          <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="4">
+            <Button x:Name="CopyStats" Classes="ghost" ToolTip.Tip="Copiar la tabla (para pegarla en una hoja de cálculo)">
+              <StackPanel Orientation="Horizontal" Spacing="6">
+                <c:Icon Kind="copy" />
+                <TextBlock Text="Copiar" />
+              </StackPanel>
+            </Button>
+            <Button x:Name="SaveStats" Classes="ghost" ToolTip.Tip="Guardar las estadísticas en un CSV">
+              <StackPanel Orientation="Horizontal" Spacing="6">
+                <c:Icon Kind="download" />
+                <TextBlock Text="CSV" />
+              </StackPanel>
+            </Button>
+          </StackPanel>
+        </Grid>
+        <ScrollViewer HorizontalScrollBarVisibility="Auto" VerticalScrollBarVisibility="Auto" MaxHeight="200">
+          <StackPanel Margin="12,0">
+            <Grid Classes="tablehead" ColumnDefinitions="180,170,170,120,90,100,100,90,80,70" ColumnSpacing="10" Margin="0,2,0,4">
+              <TextBlock Text="TAG" />
+              <TextBlock Grid.Column="1" Text="MÍN" />
+              <TextBlock Grid.Column="2" Text="MÁX" />
+              <TextBlock Grid.Column="3" Text="MEDIA" />
+              <TextBlock Grid.Column="4" Text="σ" />
+              <TextBlock Grid.Column="5" Text="PRIMERO" />
+              <TextBlock Grid.Column="6" Text="ÚLTIMO" />
+              <TextBlock Grid.Column="7" Text="Δ" />
+              <TextBlock Grid.Column="8" Text="MUESTRAS" />
+              <TextBlock Grid.Column="9" Text="FLANCOS ↑" />
+            </Grid>
+            <ItemsControl ItemsSource="{Binding Stats}">
+              <ItemsControl.ItemTemplate>
+                <DataTemplate x:DataType="ch:SeriesStatsRow">
+                  <Grid ColumnDefinitions="180,170,170,120,90,100,100,90,80,70" ColumnSpacing="10" Margin="0,2">
+                    <StackPanel Orientation="Horizontal" Spacing="7">
+                      <c:ChartSwatch ColorIndex="{Binding ColorIndex}" VerticalAlignment="Center" />
+                      <TextBlock Text="{Binding Name}" FontWeight="SemiBold" TextTrimming="CharacterEllipsis" VerticalAlignment="Center" />
+                    </StackPanel>
+                    <TextBlock Grid.Column="1" Classes="mono" FontSize="12" Text="{Binding MinText}" TextTrimming="CharacterEllipsis" />
+                    <TextBlock Grid.Column="2" Classes="mono" FontSize="12" Text="{Binding MaxText}" TextTrimming="CharacterEllipsis" />
+                    <TextBlock Grid.Column="3" Classes="mono" FontSize="12" Text="{Binding MeanText}" TextTrimming="CharacterEllipsis" />
+                    <TextBlock Grid.Column="4" Classes="mono" FontSize="12" Text="{Binding StdDevText}" TextTrimming="CharacterEllipsis" />
+                    <TextBlock Grid.Column="5" Classes="mono" FontSize="12" Text="{Binding FirstText}" TextTrimming="CharacterEllipsis" />
+                    <TextBlock Grid.Column="6" Classes="mono" FontSize="12" Text="{Binding LastText}" TextTrimming="CharacterEllipsis" />
+                    <TextBlock Grid.Column="7" Classes="mono" FontSize="12" Text="{Binding DeltaText}" TextTrimming="CharacterEllipsis" />
+                    <TextBlock Grid.Column="8" Classes="mono" FontSize="12" Text="{Binding SamplesText}" />
+                    <TextBlock Grid.Column="9" Classes="mono" FontSize="12" Text="{Binding EdgesText}" />
+                  </Grid>
+                </DataTemplate>
+              </ItemsControl.ItemTemplate>
+            </ItemsControl>
+          </StackPanel>
+        </ScrollViewer>
+      </DockPanel>
+    </Border>
+    <v:ChartCanvas x:Name="Canvas" />
   </DockPanel>
+  </Panel>
 </UserControl>

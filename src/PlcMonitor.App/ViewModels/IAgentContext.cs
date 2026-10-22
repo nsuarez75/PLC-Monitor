@@ -14,6 +14,9 @@ public interface IAgentContext
     /// <summary>Muestra un mensaje en la barra de estado.</summary>
     void Report(string message, bool isError = false);
 
+    /// <summary>Nombre del agente para la cabecera de las imágenes exportadas («Agente planta»).</summary>
+    string AgentTitle => "";
+
     /// <summary>Describe un error de la API para el usuario.</summary>
     string Describe(Exception exception);
 
