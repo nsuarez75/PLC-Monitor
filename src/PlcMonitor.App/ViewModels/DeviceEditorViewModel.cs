@@ -41,6 +41,7 @@ public sealed partial class DeviceEditorViewModel : ObservableObject
         SettingsJson = Pretty(config.SettingsJson);
         Enabled = config.Enabled;
         WritesEnabled = config.WritesEnabled;
+        OpcUaPublished = config.OpcUaPublished;
         if (config.Reconnect is { } r)
         {
             InitialDelayMs = r.InitialDelayMs;
@@ -75,6 +76,10 @@ public sealed partial class DeviceEditorViewModel : ObservableObject
 
     [ObservableProperty]
     public partial bool WritesEnabled { get; set; }
+
+    /// <summary>Primera llave de publicación en el servidor OPC UA del agente (los tags tienen la segunda).</summary>
+    [ObservableProperty]
+    public partial bool OpcUaPublished { get; set; }
 
     [ObservableProperty]
     public partial int InitialDelayMs { get; set; } = 1000;
@@ -119,6 +124,7 @@ public sealed partial class DeviceEditorViewModel : ObservableObject
                 Driver = DriverId,
                 Enabled = Enabled,
                 WritesEnabled = WritesEnabled,
+                OpcUaPublished = OpcUaPublished,
                 SettingsJson = SettingsJson,
                 Reconnect = new ReconnectConfig { InitialDelayMs = InitialDelayMs, MaxDelayMs = MaxDelayMs, Multiplier = Multiplier },
             };

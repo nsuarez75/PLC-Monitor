@@ -73,7 +73,7 @@
       <Border Classes="card" Padding="20">
         <StackPanel Spacing="12">
           <TextBlock Text="CONFIGURACIÓN" Classes="caption" />
-          <Grid ColumnDefinitions="150,*" RowDefinitions="Auto,Auto,Auto,Auto,Auto,Auto,Auto,Auto,Auto,Auto" RowSpacing="10" ColumnSpacing="16">
+          <Grid ColumnDefinitions="150,*" RowDefinitions="Auto,Auto,Auto,Auto,Auto,Auto,Auto,Auto,Auto,Auto,Auto" RowSpacing="10" ColumnSpacing="16">
             <TextBlock Text="Nombre" VerticalAlignment="Center" FontWeight="Medium" />
             <TextBox Grid.Column="1" Text="{Binding Name}" />
             <TextBlock Grid.Row="1" Text="Dirección" VerticalAlignment="Center" FontWeight="Medium" />
@@ -130,6 +130,12 @@
               </Grid>
               <CheckBox Content="Limitar al rango de ingeniería" IsChecked="{Binding ScaleClamp}" IsVisible="{Binding ScalingEnabled}" />
               <TextBlock Classes="muted" FontSize="12" TextWrapping="Wrap" Text="{Binding ScalingPreview}" />
+            </StackPanel>
+            <TextBlock Grid.Row="10" Text="OPC UA" VerticalAlignment="Center" FontWeight="Medium" />
+            <StackPanel Grid.Row="10" Grid.Column="1" Spacing="4">
+              <CheckBox Content="Publicar en OPC UA (2.ª llave)" IsChecked="{Binding OpcUaPublished}" />
+              <TextBlock Classes="muted" FontSize="12" TextWrapping="Wrap" IsVisible="{Binding !DeviceOpcUaPublished}"
+                         Text="El dispositivo no se publica en OPC UA (1.ª llave): actívalo en «Editar» del dispositivo." />
             </StackPanel>
           </Grid>
         </StackPanel>
