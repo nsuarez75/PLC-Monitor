@@ -8,10 +8,32 @@
              x:DataType="vm:TrendsViewModel"
              Background="{DynamicResource App.Background}">
   <Grid ColumnDefinitions="270,*" Margin="20,16" ColumnSpacing="16">
+    <!-- Aquí se monta un momento la imagen del panel que se exporta (tamaño cero: no se ve). -->
+    <Canvas x:Name="ExportHost" Grid.Column="1" Width="0" Height="0" ClipToBounds="True" HorizontalAlignment="Left" VerticalAlignment="Top" />
 
-    <!-- Vistas guardadas -->
+    <!-- Vistas guardadas y paneles -->
     <Border Classes="card" Padding="12">
       <DockPanel>
+        <DockPanel DockPanel.Dock="Bottom" MaxHeight="300" Margin="0,12,0,0">
+          <Grid DockPanel.Dock="Top" ColumnDefinitions="*,Auto" Margin="4,0,0,10">
+            <TextBlock Text="PANELES" Classes="caption" VerticalAlignment="Center" />
+            <Button Grid.Column="1" Classes="ghost" Command="{Binding NewPanelCommand}" ToolTip.Tip="Nuevo panel: varias vistas en una rejilla">
+              <c:Icon Kind="plus" />
+            </Button>
+          </Grid>
+          <TextBlock DockPanel.Dock="Top" Classes="muted" FontSize="11.5" Margin="4,0,0,0" TextWrapping="Wrap" IsVisible="{Binding !HasPanels}"
+                     Text="Junta varias vistas en una sola pantalla." />
+          <ListBox Classes="devices" ItemsSource="{Binding Panels}" SelectedItem="{Binding SelectedPanel}">
+            <ListBox.ItemTemplate>
+              <DataTemplate x:DataType="vm:TrendPanelItem">
+                <StackPanel Spacing="2">
+                  <TextBlock Text="{Binding Name}" FontWeight="SemiBold" TextTrimming="CharacterEllipsis" />
+                  <TextBlock Text="{Binding Description}" Classes="muted" FontSize="11.5" TextTrimming="CharacterEllipsis" />
+                </StackPanel>
+              </DataTemplate>
+            </ListBox.ItemTemplate>
+          </ListBox>
+        </DockPanel>
         <Grid DockPanel.Dock="Top" ColumnDefinitions="*,Auto" Margin="4,0,0,10">
           <TextBlock Text="TENDENCIAS" Classes="caption" VerticalAlignment="Center" />
           <Button Grid.Column="1" Classes="ghost" Command="{Binding NewCommand}" ToolTip.Tip="Nueva vista de tendencia">
@@ -33,8 +55,8 @@
 
     <DockPanel Grid.Column="1">
       <StackPanel DockPanel.Dock="Top" Spacing="2" Margin="0,0,0,14">
-        <TextBlock Text="{Binding Selected.Name, FallbackValue='Tendencias'}" Classes="title" />
-        <TextBlock Classes="muted" Text="Tags del agente o de un CSV en una gráfica: en vivo, del histórico o del fichero." />
+        <TextBlock Text="{Binding HeaderTitle}" Classes="title" />
+        <TextBlock Classes="muted" Text="{Binding HeaderHint}" />
       </StackPanel>
 
       <Panel>
@@ -300,6 +322,162 @@
             </StackPanel>
           </StackPanel>
         </ScrollViewer>
+
+        <!-- Configuración del panel -->
+        <ScrollViewer IsVisible="{Binding IsEditingPanel}">
+          <StackPanel Spacing="14">
+            <Border Classes="card" Padding="20">
+              <StackPanel Spacing="12">
+                <TextBlock Text="PANEL" Classes="caption" />
+                <Grid ColumnDefinitions="170,*" RowDefinitions="Auto,Auto,Auto" RowSpacing="10" ColumnSpacing="16">
+                  <TextBlock Text="Nombre" VerticalAlignment="Center" FontWeight="Medium" />
+                  <TextBox Grid.Column="1" Text="{Binding PanelName}" PlaceholderText="Línea 3" />
+                  <TextBlock Grid.Row="1" Text="Columnas" VerticalAlignment="Center" FontWeight="Medium" />
+                  <ComboBox Grid.Row="1" Grid.Column="1" ItemsSource="{x:Static vm:TrendsViewModel.ColumnChoices}" SelectedItem="{Binding PanelColumns}" MinWidth="160" />
+                  <CheckBox Grid.Row="2" Grid.Column="1" Content="Sincronizar el zoom de las gráficas de tiempo" IsChecked="{Binding PanelSyncZoom}"
+                            ToolTip.Tip="Al ampliar un tramo en una tendencia o un cronograma se amplía el mismo en las demás" />
+                </Grid>
+              </StackPanel>
+            </Border>
+
+            <Border Classes="card" Padding="20">
+              <Grid ColumnDefinitions="*,*" ColumnSpacing="20">
+                <StackPanel Spacing="10">
+                  <TextBlock Text="VISTAS DEL PANEL" Classes="caption" />
+                  <TextBlock Classes="muted" Text="Ninguna todavía: añádelas de la lista de la derecha. Se colocan por filas, en este orden."
+                             IsVisible="{Binding !PanelViews.Count}" TextWrapping="Wrap" />
+                  <ItemsControl ItemsSource="{Binding PanelViews}">
+                    <ItemsControl.ItemTemplate>
+                      <DataTemplate x:DataType="vm:TrendViewItem">
+                        <Grid ColumnDefinitions="*,Auto,Auto,Auto" Margin="0,0,0,4">
+                          <StackPanel Spacing="1" VerticalAlignment="Center">
+                            <TextBlock Text="{Binding Name}" TextTrimming="CharacterEllipsis" />
+                            <TextBlock Text="{Binding Description}" Classes="muted" FontSize="11" TextTrimming="CharacterEllipsis" />
+                          </StackPanel>
+                          <Button Grid.Column="1" Classes="ghost" ToolTip.Tip="Subir"
+                                  Command="{Binding $parent[UserControl].((vm:TrendsViewModel)DataContext).MovePanelViewUpCommand}" CommandParameter="{Binding}">
+                            <c:Icon Kind="chevron-up" Width="14" Height="14" />
+                          </Button>
+                          <Button Grid.Column="2" Classes="ghost" ToolTip.Tip="Bajar"
+                                  Command="{Binding $parent[UserControl].((vm:TrendsViewModel)DataContext).MovePanelViewDownCommand}" CommandParameter="{Binding}">
+                            <c:Icon Kind="chevron-down" Width="14" Height="14" />
+                          </Button>
+                          <Button Grid.Column="3" Classes="ghost danger" ToolTip.Tip="Quitar del panel (la vista no se borra)"
+                                  Command="{Binding $parent[UserControl].((vm:TrendsViewModel)DataContext).RemovePanelViewCommand}" CommandParameter="{Binding}">
+                            <c:Icon Kind="x" Width="14" Height="14" />
+                          </Button>
+                        </Grid>
+                      </DataTemplate>
+                    </ItemsControl.ItemTemplate>
+                  </ItemsControl>
+                </StackPanel>
+                <StackPanel Grid.Column="1" Spacing="10">
+                  <TextBlock Text="VISTAS GUARDADAS" Classes="caption" />
+                  <TextBlock Classes="muted" Text="No hay más vistas: créalas arriba, en «Tendencias»." TextWrapping="Wrap"
+                             IsVisible="{Binding !PanelAvailable.Count}" />
+                  <ScrollViewer MaxHeight="360">
+                    <ItemsControl ItemsSource="{Binding PanelAvailable}">
+                      <ItemsControl.ItemTemplate>
+                        <DataTemplate x:DataType="vm:TrendViewItem">
+                          <Grid ColumnDefinitions="*,Auto" ColumnSpacing="8" Margin="0,0,0,4">
+                            <StackPanel Spacing="1" VerticalAlignment="Center">
+                              <TextBlock Text="{Binding Name}" TextTrimming="CharacterEllipsis" />
+                              <TextBlock Text="{Binding Description}" Classes="muted" FontSize="11" TextTrimming="CharacterEllipsis" />
+                            </StackPanel>
+                            <Button Grid.Column="1" Classes="ghost" ToolTip.Tip="Añadir al panel"
+                                    Command="{Binding $parent[UserControl].((vm:TrendsViewModel)DataContext).AddPanelViewCommand}" CommandParameter="{Binding}">
+                              <c:Icon Kind="plus" Width="14" Height="14" />
+                            </Button>
+                          </Grid>
+                        </DataTemplate>
+                      </ItemsControl.ItemTemplate>
+                    </ItemsControl>
+                  </ScrollViewer>
+                </StackPanel>
+              </Grid>
+            </Border>
+
+            <Border Classes="pill bad" CornerRadius="8" Padding="12,8" HorizontalAlignment="Stretch"
+                    IsVisible="{Binding PanelError, Converter={x:Static StringConverters.IsNotNullOrEmpty}}">
+              <TextBlock Text="{Binding PanelError}" TextWrapping="Wrap" />
+            </Border>
+
+            <StackPanel Orientation="Horizontal" Spacing="8">
+              <Button Classes="accent" Command="{Binding OpenPanelCommand}">
+                <StackPanel Orientation="Horizontal" Spacing="6">
+                  <c:Icon Kind="play" />
+                  <TextBlock Text="Abrir" />
+                </StackPanel>
+              </Button>
+              <TextBlock Text="Leyendo el histórico…" Classes="muted" VerticalAlignment="Center" IsVisible="{Binding IsLoading}" />
+              <Button Classes="secondary" Command="{Binding SavePanelCommand}">
+                <StackPanel Orientation="Horizontal" Spacing="6">
+                  <c:Icon Kind="save" />
+                  <TextBlock Text="Guardar" />
+                </StackPanel>
+              </Button>
+              <Button Classes="ghost danger" Command="{Binding DeletePanelCommand}">
+                <StackPanel Orientation="Horizontal" Spacing="6">
+                  <c:Icon Kind="trash" />
+                  <TextBlock Text="Borrar" />
+                </StackPanel>
+              </Button>
+            </StackPanel>
+          </StackPanel>
+        </ScrollViewer>
+
+        <!-- Panel abierto: las gráficas de sus vistas en una rejilla -->
+        <DockPanel IsVisible="{Binding IsViewingPanel}">
+          <StackPanel DockPanel.Dock="Top" Orientation="Horizontal" Spacing="10" Margin="0,0,0,12">
+            <Button Classes="secondary" Command="{Binding EditPanelCommand}">
+              <StackPanel Orientation="Horizontal" Spacing="6">
+                <c:Icon Kind="pencil" />
+                <TextBlock Text="Editar panel" />
+              </StackPanel>
+            </Button>
+            <Button Classes="secondary" Command="{Binding OpenPanelCommand}" ToolTip.Tip="Volver a abrir las gráficas (y a leer el histórico)">
+              <StackPanel Orientation="Horizontal" Spacing="6">
+                <c:Icon Kind="refresh" />
+                <TextBlock Text="Actualizar" />
+              </StackPanel>
+            </Button>
+            <CheckBox Content="Sincronizar zoom" IsChecked="{Binding OpenPanel.SyncZoom, FallbackValue=False}" VerticalAlignment="Center"
+                      ToolTip.Tip="Al ampliar un tramo en una tendencia o un cronograma se amplía el mismo en las demás" />
+            <Button x:Name="SavePanelPng" Classes="secondary" ToolTip.Tip="Exportar el panel entero a PNG (fondo blanco)">
+              <StackPanel Orientation="Horizontal" Spacing="6">
+                <c:Icon Kind="image" />
+                <TextBlock Text="PNG" />
+              </StackPanel>
+            </Button>
+            <Button x:Name="CopyPanelPng" Classes="ghost" ToolTip.Tip="Copiar la imagen del panel al portapapeles">
+              <c:Icon Kind="copy" />
+            </Button>
+            <TextBlock Text="Leyendo el histórico…" Classes="muted" VerticalAlignment="Center" IsVisible="{Binding IsLoading}" />
+          </StackPanel>
+          <ScrollViewer>
+            <ItemsControl x:Name="PanelCells" ItemsSource="{Binding OpenPanel.Cells, FallbackValue={x:Null}}">
+              <ItemsControl.ItemsPanel>
+                <ItemsPanelTemplate>
+                  <UniformGrid Columns="{Binding $parent[UserControl].((vm:TrendsViewModel)DataContext).OpenPanel.Columns, FallbackValue=1}" />
+                </ItemsPanelTemplate>
+              </ItemsControl.ItemsPanel>
+              <ItemsControl.ItemTemplate>
+                <DataTemplate x:DataType="vm:PanelCellViewModel">
+                  <Border Classes="card" Padding="14" Margin="0,0,12,12" Height="{x:Static v:TrendsView.CellHeight}">
+                    <DockPanel>
+                      <StackPanel DockPanel.Dock="Top" Orientation="Horizontal" Spacing="10" Margin="0,0,0,8">
+                        <TextBlock Text="{Binding Title}" FontWeight="SemiBold" TextTrimming="CharacterEllipsis" />
+                        <TextBlock Text="{Binding Info}" Classes="muted" FontSize="11.5" VerticalAlignment="Center" TextTrimming="CharacterEllipsis" />
+                      </StackPanel>
+                      <TextBlock DockPanel.Dock="Top" Text="{Binding Error}" Classes="error" TextWrapping="Wrap" IsVisible="{Binding HasError}" />
+                      <v:ChartPanel DataContext="{Binding Chart}" IsVisible="{Binding $parent[ContentPresenter].((vm:PanelCellViewModel)DataContext).HasChart}" />
+                    </DockPanel>
+                  </Border>
+                </DataTemplate>
+              </ItemsControl.ItemTemplate>
+            </ItemsControl>
+          </ScrollViewer>
+        </DockPanel>
 
         <!-- Barras del histórico de la vista abierta -->
         <Border Classes="card" Padding="16" IsVisible="{Binding IsViewingBars}">
