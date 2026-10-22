@@ -66,6 +66,9 @@ public sealed record ChartKindChoice(ChartKind Value, string Text, string Short,
     public override string ToString() => Text;
 }
 
+/// <summary>Gráfica de una vista abierta: la de tiempo/ciclos/X-Y (<see cref="Live"/>) o las barras; o por qué no se ha podido abrir.</summary>
+public sealed record OpenedView(LiveTrendViewModel? Live, PeriodBarsViewModel? Bars, string Error = "");
+
 /// <summary>Tag del agente que se puede añadir a una vista.</summary>
 public sealed record TrendTagChoice(string Device, string Tag, string DataType)
 {
@@ -587,29 +590,44 @@ public sealed partial class TrendsViewModel : ObservableObject, IDisposable
         if (Selected is not { } item || !CheckTrigger())
             return;
         Apply(item);
-        var view = item.View;
-        if (view.DataSource == TrendDataSource.Csv && CanReadHistory(view.Kind))
+        IsLoading = true;
+        OpenedView opened;
+        try
         {
-            OpenCsv(view);
+            opened = await BuildAsync(item.View);
+        }
+        finally
+        {
+            IsLoading = false;
+        }
+        if (opened.Error.Length > 0)
+        {
+            KindError = opened.Error;
             return;
         }
+        if (Selected != item)
+            return; // se ha elegido otra vista mientras se leía
+        Live = opened.Live;
+        Bars = opened.Bars;
+    }
+
+    /// <summary>
+    /// Gráfica de una vista guardada, como al abrirla: en vivo, del histórico (lo consulta), de su CSV o las barras.
+    /// Sirve para la vista abierta y para cada celda de un panel.
+    /// </summary>
+    internal async Task<OpenedView> BuildAsync(TrendView view)
+    {
+        if (view.DataSource == TrendDataSource.Csv && CanReadHistory(view.Kind))
+            return BuildCsv(view);
         if (view.Kind == ChartKind.Bars)
         {
-            Live = null;
-            Bars = new PeriodBarsViewModel(_main, view, t => _main.FindTag(t.Device, t.Tag));
-            Bars.Chart.Title = view.Name;
-            Bars.Chart.Source = SourceText(view);
-            Bars.Chart.AutoY = view.AutoY;
-            Bars.Chart.YMinInput = YMin;
-            Bars.Chart.YMaxInput = YMax;
-            _ = Bars.RefreshCommand.ExecuteAsync(null);
-            return;
+            var bars = new PeriodBarsViewModel(_main, view, t => _main.FindTag(t.Device, t.Tag));
+            ConfigureBars(bars, view);
+            _ = bars.RefreshCommand.ExecuteAsync(null);
+            return new OpenedView(null, bars);
         }
         if (view.DataSource == TrendDataSource.History && CanReadHistory(view.Kind))
-        {
-            await OpenHistoryAsync(view);
-            return;
-        }
+            return await BuildHistoryAsync(view);
         var trigger = view.Trigger;
         var live = new LiveTrendViewModel(
             () => view.Tags.Select(t => (t.ToString(), TrendSource.Of(_main.FindTag(t.Device, t.Tag)))).ToArray(),
@@ -617,26 +635,24 @@ public sealed partial class TrendsViewModel : ObservableObject, IDisposable
             trigger is null ? null : () => TrendSource.Of(_main.FindTag(trigger.Device, trigger.Tag)),
             view.Kind)
         {
-            Window = Window,
+            Window = LiveTrendViewModel.Windows.FirstOrDefault(w => (int)w.Value.TotalMinutes == view.WindowMinutes) ?? LiveTrendViewModel.Windows[1],
         };
         live.Chart.EmptyText = view.Tags.Count == 0 ? "Esta vista no tiene tags: edítala y añade alguno"
             : trigger is not null ? "Esperando el disparo"
             : view.Kind == ChartKind.XY ? "Aún no hay valores de los dos ejes"
             : "Aún no hay valores de estos tags";
-        Show(live, view);
+        Configure(live, view);
+        return new OpenedView(live, null);
     }
 
     /// <summary>
-    /// Lee del histórico del agente los tags de la vista (y el disparo) en su periodo y abre la gráfica con esos datos.
+    /// Lee del histórico del agente los tags de la vista (y el disparo) en su periodo y monta la gráfica con esos datos.
     /// Los tags que no se historizan se avisan como no disponibles.
     /// </summary>
-    private async Task OpenHistoryAsync(TrendView view)
+    private async Task<OpenedView> BuildHistoryAsync(TrendView view)
     {
         if (_main.Client is not { } client)
-        {
-            KindError = "Conéctate al agente para leer su histórico.";
-            return;
-        }
+            return new OpenedView(null, null, "Conéctate al agente para leer su histórico.");
         var (from, to) = TrendHistory.Window(view, DateTimeOffset.UtcNow);
         var trigger = view.Trigger;
         var refs = view.Tags.Concat(trigger is null ? [] : [trigger.Ref])
@@ -646,7 +662,6 @@ public sealed partial class TrendsViewModel : ObservableObject, IDisposable
             .ToList();
         Dictionary<TrendTagRef, TrendSource> sources;
         TimeSpan? aggregated = null;
-        IsLoading = true;
         try
         {
             (sources, aggregated) = refs.Count == 0 ? ([], null) : await TrendHistory.LoadAsync(client, refs, from, to);
@@ -654,11 +669,7 @@ public sealed partial class TrendsViewModel : ObservableObject, IDisposable
         catch (Grpc.Core.RpcException ex)
         {
             _main.Report(_main.Describe(ex), isError: true);
-            return;
-        }
-        finally
-        {
-            IsLoading = false;
+            return new OpenedView(null, null, _main.Describe(ex));
         }
         var points = sources.Values.Sum(s => s.Points.Count);
         foreach (var (key, source) in sources.ToArray())
@@ -679,11 +690,12 @@ public sealed partial class TrendsViewModel : ObservableObject, IDisposable
         live.Chart.EmptyText = view.Tags.Count == 0 ? "Esta vista no tiene tags: edítala y añade alguno"
             : refs.Count == 0 ? "Ningún tag de la vista se historiza: actívalo en la configuración del tag"
             : "No hay histórico de estos tags en ese periodo";
-        Show(live, view);
+        Configure(live, view);
+        return new OpenedView(live, null);
     }
 
-    /// <summary>Lee el CSV de la vista (otra vez, por si ha cambiado) y abre su gráfica con los tags elegidos.</summary>
-    private void OpenCsv(TrendView view)
+    /// <summary>Lee el CSV de la vista (otra vez, por si ha cambiado) y monta su gráfica con los tags elegidos.</summary>
+    private OpenedView BuildCsv(TrendView view)
     {
         HistoryCsvContent content;
         try
@@ -692,8 +704,7 @@ public sealed partial class TrendsViewModel : ObservableObject, IDisposable
         }
         catch (Exception ex) when (ex is FormatException or IOException or UnauthorizedAccessException)
         {
-            KindError = $"No se puede leer el CSV: {ex.Message}";
-            return;
+            return new OpenedView(null, null, $"No se puede leer el CSV: {ex.Message}");
         }
         var sources = new Dictionary<TrendTagRef, TrendSource>();
         for (var i = 0; i < content.Keys.Count; i++)
@@ -705,15 +716,10 @@ public sealed partial class TrendsViewModel : ObservableObject, IDisposable
         var file = Path.GetFileName(view.CsvPath!);
         if (view.Kind == ChartKind.Bars)
         {
-            Live = null;
-            Bars = new PeriodBarsViewModel(view, sources, file);
-            Bars.Chart.Title = view.Name;
-            Bars.Chart.Source = SourceText(view);
-            Bars.Chart.AutoY = view.AutoY;
-            Bars.Chart.YMinInput = YMin;
-            Bars.Chart.YMaxInput = YMax;
-            _ = Bars.RefreshCommand.ExecuteAsync(null);
-            return;
+            var bars = new PeriodBarsViewModel(view, sources, file);
+            ConfigureBars(bars, view);
+            _ = bars.RefreshCommand.ExecuteAsync(null);
+            return new OpenedView(null, bars);
         }
         var now = DateTimeOffset.UtcNow;
         var trigger = view.Trigger;
@@ -728,10 +734,20 @@ public sealed partial class TrendsViewModel : ObservableObject, IDisposable
             MissingText = "No están en el CSV",
         };
         live.Chart.EmptyText = view.Tags.Count == 0 ? "Esta vista no tiene tags: edítala y añade los del CSV" : "El CSV no tiene valores de estos tags";
-        Show(live, view);
+        Configure(live, view);
+        return new OpenedView(live, null);
     }
 
-    private void Show(LiveTrendViewModel live, TrendView view)
+    private void ConfigureBars(PeriodBarsViewModel bars, TrendView view)
+    {
+        bars.Chart.Title = view.Name;
+        bars.Chart.Source = SourceText(view);
+        bars.Chart.AutoY = view.AutoY;
+        bars.Chart.YMinInput = view.YMin is { } min ? (decimal)min : null;
+        bars.Chart.YMaxInput = view.YMax is { } max ? (decimal)max : null;
+    }
+
+    private void Configure(LiveTrendViewModel live, TrendView view)
     {
         live.Chart.Title = view.Name;
         live.Chart.Source = SourceText(view);
@@ -740,8 +756,8 @@ public sealed partial class TrendsViewModel : ObservableObject, IDisposable
         live.Chart.LowLimit = view.LowLimit;
         live.Chart.HighLimit = view.HighLimit;
         live.Chart.GaugeStyle = view.GaugeStyle;
-        live.Chart.YMinInput = YMin;
-        live.Chart.YMaxInput = YMax;
+        live.Chart.YMinInput = view.YMin is { } min ? (decimal)min : null;
+        live.Chart.YMaxInput = view.YMax is { } max ? (decimal)max : null;
         // Ciclo de referencia guardado con la vista; lo que se cambie en la gráfica se vuelve a guardar.
         foreach (var (name, points) in view.ReferenceCycles ?? [])
             live.Reference[name] = points.Where(p => p.Length == 2).Select(p => new XYPoint(p[0], p[1])).ToList();
@@ -756,7 +772,6 @@ public sealed partial class TrendsViewModel : ObservableObject, IDisposable
             view.ReferenceTolerancePercent = live.TolerancePercent;
             Persist();
         };
-        Live = live;
     }
 
     /// <summary>De dónde salen los datos de la vista, para la cabecera de la imagen exportada.</summary>
