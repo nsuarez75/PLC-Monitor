@@ -185,6 +185,8 @@ public sealed partial class MainViewModel : ObservableObject, IAgentContext, IAs
     /// <summary>Agente al que pertenecen las vistas de tendencia: el id de su perfil o, sin perfil, su URL.</summary>
     public string AgentKey => SelectedProfile?.Id ?? AgentUrl.Trim();
 
+    public string AgentTitle => $"Agente {(SelectedProfile is { Name.Length: > 0 } profile ? profile.Name : AgentUrl.Trim())}";
+
     /// <summary>Han cambiado los tags del agente (foto nueva, dispositivo reconfigurado o quitado).</summary>
     public event EventHandler? TagsChanged;
 

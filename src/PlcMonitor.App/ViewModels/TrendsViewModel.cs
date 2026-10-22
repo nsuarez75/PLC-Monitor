@@ -597,6 +597,8 @@ public sealed partial class TrendsViewModel : ObservableObject, IDisposable
         {
             Live = null;
             Bars = new PeriodBarsViewModel(_main, view, t => _main.FindTag(t.Device, t.Tag));
+            Bars.Chart.Title = view.Name;
+            Bars.Chart.Source = SourceText(view);
             Bars.Chart.AutoY = view.AutoY;
             Bars.Chart.YMinInput = YMin;
             Bars.Chart.YMaxInput = YMax;
@@ -705,6 +707,8 @@ public sealed partial class TrendsViewModel : ObservableObject, IDisposable
         {
             Live = null;
             Bars = new PeriodBarsViewModel(view, sources, file);
+            Bars.Chart.Title = view.Name;
+            Bars.Chart.Source = SourceText(view);
             Bars.Chart.AutoY = view.AutoY;
             Bars.Chart.YMinInput = YMin;
             Bars.Chart.YMaxInput = YMax;
@@ -729,6 +733,8 @@ public sealed partial class TrendsViewModel : ObservableObject, IDisposable
 
     private void Show(LiveTrendViewModel live, TrendView view)
     {
+        live.Chart.Title = view.Name;
+        live.Chart.Source = SourceText(view);
         live.Chart.AutoY = view.AutoY;
         live.Chart.SeparateAxes = view.SeparateAxes;
         live.Chart.LowLimit = view.LowLimit;
@@ -752,6 +758,12 @@ public sealed partial class TrendsViewModel : ObservableObject, IDisposable
         };
         Live = live;
     }
+
+    /// <summary>De dónde salen los datos de la vista, para la cabecera de la imagen exportada.</summary>
+    private string SourceText(TrendView view) =>
+        view.DataSource == TrendDataSource.Csv && CanReadHistory(view.Kind) ? $"CSV {Path.GetFileName(view.CsvPath)}"
+        : view.DataSource == TrendDataSource.History || view.Kind == ChartKind.Bars ? $"Histórico · {_main.AgentTitle}"
+        : _main.AgentTitle;
 
     /// <summary>Vuelve de la gráfica a la configuración de la vista.</summary>
     [RelayCommand]

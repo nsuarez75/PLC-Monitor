@@ -182,6 +182,8 @@ public sealed partial class HistoryViewModel(IAgentContext context, Func<DeviceV
                          .SelectMany(s => s.Points.Select(p => Row(p, s.Tag, known.GetValueOrDefault(s.Tag))))
                          .OrderByDescending(r => r.Timestamp))
                 Rows.Add(row);
+            Chart.Title = $"Histórico {target.Name}";
+            Chart.Source = context.AgentTitle;
             Chart.SetData(
                 reply.Series.Select(s => new ChartSeriesData(
                     s.Tag,
