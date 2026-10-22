@@ -104,6 +104,9 @@ public class AgentSecurityTests
         await Denied(async () => await client.PutTransformsAsync(new PutTransformsRequest(), asReader, cancellationToken: Ct));
         await Denied(async () => await client.RenameHistoryAsync(new RenameHistoryRequest(), asReader, cancellationToken: Ct));
         await Denied(async () => await client.DeleteHistoryAsync(new DeleteHistoryRequest(), asReader, cancellationToken: Ct));
+        await Denied(async () => await client.PutOpcUaAsync(new PutOpcUaRequest(), asReader, cancellationToken: Ct));
+        await Denied(async () => await client.DeleteOpcUaCertificateAsync(new OpcUaCertificateRequest { Thumbprint = "AB" }, asReader, cancellationToken: Ct));
+        (await client.GetOpcUaAsync(new Empty(), asReader, cancellationToken: Ct)).Enabled.ShouldBeFalse();
         agent.Driver.Plc("plc1").Writes.ShouldBeEmpty();
         (await client.ListDevicesAsync(new Empty(), asFull, cancellationToken: Ct)).Devices.ShouldHaveSingleItem().Enabled.ShouldBeTrue();
     }
@@ -115,7 +118,7 @@ public class AgentSecurityTests
 
         TokenAuthInterceptor.FullAccessMethods.ShouldBeSubsetOf(all);
         all.Except(TokenAuthInterceptor.FullAccessMethods).ShouldBe(
-            ["GetInfo", "ListDevices", "GetDeviceInfo", "ListTags", "Read", "Subscribe", "Browse", "GetConfiguration", "GetDeviceConfig", "QueryHistory", "GetTransforms"],
+            ["GetInfo", "ListDevices", "GetDeviceInfo", "ListTags", "Read", "Subscribe", "Browse", "GetConfiguration", "GetDeviceConfig", "QueryHistory", "GetTransforms", "GetOpcUa"],
             ignoreOrder: true);
     }
 

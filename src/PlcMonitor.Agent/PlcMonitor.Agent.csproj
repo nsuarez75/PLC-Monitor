@@ -1,7 +1,7 @@
 <Project Sdk="Microsoft.NET.Sdk.Web">
   <PropertyGroup>
     <AssemblyName>plcmon-agent</AssemblyName>
-    <Description>Agente de PLC-Monitor: servicio que vigila los dispositivos y los expone por gRPC.</Description>
+    <Description>Agente de PLC-Monitor: servicio que vigila los dispositivos y los expone por gRPC y OPC UA.</Description>
     <!-- Solo gRPC: sin ficheros estáticos (así el publicado es un único ejecutable). -->
     <StaticWebAssetsEnabled>false</StaticWebAssetsEnabled>
     <IsTransformWebConfigDisabled>true</IsTransformWebConfigDisabled>
@@ -15,6 +15,7 @@
     <ProjectReference Include="..\PlcMonitor.Agent.Contracts\PlcMonitor.Agent.Contracts.csproj" />
     <ProjectReference Include="..\PlcMonitor.Engine\PlcMonitor.Engine.csproj" />
     <ProjectReference Include="..\PlcMonitor.Historian\PlcMonitor.Historian.csproj" />
+    <ProjectReference Include="..\PlcMonitor.OpcUa\PlcMonitor.OpcUa.csproj" />
     <ProjectReference Include="..\PlcMonitor.Drivers.S7Absolute\PlcMonitor.Drivers.S7Absolute.csproj" />
     <ProjectReference Include="..\PlcMonitor.Drivers.S7Symbolic\PlcMonitor.Drivers.S7Symbolic.csproj" />
   </ItemGroup>

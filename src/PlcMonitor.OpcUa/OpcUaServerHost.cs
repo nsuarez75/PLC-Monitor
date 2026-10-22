@@ -56,6 +56,7 @@ public sealed class OpcUaServerHost : IAsyncDisposable
     private BackgroundService? _server;
     private PlcNodeManager? _manager;
     private int _runningPort;
+    private int _disposed;
 
     public OpcUaServerHost(TagEngine engine, HistorianService? historian, string directory, ILoggerFactory loggerFactory)
     {
@@ -408,8 +409,11 @@ public sealed class OpcUaServerHost : IAsyncDisposable
         directory.SetAccessControl(acl);
     }
 
+    /// <summary>Para el servidor. Idempotente: el agente lo libera al pararse y otra vez al liberar el contenedor.</summary>
     public async ValueTask DisposeAsync()
     {
+        if (Interlocked.Exchange(ref _disposed, 1) == 1)
+            return;
         await _lock.WaitAsync();
         try
         {
@@ -419,7 +423,6 @@ public sealed class OpcUaServerHost : IAsyncDisposable
         {
             _lock.Release();
         }
-        _lock.Dispose();
     }
 
     /// <summary>Crea el gestor de nodos de cada arranque y lo recuerda (para aplicar en caliente la tercera llave).</summary>

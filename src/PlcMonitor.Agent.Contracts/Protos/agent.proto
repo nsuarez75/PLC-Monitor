@@ -13,8 +13,8 @@ import "google/protobuf/timestamp.proto";
 service AgentService {
   // Versión del agente, máquina, drivers disponibles y acceso de quien llama.
   // Seguridad: si el agente tiene token, todas las llamadas lo exigen (UNAUTHENTICATED si falta). Con el token de solo
-  // lectura, SetDeviceEnabled, Write, PutDevice, DeleteDevice, PutTransforms, RenameHistory y DeleteHistory devuelven
-  // PERMISSION_DENIED.
+  // lectura, SetDeviceEnabled, Write, PutDevice, DeleteDevice, PutTransforms, RenameHistory, DeleteHistory, PutOpcUa,
+  // TrustOpcUaCertificate y DeleteOpcUaCertificate devuelven PERMISSION_DENIED.
   rpc GetInfo(google.protobuf.Empty) returns (AgentInfo);
 
   // Dispositivos configurados con su estado de conexión.
@@ -75,6 +75,19 @@ service AgentService {
   // Sustituye todas las transformaciones. Se valida antes de aplicar (nombres y valores repetidos, transformaciones
   // en uso por algún tag); si hay errores devuelve INVALID_ARGUMENT con la lista y no cambia nada.
   rpc PutTransforms(PutTransformsRequest) returns (TransformList);
+
+  // Servidor OPC UA del agente: ajustes, estado y certificados de los clientes.
+  rpc GetOpcUa(google.protobuf.Empty) returns (OpcUaInfo);
+
+  // Cambia los ajustes OPC UA, los guarda y los aplica (arranca, para o reinicia el servidor). Si no son válidos:
+  // INVALID_ARGUMENT con la lista y no cambia nada.
+  rpc PutOpcUa(PutOpcUaRequest) returns (OpcUaInfo);
+
+  // Acepta el certificado (rechazado) de un cliente OPC UA. NOT_FOUND si no está.
+  rpc TrustOpcUaCertificate(OpcUaCertificateRequest) returns (OpcUaInfo);
+
+  // Quita el certificado de un cliente OPC UA (rechazado o aceptado): ese cliente deja de poder conectar.
+  rpc DeleteOpcUaCertificate(OpcUaCertificateRequest) returns (OpcUaInfo);
 }
 
 enum ConnectionState {
@@ -525,4 +538,65 @@ message Scaling {
   double eng_max = 4;
   // Limitar al rango de ingeniería (y rechazar escrituras fuera de él).
   bool clamp = 5;
+}
+
+// Servidor OPC UA: solo canales firmados y cifrados y usuarios con contraseña (sin anónimo).
+message OpcUaInfo {
+  bool enabled = 1;
+  int32 port = 2;
+  // Tercera llave de escritura (además de WritesEnabled del dispositivo, Writable del tag y un usuario con rol de escritura).
+  bool allow_writes = 3;
+  // Sin contraseñas: nunca salen del agente.
+  repeated OpcUaUser users = 4;
+  OpcUaState state = 5;
+  // Motivo del error, si lo hay.
+  string detail = 6;
+  // URL para los clientes (p.ej. opc.tcp://equipo:4840).
+  string endpoint_url = 7;
+  // Huella (SHA-1, la que muestran Ignition y UaExpert) del certificado del servidor.
+  string certificate_thumbprint = 8;
+  repeated OpcUaCertificate certificates = 9;
+}
+
+enum OpcUaState {
+  OPC_UA_STATE_STOPPED = 0;
+  OPC_UA_STATE_STARTING = 1;
+  OPC_UA_STATE_RUNNING = 2;
+  OPC_UA_STATE_ERROR = 3;
+}
+
+enum OpcUaRole {
+  // Leer, suscribirse, explorar y leer el histórico.
+  OPC_UA_ROLE_READ = 0;
+  // Además escribir, si el servidor, el dispositivo y el tag lo permiten.
+  OPC_UA_ROLE_WRITE = 1;
+}
+
+message OpcUaUser {
+  string name = 1;
+  OpcUaRole role = 2;
+  // Solo en PutOpcUa: contraseña nueva. Vacía = se conserva la que tenía (obligatoria para un usuario nuevo).
+  string password = 3;
+}
+
+message PutOpcUaRequest {
+  bool enabled = 1;
+  int32 port = 2;
+  bool allow_writes = 3;
+  // Lista completa: los que no estén se quitan.
+  repeated OpcUaUser users = 4;
+}
+
+// Certificado de un cliente OPC UA (Ignition, UaExpert...).
+message OpcUaCertificate {
+  string thumbprint = 1;
+  string subject = 2;
+  string application_uri = 3;
+  google.protobuf.Timestamp not_after = 4;
+  // false = rechazado, pendiente de aceptar.
+  bool trusted = 5;
+}
+
+message OpcUaCertificateRequest {
+  string thumbprint = 1;
 }
