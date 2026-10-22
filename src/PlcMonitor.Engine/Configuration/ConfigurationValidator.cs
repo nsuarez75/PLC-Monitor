@@ -26,6 +26,7 @@ public static class ConfigurationValidator
             errors.Add("historian.flushIntervalMs debe ser al menos 100.");
         if (string.IsNullOrWhiteSpace(historian.Path))
             errors.Add("historian.path está vacío.");
+        ValidateOpcUa(configuration.OpcUa ?? new OpcUaSettings(), errors);
         var transforms = ValidateTransforms(configuration.Transforms ?? [], errors);
         var deviceNames = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
         for (var i = 0; i < configuration.Devices.Count; i++)
@@ -49,6 +50,24 @@ public static class ConfigurationValidator
             ValidateGroups(device, where, transforms, errors);
         }
         return errors;
+    }
+
+    private static void ValidateOpcUa(OpcUaSettings opcUa, List<string> errors)
+    {
+        if (opcUa.Port is < 1 or > 65535)
+            errors.Add("opcUa.port debe estar entre 1 y 65535.");
+        var names = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        foreach (var user in opcUa.Users ?? [])
+        {
+            if (string.IsNullOrWhiteSpace(user.Name))
+                errors.Add("Usuario OPC UA sin nombre.");
+            else if (!names.Add(user.Name.Trim()))
+                errors.Add($"Usuario OPC UA '{user.Name}': nombre repetido.");
+            else if (string.IsNullOrWhiteSpace(user.PasswordHash))
+                errors.Add($"Usuario OPC UA '{user.Name}': falta la contraseña.");
+        }
+        if (opcUa.Enabled && names.Count == 0)
+            errors.Add("Para activar el servidor OPC UA hace falta al menos un usuario (no se admite el acceso anónimo).");
     }
 
     /// <summary>Comprueba las transformaciones y devuelve sus nombres.</summary>

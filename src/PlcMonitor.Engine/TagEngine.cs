@@ -296,6 +296,48 @@ public sealed class TagEngine : IAsyncDisposable, IEngineSink
         }
     }
 
+    /// <summary>Copia de los ajustes del servidor OPC UA.</summary>
+    public OpcUaSettings GetOpcUa()
+    {
+        lock (_sync)
+            return CloneOpcUa(Configuration.OpcUa ?? new OpcUaSettings());
+    }
+
+    /// <summary>
+    /// Sustituye los ajustes del servidor OPC UA (los aplica quien aloja el servidor). Si no son válidos lanza
+    /// <see cref="EngineConfigurationException"/> y no cambia nada.
+    /// </summary>
+    public async Task<OpcUaSettings> SetOpcUaAsync(OpcUaSettings settings)
+    {
+        ArgumentNullException.ThrowIfNull(settings);
+        await _changes.WaitAsync();
+        try
+        {
+            var candidate = SnapshotConfiguration();
+            candidate.OpcUa = CloneOpcUa(settings);
+            var errors = ConfigurationValidator.Validate(candidate, _registry);
+            if (errors.Count > 0)
+                throw new EngineConfigurationException(errors);
+            lock (_sync)
+                Configuration.OpcUa = candidate.OpcUa;
+            _logger.LogInformation("Ajustes OPC UA actualizados (activo: {Enabled}, puerto {Port}, {Users} usuarios)",
+                candidate.OpcUa.Enabled, candidate.OpcUa.Port, candidate.OpcUa.Users.Count);
+            return GetOpcUa();
+        }
+        finally
+        {
+            _changes.Release();
+        }
+    }
+
+    private static OpcUaSettings CloneOpcUa(OpcUaSettings settings) => new()
+    {
+        Enabled = settings.Enabled,
+        Port = settings.Port,
+        AllowWrites = settings.AllowWrites,
+        Users = [.. (settings.Users ?? []).Select(u => new OpcUaUser { Name = u.Name.Trim(), Role = u.Role, PasswordHash = u.PasswordHash })],
+    };
+
     private static List<ValueTransform> CloneTransforms(IEnumerable<ValueTransform> transforms) =>
         [.. transforms.Select(t => new ValueTransform
         {
