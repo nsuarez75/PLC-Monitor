@@ -23,6 +23,9 @@ builder.Configuration.Sources.Insert(0, new MemoryConfigurationSource
         ["Logging:LogLevel:PlcMonitor.Audit"] = "Information",
         // La pila OPC UA es muy habladora en Information (cada canal y cada certificado): solo avisos y errores.
         ["Logging:LogLevel:Opc.Ua"] = "Warning",
+        // Al arrancar avisa de que su propio certificado es autofirmado («validation suppressed BadCertificateUntrusted»):
+        // es lo normal y no requiere nada.
+        ["Logging:LogLevel:Opc.Ua.Configuration.ApplicationInstance"] = "Error",
     },
 });
 // agent.settings.json: lo escribe el instalador (puerto, certificado TLS, hash del token) y no lo pisan las actualizaciones.
