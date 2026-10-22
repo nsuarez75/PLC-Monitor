@@ -239,6 +239,7 @@ public sealed class MainViewModelTests : IDisposable
         (details.Name, details.Address, details.GroupName, details.IntervalMs, details.Writable, details.SelectedDataType)
             .ShouldBe(("velocidad", "DB1.DBW0", "g", 50, false, TagDetailsViewModel.AutomaticType));
         details.WritesEnabled.ShouldBeTrue();
+        (details.OpcUaPublished, details.DeviceOpcUaPublished).ShouldBe((true, false)); // tag publicado por defecto; el dispositivo no
         details.Groups.ShouldBe(["g"]);
         details.GroupNote.ShouldBe("El grupo «g» se lee cada 50 ms.");
 
@@ -252,10 +253,12 @@ public sealed class MainViewModelTests : IDisposable
         details.IntervalMs = 2000;
         details.GroupNote.ShouldBe("Grupo nuevo: se creará con un periodo de 2000 ms.");
         details.Writable = true;
+        details.OpcUaPublished = false;
         details.SelectedDataType = "Int16";
         await details.SaveCommand.ExecuteAsync(null);
 
         details.Saved.ShouldBeTrue(details.Errors);
+        (await ConfigurationFileLoad(agent)).Devices[0].ScanGroups.Single(g => g.Name == "lento").Tags.Single().OpcUaPublished.ShouldBeFalse();
         var saved = (await ConfigurationFileLoad(agent)).Devices[0];
         var moved = saved.ScanGroups.Single(g => g.Name == "lento");
         moved.IntervalMs.ShouldBe(2000);
@@ -443,9 +446,13 @@ public sealed class MainViewModelTests : IDisposable
 
         editor.SettingsJson = """{ "host": "10.0.0.2" }""";
         editor.Name = "linea1";
+        editor.OpcUaPublished.ShouldBeFalse();
+        editor.OpcUaPublished = true;
         await editor.SaveCommand.ExecuteAsync(null);
 
         vm.Editor.ShouldBeNull();
+        (await ConfigurationFileLoad(agent)).Devices.Single().OpcUaPublished.ShouldBeTrue();
+        await Wait.UntilAsync(() => _ui.Read(() => vm.Devices.FirstOrDefault()?.OpcUaPublished == true), "etiqueta OPC UA del dispositivo");
         await Wait.UntilAsync(() => _ui.Read(() => vm.Devices.Select(d => d.Name).SequenceEqual(["linea1"])), "renombrado");
         _ui.Read(() => vm.Devices[0].Tags.Select(t => t.Name).ToArray()).ShouldBe(["a", "b"]);
         _ui.Read(() => vm.SelectedDevice?.Name).ShouldBe("linea1");

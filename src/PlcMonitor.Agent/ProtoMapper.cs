@@ -31,6 +31,7 @@ internal static class ProtoMapper
             Detail = status.Detail ?? "",
             Since = Timestamp.FromDateTimeOffset(status.Timestamp),
             TagCount = tagCount,
+            OpcUaPublished = status.OpcUaPublished,
         };
         if (status.NextRetry is { } next)
             device.NextRetry = Timestamp.FromDateTimeOffset(next);
@@ -110,6 +111,7 @@ internal static class ProtoMapper
             Driver = device.Driver,
             Enabled = device.Enabled,
             WritesEnabled = device.WritesEnabled,
+            OpcUaPublished = device.OpcUaPublished,
             SettingsJson = device.Settings.ValueKind == JsonValueKind.Undefined ? "{}" : JsonSerializer.Serialize(device.Settings),
             Reconnect = new Api.ReconnectConfig
             {
@@ -126,6 +128,7 @@ internal static class ProtoMapper
                 Name = t.Name ?? "",
                 Address = t.Address,
                 Writable = t.Writable,
+                OpcUaHidden = !t.OpcUaPublished,
                 DataType = t.DataType is { } type ? ToProto(type) : Api.DataType.Unknown,
                 History = t.History is { } h
                     ? new Api.HistoryConfig
@@ -177,6 +180,7 @@ internal static class ProtoMapper
             Driver = pb.Driver.Trim(),
             Enabled = pb.Enabled,
             WritesEnabled = pb.WritesEnabled,
+            OpcUaPublished = pb.OpcUaPublished,
             Settings = settings,
             Reconnect = pb.Reconnect is null
                 ? new ReconnectSettings()
@@ -190,6 +194,7 @@ internal static class ProtoMapper
                 Name = string.IsNullOrWhiteSpace(t.Name) ? null : t.Name.Trim(),
                 Address = t.Address.Trim(),
                 Writable = t.Writable,
+                OpcUaPublished = !t.OpcUaHidden,
                 DataType = t.DataType == Api.DataType.Unknown ? null : FromProto(t.DataType),
                 History = t.History is { } h
                     ? new TagHistorySettings

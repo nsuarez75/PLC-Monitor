@@ -261,6 +261,10 @@ public sealed partial class DeviceViewModel : ObservableObject
     [ObservableProperty]
     public partial bool WritesEnabled { get; set; }
 
+    /// <summary>Publicado en el servidor OPC UA del agente (1.ª llave).</summary>
+    [ObservableProperty]
+    public partial bool OpcUaPublished { get; set; }
+
     [ObservableProperty]
     [NotifyPropertyChangedFor(nameof(IsConnected), nameof(IsFaulted), nameof(IsConnecting), nameof(StateText))]
     public partial ConnectionState State { get; set; }
@@ -293,6 +297,7 @@ public sealed partial class DeviceViewModel : ObservableObject
         Driver = device.Driver;
         Enabled = device.Enabled;
         WritesEnabled = device.WritesEnabled;
+        OpcUaPublished = device.OpcUaPublished;
         State = device.State;
         var detail = device.Detail;
         if (device.NextRetry is not null)

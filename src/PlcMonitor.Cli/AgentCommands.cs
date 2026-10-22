@@ -713,6 +713,8 @@ public sealed class AgentTagAddCommand : AsyncCommand<AgentTagAddSettings>
                 Name = settings.Name ?? string.Empty,
                 Address = settings.Address,
                 Writable = settings.Writable,
+                // La llave de publicación en OPC UA tampoco se toca: se conserva (nuevo = publicado).
+                OpcUaHidden = previous?.OpcUaHidden ?? false,
                 DataType = dataType,
                 History = settings.HistoryConfig(),
                 // La transformación y el grupo de visualización no se tocan desde aquí: se conservan los que tuviera.

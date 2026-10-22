@@ -171,6 +171,9 @@
                 <Border Classes="pill accent" IsVisible="{Binding WritesEnabled}">
                   <TextBlock Text="Escritura habilitada" />
                 </Border>
+                <Border Classes="pill accent" IsVisible="{Binding OpcUaPublished}" ToolTip.Tip="Publicado en el servidor OPC UA del agente">
+                  <TextBlock Text="OPC UA" />
+                </Border>
               </StackPanel>
               <TextBlock Classes="muted" TextWrapping="Wrap" FontSize="12">
                 <Run Text="{Binding Driver}" /><Run Text="  ·  desde " /><Run Text="{Binding Since}" /><Run Text="  " /><Run Text="{Binding Detail}" />
@@ -513,6 +516,8 @@
                   <StackPanel Grid.Row="3" Grid.Column="1" Orientation="Horizontal" Spacing="20">
                     <CheckBox Content="Activo" IsChecked="{Binding Enabled}" />
                     <CheckBox Content="Escrituras habilitadas (1.ª llave)" IsChecked="{Binding WritesEnabled}" />
+                    <CheckBox Content="Publicar en OPC UA (1.ª llave)" IsChecked="{Binding OpcUaPublished}"
+                              ToolTip.Tip="El dispositivo aparece en el servidor OPC UA del agente con los tags que tengan la 2.ª llave (activada por defecto)" />
                   </StackPanel>
                   <StackPanel Grid.Row="4" Spacing="2">
                     <TextBlock Text="Reconexión" FontWeight="Medium" />

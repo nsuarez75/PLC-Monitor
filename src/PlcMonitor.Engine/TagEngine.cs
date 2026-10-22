@@ -193,7 +193,7 @@ public sealed class TagEngine : IAsyncDisposable, IEngineSink
         }
     }
 
-    /// <summary>Mismo dispositivo y misma conexión: solo cambian grupos, tags o la llave de escritura.</summary>
+    /// <summary>Mismo dispositivo y misma conexión: solo cambian grupos, tags o las llaves de escritura y de OPC UA.</summary>
     private static bool CanReconfigureInPlace(DeviceConfiguration current, DeviceConfiguration next)
     {
         if (!string.Equals(current.Name, next.Name, StringComparison.Ordinal))
@@ -203,6 +203,7 @@ public sealed class TagEngine : IAsyncDisposable, IEngineSink
             var copy = Clone(device);
             copy.ScanGroups.Clear();
             copy.WritesEnabled = false;
+            copy.OpcUaPublished = false;
             return ConfigurationFile.Serialize(new AgentConfiguration { Devices = [copy] });
         }
         return ConnectionPart(current) == ConnectionPart(next);

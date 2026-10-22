@@ -36,6 +36,7 @@ public sealed partial class TagDetailsViewModel : ObservableObject
         Tag = tag;
         Device = device.Name;
         WritesEnabled = device.WritesEnabled;
+        DeviceOpcUaPublished = device.OpcUaPublished;
         _originalName = tag.Name;
         _groupIntervals = device.ScanGroups.ToDictionary(g => g.Name, g => g.IntervalMs, StringComparer.OrdinalIgnoreCase);
         Groups = [.. device.ScanGroups.Select(g => g.Name)];
@@ -45,6 +46,7 @@ public sealed partial class TagDetailsViewModel : ObservableObject
         Name = string.IsNullOrEmpty(config?.Name) ? tag.Name : config.Name;
         Address = config?.Address ?? tag.Address;
         Writable = config?.Writable ?? tag.Writable;
+        OpcUaPublished = config?.OpcUaHidden != true;
         SelectedDataType = config is null || config.DataType == Agent.Contracts.DataType.Unknown ? AutomaticType : config.DataType.ToString();
         GroupName = group?.Name ?? "default";
         IntervalMs = group?.IntervalMs ?? 1000;
@@ -375,6 +377,13 @@ public sealed partial class TagDetailsViewModel : ObservableObject
     [ObservableProperty]
     public partial bool Writable { get; set; }
 
+    /// <summary>Segunda llave de publicación en OPC UA (la primera es la del dispositivo).</summary>
+    [ObservableProperty]
+    public partial bool OpcUaPublished { get; set; }
+
+    /// <summary>El dispositivo se publica en OPC UA (1.ª llave).</summary>
+    public bool DeviceOpcUaPublished { get; }
+
     [ObservableProperty]
     public partial string SelectedDataType { get; set; } = AutomaticType;
 
@@ -469,6 +478,7 @@ public sealed partial class TagDetailsViewModel : ObservableObject
                 Name = name == address ? "" : name,
                 Address = address,
                 Writable = Writable,
+                OpcUaHidden = !OpcUaPublished,
                 DataType = SelectedDataType == AutomaticType ? Agent.Contracts.DataType.Unknown : Enum.Parse<DataType>(SelectedDataType),
                 History = HistoryEnabled || HistoryMinIntervalMs > 0 || HistoryMaxIntervalMs > 0 || HistoryDeadband > 0 || TriggerEnabled
                     ? new HistoryConfig

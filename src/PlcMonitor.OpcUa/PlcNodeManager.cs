@@ -11,7 +11,8 @@ using PlcMonitor.Historian;
 namespace PlcMonitor.OpcUa;
 
 /// <summary>
-/// Espacio de direcciones con los tags del motor, en <c>Objects/PLC-Monitor/&lt;dispositivo&gt;/[carpetas]/&lt;tag&gt;</c>
+/// Espacio de direcciones con los tags publicados del motor (doble llave: el dispositivo y el tag), en
+/// <c>Objects/PLC-Monitor/&lt;dispositivo&gt;/[carpetas]/&lt;tag&gt;</c>
 /// (NodeId <c>ns=…;s=&lt;dispositivo&gt;/&lt;tag&gt;</c>) y el estado de cada dispositivo en <c>_Estado</c>. Sigue los cambios
 /// del motor en caliente (valores, estado, altas, bajas y reconfiguraciones) con una única tarea que lo serializa todo.
 /// </summary>
@@ -64,10 +65,10 @@ internal sealed class PlcNodeManager : AsyncCustomNodeManager
         try
         {
             var tags = subscription.InitialTags.ToLookup(t => t.Definition.Key.Device, StringComparer.OrdinalIgnoreCase);
-            foreach (var status in subscription.InitialDevices)
+            foreach (var status in subscription.InitialDevices.Where(d => d.OpcUaPublished))
             {
                 var device = CreateDevice(status);
-                foreach (var tag in tags[status.Device])
+                foreach (var tag in tags[status.Device].Where(t => t.Definition.OpcUaPublished))
                     CreateTag(device, tag);
             }
             await AddPredefinedNodeAsync(SystemContext, _root, cancellationToken);
@@ -148,6 +149,7 @@ internal sealed class PlcNodeManager : AsyncCustomNodeManager
                         ApplyValue(tag.Variable, update.Value);
                 }
                 break;
+            // Un cambio de la llave de publicación del dispositivo llega como reconfiguración (DeviceConfigured).
             case DeviceStatusChanged status:
                 await _gate.WaitAsync(token);
                 try
@@ -199,10 +201,10 @@ internal sealed class PlcNodeManager : AsyncCustomNodeManager
         try
         {
             var tags = subscription.InitialTags.ToLookup(t => t.Definition.Key.Device, StringComparer.OrdinalIgnoreCase);
-            var present = subscription.InitialDevices.Select(d => d.Device).ToHashSet(StringComparer.OrdinalIgnoreCase);
+            var present = subscription.InitialDevices.Where(d => d.OpcUaPublished).Select(d => d.Device).ToHashSet(StringComparer.OrdinalIgnoreCase);
             foreach (var gone in _devices.Keys.Where(d => !present.Contains(d)).ToList())
                 await RemoveDeviceAsync(gone, token);
-            foreach (var status in subscription.InitialDevices)
+            foreach (var status in subscription.InitialDevices.Where(d => d.OpcUaPublished))
                 await SyncDeviceAsync(status, [.. tags[status.Device]], token);
         }
         finally
@@ -213,10 +215,17 @@ internal sealed class PlcNodeManager : AsyncCustomNodeManager
 
     /// <summary>
     /// Alta o reconfiguración de un dispositivo: los tags que siguen igual conservan su nodo (y las suscripciones de los
-    /// clientes); los que cambian de tipo o de carpeta se vuelven a crear; los que ya no están se quitan.
+    /// clientes); los que cambian de tipo o de carpeta se vuelven a crear; los que ya no están (o ya no se publican) se
+    /// quitan. Un dispositivo que deja de publicarse desaparece entero.
     /// </summary>
-    private async Task SyncDeviceAsync(DeviceStatus status, IReadOnlyList<TagSnapshot> tags, CancellationToken token)
+    private async Task SyncDeviceAsync(DeviceStatus status, IReadOnlyList<TagSnapshot> allTags, CancellationToken token)
     {
+        if (!status.OpcUaPublished)
+        {
+            await RemoveDeviceAsync(status.Device, token);
+            return;
+        }
+        var tags = allTags.Where(t => t.Definition.OpcUaPublished).ToList();
         if (!_devices.TryGetValue(status.Device, out var device))
         {
             device = CreateDevice(status);
