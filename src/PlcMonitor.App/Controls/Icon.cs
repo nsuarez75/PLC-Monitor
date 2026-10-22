@@ -46,6 +46,7 @@ public sealed class Icon : Control
         ["alert"] = "M12 2a10 10 0 1 0 0 20a10 10 0 1 0 0-20z M12 8v4 M12 16h.01",
         ["info"] = "M12 2a10 10 0 1 0 0 20a10 10 0 1 0 0-20z M12 16v-4 M12 8h.01",
         ["save"] = "M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z M17 21v-8H7v8 M7 3v5h8",
+        ["chevron-up"] = "M18 15l-6-6-6 6",
         ["chevron-down"] = "M6 9l6 6 6-6",
         ["chevron-right"] = "M9 18l6-6-6-6",
         ["replace"] = "M16 3l4 4-4 4 M20 7H4 M8 21l-4-4 4-4 M4 17h16",

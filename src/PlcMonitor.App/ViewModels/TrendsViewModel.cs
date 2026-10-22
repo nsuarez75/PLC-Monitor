@@ -92,10 +92,14 @@ public sealed partial class TrendsViewModel : ObservableObject, IDisposable
         _main = main ?? throw new ArgumentNullException(nameof(main));
         _path = path;
         _all = TrendViewStore.Load(path);
+        _panelsPath = TrendPanelStore.PathNextTo(path);
+        _allPanels = TrendPanelStore.Load(_panelsPath);
         Tags.CollectionChanged += (_, _) => OnPropertyChanged(nameof(XAxisText));
         // Las vistas de CSV no dependen del agente: se ven siempre.
         foreach (var view in _all.Where(v => v.Agent == main.AgentKey || v.DataSource == TrendDataSource.Csv))
             Views.Add(new TrendViewItem(view));
+        foreach (var panel in _allPanels.Where(p => p.Agent == main.AgentKey))
+            Panels.Add(new TrendPanelItem(panel));
         _main.TagsChanged += OnTagsChanged;
         Selected = Views.FirstOrDefault();
     }
@@ -103,7 +107,15 @@ public sealed partial class TrendsViewModel : ObservableObject, IDisposable
     public ObservableCollection<TrendViewItem> Views { get; } = [];
 
     [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(HeaderTitle))]
     public partial TrendViewItem? Selected { get; set; }
+
+    /// <summary>Título de la página: el panel o la vista elegidos.</summary>
+    public string HeaderTitle => SelectedPanel?.Name ?? Selected?.Name ?? "Tendencias";
+
+    public string HeaderHint => SelectedPanel is null
+        ? "Tags del agente o de un CSV en una gráfica: en vivo, del histórico o del fichero."
+        : "Varias vistas guardadas en una rejilla, cada una con sus datos y su tipo de gráfica.";
 
     /// <summary>Gráfica abierta (null = configurando la vista).</summary>
     [ObservableProperty]
@@ -392,6 +404,8 @@ public sealed partial class TrendsViewModel : ObservableObject, IDisposable
 
     partial void OnSelectedChanged(TrendViewItem? value)
     {
+        if (value is not null)
+            SelectedPanel = null;
         Live = null;
         Bars = null;
         LoadForm(value?.View);
@@ -798,13 +812,18 @@ public sealed partial class TrendsViewModel : ObservableObject, IDisposable
             return;
         _all.Remove(item.View);
         Views.Remove(item);
+        ForgetInPanels(item.View);
         OnPropertyChanged(nameof(HasViews));
         Selected = Views.FirstOrDefault();
         Persist();
     }
 
     /// <summary>Avanza la gráfica abierta (temporizador de la vista).</summary>
-    public void Refresh(DateTimeOffset now) => Live?.Refresh(now);
+    public void Refresh(DateTimeOffset now)
+    {
+        Live?.Refresh(now);
+        OpenPanel?.Refresh(now);
+    }
 
     private void Apply(TrendViewItem item)
     {
@@ -839,9 +858,14 @@ public sealed partial class TrendsViewModel : ObservableObject, IDisposable
     private void OnTagsChanged(object? sender, EventArgs e)
     {
         Live?.RefreshTags();
+        OpenPanel?.RefreshTags();
         if (Live is null)
             RefreshAvailable();
     }
 
-    public void Dispose() => _main.TagsChanged -= OnTagsChanged;
+    public void Dispose()
+    {
+        _main.TagsChanged -= OnTagsChanged;
+        OpenPanel?.Dispose();
+    }
 }
