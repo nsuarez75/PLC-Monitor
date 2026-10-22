@@ -210,6 +210,56 @@
                 </StackPanel>
               </TabItem.Header>
               <DockPanel Margin="0,12,0,0">
+                <!-- Alta de tags por dirección -->
+                <Border DockPanel.Dock="Top" Classes="card" Padding="14" Margin="0,0,0,10" DataContext="{Binding AddTag}" x:DataType="vm:AddTagViewModel"
+                        IsVisible="{Binding IsOpen}">
+                  <StackPanel Spacing="10">
+                    <Grid ColumnDefinitions="*,Auto">
+                      <TextBlock Text="AÑADIR TAG POR DIRECCIÓN" Classes="caption" VerticalAlignment="Center" />
+                      <Button Grid.Column="1" Classes="ghost" Command="{Binding CloseCommand}" ToolTip.Tip="Cerrar">
+                        <c:Icon Kind="x" Width="14" Height="14" />
+                      </Button>
+                    </Grid>
+                    <Grid ColumnDefinitions="2*,*,Auto,Auto" ColumnSpacing="8">
+                      <TextBox Text="{Binding Address}" Classes="mono" PlaceholderText="Dirección (p.ej. DB1.DBW10)">
+                        <TextBox.KeyBindings>
+                          <KeyBinding Gesture="Enter" Command="{Binding TestCommand}" />
+                        </TextBox.KeyBindings>
+                      </TextBox>
+                      <TextBox Grid.Column="1" Text="{Binding Name}" PlaceholderText="Nombre (vacío = la dirección)" />
+                      <Button Grid.Column="2" Classes="secondary" Command="{Binding TestCommand}" ToolTip.Tip="Leer la dirección del PLC sin añadirla">
+                        <StackPanel Orientation="Horizontal" Spacing="6">
+                          <c:Icon Kind="search" />
+                          <TextBlock Text="Probar" />
+                        </StackPanel>
+                      </Button>
+                      <Button Grid.Column="3" Classes="accent" Command="{Binding AddCommand}">
+                        <StackPanel Orientation="Horizontal" Spacing="6">
+                          <c:Icon Kind="plus" />
+                          <TextBlock Text="Añadir" />
+                        </StackPanel>
+                      </Button>
+                    </Grid>
+                    <TextBlock Text="{Binding TestResult}" Classes="mono" FontSize="12.5" Classes.error="{Binding TestIsError}" TextWrapping="Wrap"
+                               IsVisible="{Binding TestResult, Converter={x:Static StringConverters.IsNotNullOrEmpty}}" />
+                    <WrapPanel Orientation="Horizontal">
+                      <TextBlock Text="Grupo" Classes="muted" VerticalAlignment="Center" Margin="0,0,8,6" />
+                      <TextBox Text="{Binding GroupName}" Width="140" Margin="0,0,10,6" />
+                      <TextBlock Text="cada" Classes="muted" VerticalAlignment="Center" Margin="0,0,8,6" />
+                      <NumericUpDown Value="{Binding IntervalMs}" Minimum="50" Increment="250" FormatString="0" Width="130" Margin="0,0,8,6" />
+                      <TextBlock Text="ms (si el grupo es nuevo)" Classes="muted" VerticalAlignment="Center" Margin="0,0,16,6" />
+                      <CheckBox Content="Escribible" IsChecked="{Binding Writable}" Margin="0,0,0,6" />
+                    </WrapPanel>
+                    <TextBlock Text="{Binding Hint}" Classes="muted" FontSize="12" TextWrapping="Wrap" />
+                  </StackPanel>
+                </Border>
+                <Button DockPanel.Dock="Top" Classes="secondary" HorizontalAlignment="Right" Margin="0,0,0,10"
+                        Command="{Binding AddTag.OpenCommand}" IsVisible="{Binding !AddTag.IsOpen}" ToolTip.Tip="Añadir un tag escribiendo su dirección">
+                  <StackPanel Orientation="Horizontal" Spacing="6">
+                    <c:Icon Kind="plus" Width="14" Height="14" />
+                    <TextBlock Text="Añadir tag" />
+                  </StackPanel>
+                </Button>
                 <StackPanel DockPanel.Dock="Top" Orientation="Horizontal" Spacing="8" Margin="0,0,0,10"
                             DataContext="{Binding SelectedDevice}" x:DataType="vm:DeviceViewModel" IsVisible="{Binding HasTags, FallbackValue=False}">
                   <Border Classes="pill good">
@@ -243,7 +293,7 @@
                     <StackPanel DockPanel.Dock="Top" Margin="16,24" Spacing="6" HorizontalAlignment="Center"
                                 IsVisible="{Binding !SelectedDevice.HasTags, FallbackValue=False}">
                       <TextBlock Text="Sin tags" FontWeight="SemiBold" HorizontalAlignment="Center" />
-                      <TextBlock Classes="muted" Text="Añádelos desde la pestaña «Explorar» con el PLC conectado." HorizontalAlignment="Center" />
+                      <TextBlock Classes="muted" Text="{Binding EmptyTagsHint}" HorizontalAlignment="Center" />
                     </StackPanel>
                     <ListBox x:Name="TagsList" Classes="table" ItemsSource="{Binding SelectedDevice.Rows}" SelectionMode="Multiple" DragDrop.AllowDrop="True"
                              ToolTip.Tip="Doble clic para ver el detalle del tag. Clic derecho para editar, ver su histórico, agrupar o quitar (Ctrl o Mayús para elegir varios). Arrastra tags a un grupo para moverlos">
@@ -415,7 +465,7 @@
             </TabItem>
 
             <!-- Explorador de símbolos -->
-            <TabItem Header="Explorar">
+            <TabItem Header="Explorar" IsVisible="{Binding SelectedDeviceCanBrowse}">
               <DockPanel Margin="0,12,0,0" DataContext="{Binding Browse}" x:DataType="vm:BrowseViewModel">
                 <Border DockPanel.Dock="Top" Classes="card" Padding="14" Margin="0,0,0,12">
                   <StackPanel Spacing="12">
