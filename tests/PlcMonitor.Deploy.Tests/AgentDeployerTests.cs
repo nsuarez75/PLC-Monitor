@@ -85,6 +85,7 @@ public sealed class AgentDeployerTests : IDisposable
         var script = install.Input;
         script.ShouldContain(upload.Key);
         script.ShouldContain("useradd --system");
+        script.ShouldContain("for G in dialout uucp; do getent group $G >/dev/null && { usermod -aG $G plcmon; break; }; done"); // puertos serie (Modbus RTU)
         script.ShouldContain("ExecStart=/opt/plc-monitor/agent/plcmon-agent");
         script.ShouldContain("TimeoutStopSec=15"); // margen para parar ordenadamente aunque el sistema baje el valor por defecto
         script.ShouldContain("for P in 5311 4840; do"); // puerto del agente y el de OPC UA

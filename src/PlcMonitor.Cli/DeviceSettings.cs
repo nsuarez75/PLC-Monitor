@@ -1,6 +1,7 @@
 using System.ComponentModel;
 using System.Text.Json;
 using PlcMonitor.Abstractions;
+using PlcMonitor.Drivers.Modbus;
 using PlcMonitor.Drivers.S7Absolute;
 using PlcMonitor.Drivers.S7Symbolic;
 using Spectre.Console;
@@ -14,12 +15,12 @@ public class DeviceSettings : CommandSettings
     public const string PasswordEnvironmentVariable = "PLCMON_PASSWORD";
 
     [CommandOption("-d|--driver <DRIVER>")]
-    [Description("Driver: s7-symbolic (S7-1200/1500, acceso simbólico) o s7-absolute (PUT/GET).")]
+    [Description("Driver: s7-symbolic (S7-1200/1500, acceso simbólico), s7-absolute (PUT/GET) o modbus (TCP, RTU por puerto serie o RTU sobre TCP).")]
     [DefaultValue(S7SymbolicDriverFactory.Id)]
     public string Driver { get; set; } = S7SymbolicDriverFactory.Id;
 
     [CommandOption("-H|--host <HOST>")]
-    [Description("IP o nombre del PLC.")]
+    [Description("IP o nombre del PLC (en Modbus RTU, no se usa: va --serial).")]
     public string Host { get; set; } = "";
 
     [CommandOption("-p|--password <PASSWORD>")]
@@ -46,9 +47,45 @@ public class DeviceSettings : CommandSettings
     public short Slot { get; set; } = 1;
 
     [CommandOption("--port <PORT>")]
-    [Description("Puerto TCP (s7-absolute).")]
-    [DefaultValue(102)]
-    public int Port { get; set; } = 102;
+    [Description("Puerto TCP (s7-absolute: 102 por defecto; modbus: 502).")]
+    public int? Port { get; set; }
+
+    [CommandOption("--serial <PUERTO>")]
+    [Description("Puerto serie para Modbus RTU (COM3, /dev/ttyUSB0...).")]
+    public string? SerialPort { get; set; }
+
+    [CommandOption("--rtu-over-tcp")]
+    [Description("Modbus RTU sobre TCP (convertidor serie-Ethernet en modo transparente) en --host/--port.")]
+    public bool RtuOverTcp { get; set; }
+
+    [CommandOption("--baud <BAUDIOS>")]
+    [Description("Baudios (Modbus RTU).")]
+    [DefaultValue(9600)]
+    public int BaudRate { get; set; } = 9600;
+
+    [CommandOption("--parity <PARIDAD>")]
+    [Description("Paridad (Modbus RTU): none, even u odd.")]
+    [DefaultValue(ModbusParity.None)]
+    public ModbusParity Parity { get; set; } = ModbusParity.None;
+
+    [CommandOption("--stop-bits <BITS>")]
+    [Description("Bits de parada (Modbus RTU): one o two.")]
+    [DefaultValue(ModbusStopBits.One)]
+    public ModbusStopBits StopBits { get; set; } = ModbusStopBits.One;
+
+    [CommandOption("--unit-id <N>")]
+    [Description("Número de esclavo Modbus (unit id).")]
+    [DefaultValue(1)]
+    public int UnitId { get; set; } = 1;
+
+    [CommandOption("--byte-order <ORDEN>")]
+    [Description("Orden de bytes Modbus de los valores de 32/64 bits: ABCD, BADC, CDAB o DCBA.")]
+    [DefaultValue(ModbusByteOrder.ABCD)]
+    public ModbusByteOrder ByteOrder { get; set; } = ModbusByteOrder.ABCD;
+
+    [CommandOption("--one-based")]
+    [Description("Las direcciones Modbus por tabla (HR1, C1...) empiezan en 1.")]
+    public bool OneBased { get; set; }
 
     [CommandOption("-t|--timeout <MS>")]
     [Description("Timeout en milisegundos.")]
@@ -66,10 +103,14 @@ public class DeviceSettings : CommandSettings
 
     public override ValidationResult Validate()
     {
+        if (IsModbusRtu)
+            return string.IsNullOrWhiteSpace(SerialPort) ? ValidationResult.Error("Falta --serial.") : ValidationResult.Success();
         if (string.IsNullOrWhiteSpace(Host))
             return ValidationResult.Error("Falta --host.");
         return ValidationResult.Success();
     }
+
+    private bool IsModbusRtu => Driver.Equals(ModbusDriverFactory.Id, StringComparison.OrdinalIgnoreCase) && !string.IsNullOrWhiteSpace(SerialPort);
 
     /// <summary>Construye la definición del dispositivo para el driver elegido.</summary>
     public DeviceDefinition ToDeviceDefinition(Func<string, string?>? environment = null)
@@ -80,7 +121,7 @@ public class DeviceSettings : CommandSettings
             "S7-ABSOLUTE" => new S7AbsoluteSettings
             {
                 Host = Host,
-                Port = Port,
+                Port = Port ?? 102,
                 Cpu = Cpu,
                 Rack = Rack,
                 Slot = Slot,
@@ -94,8 +135,23 @@ public class DeviceSettings : CommandSettings
                 TimeoutMs = TimeoutMs,
                 Security = Security,
             },
-            _ => throw new ArgumentException($"Driver desconocido '{Driver}'. Usa s7-symbolic o s7-absolute."),
+            "MODBUS" => new ModbusSettings
+            {
+                Transport = IsModbusRtu ? ModbusTransport.Rtu : RtuOverTcp ? ModbusTransport.RtuOverTcp : ModbusTransport.Tcp,
+                Host = Host,
+                Port = Port ?? 502,
+                SerialPort = SerialPort ?? string.Empty,
+                BaudRate = BaudRate,
+                Parity = Parity,
+                StopBits = StopBits,
+                UnitId = UnitId,
+                TimeoutMs = TimeoutMs,
+                ByteOrder = ByteOrder,
+                OneBasedAddresses = OneBased,
+            },
+            _ => throw new ArgumentException($"Driver desconocido '{Driver}'. Usa s7-symbolic, s7-absolute o modbus."),
         };
-        return new DeviceDefinition(Host, Driver, JsonSerializer.SerializeToElement(settings, settings.GetType(), DriverJson.Options));
+        var name = IsModbusRtu ? SerialPort! : Host;
+        return new DeviceDefinition(name, Driver, JsonSerializer.SerializeToElement(settings, settings.GetType(), DriverJson.Options));
     }
 }

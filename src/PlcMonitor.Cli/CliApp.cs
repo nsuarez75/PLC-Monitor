@@ -25,7 +25,9 @@ public static class CliApp
         config.AddCommand<ReadCommand>("read")
             .WithDescription("Lee una o varias direcciones.")
             .WithExample("read", "\"MiDB\".Motor.Velocidad", "-H", "192.168.2.1")
-            .WithExample("read", "DB1.DBW10", "DB1.REAL20", "-d", "s7-absolute", "-H", "192.168.0.10", "--cpu", "S7300", "--slot", "2");
+            .WithExample("read", "DB1.DBW10", "DB1.REAL20", "-d", "s7-absolute", "-H", "192.168.0.10", "--cpu", "S7300", "--slot", "2")
+            .WithExample("read", "HR0", "HR10:FLOAT", "C3", "-d", "modbus", "-H", "192.168.0.20", "--unit-id", "1")
+            .WithExample("read", "40001", "30005:UINT16", "-d", "modbus", "--serial", "/dev/ttyUSB0", "--baud", "19200", "--parity", "even", "--unit-id", "3");
         config.AddCommand<WatchCommand>("watch")
             .WithDescription("Lee periódicamente y muestra los cambios (Ctrl+C para salir).")
             .WithExample("watch", "\"MiDB\".Contador", "-H", "192.168.2.1", "-i", "500");

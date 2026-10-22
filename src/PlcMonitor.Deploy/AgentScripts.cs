@@ -41,6 +41,9 @@ internal static class AgentScripts
         D={{LinuxDir}}
         A='{{archive}}'
         id plcmon >/dev/null 2>&1 || useradd --system --no-create-home --shell /usr/sbin/nologin plcmon
+        # Modbus RTU: acceso a los puertos serie (/dev/ttyUSB0...), que son del grupo dialout (Debian, Ubuntu, Fedora) o uucp (Arch).
+        # systemd carga los grupos del usuario al arrancar el servicio.
+        for G in dialout uucp; do getent group $G >/dev/null && { usermod -aG $G plcmon; break; }; done
         systemctl stop {{LinuxService}} 2>/dev/null || true
         mkdir -p "$D"
         [ -s "$A" ] || { echo "No llegó el ejecutable del agente" >&2; exit 3; }

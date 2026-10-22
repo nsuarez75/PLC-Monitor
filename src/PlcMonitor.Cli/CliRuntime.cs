@@ -1,6 +1,7 @@
 using Microsoft.Extensions.Logging;
 using PlcMonitor.Abstractions;
 using PlcMonitor.Core;
+using PlcMonitor.Drivers.Modbus;
 using PlcMonitor.Drivers.S7Absolute;
 using PlcMonitor.Drivers.S7Symbolic;
 using Spectre.Console;
@@ -10,7 +11,7 @@ namespace PlcMonitor.Cli;
 /// <summary>Servicios compartidos por los comandos: drivers disponibles, logging y conexión.</summary>
 internal static class CliRuntime
 {
-    public static DriverRegistry Registry { get; } = new([new S7SymbolicDriverFactory(), new S7AbsoluteDriverFactory()]);
+    public static DriverRegistry Registry { get; } = new([new S7SymbolicDriverFactory(), new S7AbsoluteDriverFactory(), new ModbusDriverFactory()]);
 
     public static async Task<(IDeviceConnection Connection, ILoggerFactory Logging)> ConnectAsync(DeviceSettings settings, CancellationToken cancellationToken)
     {
