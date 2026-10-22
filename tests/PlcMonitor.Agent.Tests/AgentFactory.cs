@@ -1,8 +1,10 @@
+using System.Collections.Concurrent;
 using Grpc.Net.Client;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Mvc.Testing;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
+using Microsoft.Extensions.Logging;
 using PlcMonitor.Agent.Contracts;
 using PlcMonitor.Core;
 using PlcMonitor.Engine.Configuration;
@@ -32,6 +34,9 @@ internal sealed class AgentFactory : WebApplicationFactory<Program>
 
     public string ConfigPath => Path.Combine(Directory, "agent.json");
 
+    /// <summary>Mensajes del log de auditoría (PlcMonitor.Audit) en el orden en que llegan.</summary>
+    public ConcurrentQueue<string> AuditLog { get; } = new();
+
     /// <summary>Ajustes adicionales del agente (p.ej. Agent:Security:TokenSha256). Se aplican al arrancar.</summary>
     public Dictionary<string, string> Settings { get; } = [];
 
@@ -60,6 +65,7 @@ internal sealed class AgentFactory : WebApplicationFactory<Program>
         builder.UseSetting("Agent:ConfigPath", ConfigPath);
         foreach (var (key, value) in Settings)
             builder.UseSetting(key, value);
+        builder.ConfigureLogging(logging => logging.AddProvider(new AuditCapture(AuditLog)));
         builder.ConfigureServices(services =>
         {
             services.RemoveAll<DriverRegistry>();
@@ -79,6 +85,26 @@ internal sealed class AgentFactory : WebApplicationFactory<Program>
         catch (IOException)
         {
             // El historiador puede tardar un instante en soltar sus ficheros: es una carpeta temporal.
+        }
+    }
+
+    /// <summary>Guarda los mensajes de la categoría de auditoría.</summary>
+    private sealed class AuditCapture(ConcurrentQueue<string> log) : ILoggerProvider, ILogger
+    {
+        private string? _category;
+
+        public ILogger CreateLogger(string categoryName) =>
+            categoryName == "PlcMonitor.Audit" ? new AuditCapture(log) { _category = categoryName } : Microsoft.Extensions.Logging.Abstractions.NullLogger.Instance;
+
+        public IDisposable? BeginScope<TState>(TState state) where TState : notnull => null;
+
+        public bool IsEnabled(LogLevel logLevel) => _category is not null;
+
+        public void Log<TState>(LogLevel logLevel, EventId eventId, TState state, Exception? exception, Func<TState, Exception?, string> formatter) =>
+            log.Enqueue(formatter(state, exception));
+
+        public void Dispose()
+        {
         }
     }
 
