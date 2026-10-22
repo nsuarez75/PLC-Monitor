@@ -197,6 +197,29 @@ public class MainWindowTests
     });
 
     [Fact]
+    public Task Absolute_devices_add_tags_by_address_without_explore() => HeadlessApp.RunAsync(() =>
+    {
+        Avalonia.Application.Current!.RequestedThemeVariant = Avalonia.Styling.ThemeVariant.Light;
+        var vm = ViewModelWithData();
+        var window = new MainWindow { DataContext = vm };
+        window.Show();
+        // El agente de prueba no declara drivers con explorador: es lo que pasa con el absoluto (PUT/GET).
+        vm.SelectedDevice = vm.Devices.Single(d => d.Name == "prensa2");
+        vm.AddTag.OpenCommand.Execute(null);
+        vm.AddTag.Address = "DB1.REAL20";
+        vm.AddTag.Name = "presion";
+        vm.AddTag.TestResult = "✔ 4.25 (Float)";
+        window.UpdateLayout();
+
+        vm.SelectedDeviceCanBrowse.ShouldBeFalse();
+        window.GetVisualDescendants().OfType<TabItem>().Where(t => t.IsVisible).Select(t => t.Header as string).ShouldNotContain("Explorar");
+        var texts = window.GetVisualDescendants().OfType<TextBlock>().Where(t => t.IsEffectivelyVisible).Select(t => t.Text).ToList();
+        texts.ShouldContain("AÑADIR TAG POR DIRECCIÓN");
+        texts.ShouldContain("Añádelos con «Añadir tag» indicando su dirección (p.ej. DB1.DBW10).");
+        Capture(window, "add-tag.png");
+    });
+
+    [Fact]
     public Task Opc_ua_page_shows_status_users_and_clients() => HeadlessApp.RunAsync(() =>
     {
         Avalonia.Application.Current!.RequestedThemeVariant = Avalonia.Styling.ThemeVariant.Light;

@@ -66,6 +66,7 @@ public sealed partial class MainViewModel : ObservableObject, IAgentContext, IAs
         RecentAgents = [.. settings.RecentAgents];
         TagColumns = ValidTagColumns(settings.TagColumns) ?? DefaultTagColumns;
         Browse = new BrowseViewModel(this, () => SelectedDevice);
+        AddTag = new AddTagViewModel(this, () => SelectedDevice, DriverOf);
         History = new HistoryViewModel(this, () => SelectedDevice);
         History.OpenInTrendsRequested += (_, view) =>
         {
@@ -192,6 +193,22 @@ public sealed partial class MainViewModel : ObservableObject, IAgentContext, IAs
 
     public BrowseViewModel Browse { get; }
 
+    /// <summary>Alta de tags por dirección (la única forma en drivers sin explorador, como el absoluto).</summary>
+    public AddTagViewModel AddTag { get; }
+
+    private Driver? DriverOf(string? id) => Drivers.FirstOrDefault(d => string.Equals(d.Id, id, StringComparison.OrdinalIgnoreCase));
+
+    /// <summary>
+    /// El driver del dispositivo seleccionado sabe explorar (simbólico). El absoluto (PUT/GET) no: se oculta la
+    /// pestaña «Explorar» y los tags se añaden por dirección.
+    /// </summary>
+    public bool SelectedDeviceCanBrowse => DriverOf(SelectedDevice?.Driver)?.CanBrowse == true;
+
+    /// <summary>Qué hacer cuando el dispositivo aún no tiene tags.</summary>
+    public string EmptyTagsHint => SelectedDeviceCanBrowse
+        ? "Añádelos con «Añadir tag» o búscalos en «Explorar» con el PLC conectado."
+        : "Añádelos con «Añadir tag» indicando su dirección (p.ej. DB1.DBW10).";
+
     /// <summary>Consulta del histórico del dispositivo seleccionado.</summary>
     public HistoryViewModel History { get; }
 
@@ -307,6 +324,12 @@ public sealed partial class MainViewModel : ObservableObject, IAgentContext, IAs
     {
         Browse.Clear();
         History.Reset();
+        AddTag.Reset();
+        OnPropertyChanged(nameof(SelectedDeviceCanBrowse));
+        OnPropertyChanged(nameof(EmptyTagsHint));
+        // Sin explorador no hay pestaña «Explorar»: si estaba abierta se vuelve a Tags.
+        if (DeviceTab == ExploreTab && !SelectedDeviceCanBrowse)
+            DeviceTab = 0;
     }
 
     public void Report(string message, bool isError = false) => _ui.Post(() =>
@@ -516,6 +539,9 @@ public sealed partial class MainViewModel : ObservableObject, IAgentContext, IAs
 
     public const int HistoryTab = 1;
 
+    /// <summary>Índice de la pestaña «Explorar» del dispositivo.</summary>
+    private const int ExploreTab = 2;
+
     /// <summary>Abre la pestaña Histórico con solo este tag marcado y lo consulta (menú del tag).</summary>
     [RelayCommand]
     private async Task OpenTagHistoryAsync(TagViewModel? tag)
@@ -647,6 +673,8 @@ public sealed partial class MainViewModel : ObservableObject, IAgentContext, IAs
     private void ApplyInfo(AgentInfo info)
     {
         Drivers = [.. info.Drivers];
+        OnPropertyChanged(nameof(SelectedDeviceCanBrowse));
+        OnPropertyChanged(nameof(EmptyTagsHint));
         HistorianEnabled = info.Historian?.Enabled ?? false;
         // Un agente anterior a los roles no dice nada (UNSPECIFIED): su único token es de acceso completo.
         ReadOnlyAccess = info.Access == AccessLevel.Read;

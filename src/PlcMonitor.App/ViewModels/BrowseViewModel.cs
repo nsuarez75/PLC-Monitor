@@ -106,21 +106,9 @@ public sealed partial class BrowseViewModel(IAgentContext context, Func<DeviceVi
             return;
         try
         {
-            var config = await client.GetDeviceConfigAsync(new DeviceRequest { Device = target.Name });
-            if (config.ScanGroups.SelectMany(g => g.Tags).Any(t => t.Address == item.Address || (string.IsNullOrEmpty(t.Name) ? t.Address : t.Name) == item.Address))
-            {
-                item.IsAdded = true;
-                context.Report($"{item.Address} ya es un tag de {target.Name}");
-                return;
-            }
-            var groupName = string.IsNullOrWhiteSpace(GroupName) ? "default" : GroupName.Trim();
-            var group = config.ScanGroups.FirstOrDefault(g => string.Equals(g.Name, groupName, StringComparison.OrdinalIgnoreCase));
-            if (group is null)
-                config.ScanGroups.Add(group = new ScanGroupConfig { Name = groupName, IntervalMs = IntervalMs });
-            group.Tags.Add(new TagConfig { Address = item.Address, Writable = AddWritable });
-            await client.PutDeviceAsync(new PutDeviceRequest { Device = config, Persist = true });
+            var result = await TagAdder.AddAsync(client, target.Name, item.Address, null, GroupName, IntervalMs, AddWritable);
             item.IsAdded = true;
-            context.Report($"Añadido {item.Address} a {target.Name} (grupo {group.Name}, {group.IntervalMs} ms)");
+            context.Report(result.Message);
         }
         catch (RpcException ex)
         {
