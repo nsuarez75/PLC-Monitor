@@ -1,0 +1,16 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <Description>Driver Modbus: TCP, RTU (serie RS-485/RS-232) y RTU sobre TCP (convertidores serie-Ethernet).</Description>
+  </PropertyGroup>
+  <ItemGroup>
+    <PackageReference Include="FluentModbus" />
+    <!-- FluentModbus pide la 5.0.0; se usa la de .NET 10, como el resto de paquetes de Microsoft. -->
+    <PackageReference Include="System.IO.Ports" />
+  </ItemGroup>
+  <ItemGroup>
+    <ProjectReference Include="..\PlcMonitor.Abstractions\PlcMonitor.Abstractions.csproj" />
+  </ItemGroup>
+  <ItemGroup>
+    <InternalsVisibleTo Include="PlcMonitor.Drivers.Modbus.Tests" />
+  </ItemGroup>
+</Project>
