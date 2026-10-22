@@ -2,6 +2,7 @@ using System.Text.Json;
 using Microsoft.Extensions.Logging.Abstractions;
 using PlcMonitor.Abstractions;
 using PlcMonitor.Core;
+using PlcMonitor.Drivers.Modbus;
 using PlcMonitor.Drivers.S7Absolute;
 using PlcMonitor.Drivers.S7Symbolic;
 
@@ -126,5 +127,23 @@ public class RealPlcTests
         await using var conn = new S7AbsoluteDriverFactory().CreateConnection(device, NullLoggerFactory.Instance);
         await conn.ConnectAsync(TestContext.Current.CancellationToken);
         (await conn.ReadAsync([address!], TestContext.Current.CancellationToken))[0].Quality.ShouldBe(QualityCode.Good);
+    }
+
+    /// <summary>
+    /// Solo lectura contra un equipo Modbus real. PLCMON_IT_MODBUS_SETTINGS: ajustes del driver en JSON, p.ej.
+    /// {"host":"192.168.0.20","unitId":1} o {"transport":"Rtu","serialPort":"/dev/ttyUSB0","baudRate":19200,"unitId":3};
+    /// PLCMON_IT_MODBUS_ADDR: una dirección que exista (p.ej. HR0).
+    /// </summary>
+    [Fact]
+    public async Task Modbus_reads_address()
+    {
+        var json = Env("PLCMON_IT_MODBUS_SETTINGS");
+        var address = Env("PLCMON_IT_MODBUS_ADDR");
+        Assert.SkipWhen(json is null || address is null, "PLCMON_IT_MODBUS_SETTINGS / PLCMON_IT_MODBUS_ADDR no definidas");
+        var device = new DeviceDefinition("it-modbus", ModbusDriverFactory.Id, JsonDocument.Parse(json!).RootElement.Clone());
+        await using var conn = new ModbusDriverFactory().CreateConnection(device, NullLoggerFactory.Instance);
+        await conn.ConnectAsync(TestContext.Current.CancellationToken);
+        var value = (await conn.ReadAsync([address!], TestContext.Current.CancellationToken))[0];
+        value.Quality.ShouldBe(QualityCode.Good, value.ErrorDetail);
     }
 }

@@ -13,6 +13,7 @@
   <ItemGroup>
     <ProjectReference Include="..\PlcMonitor.Agent.Contracts\PlcMonitor.Agent.Contracts.csproj" />
     <ProjectReference Include="..\PlcMonitor.Core\PlcMonitor.Core.csproj" />
+    <ProjectReference Include="..\PlcMonitor.Drivers.Modbus\PlcMonitor.Drivers.Modbus.csproj" />
     <ProjectReference Include="..\PlcMonitor.Drivers.S7Absolute\PlcMonitor.Drivers.S7Absolute.csproj" />
     <ProjectReference Include="..\PlcMonitor.Drivers.S7Symbolic\PlcMonitor.Drivers.S7Symbolic.csproj" />
   </ItemGroup>

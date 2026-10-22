@@ -5,6 +5,7 @@ using Microsoft.AspNetCore.Mvc.Testing;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
 using Microsoft.Extensions.Logging;
+using PlcMonitor.Abstractions;
 using PlcMonitor.Agent.Contracts;
 using PlcMonitor.Core;
 using PlcMonitor.Engine.Configuration;
@@ -28,6 +29,9 @@ internal sealed class AgentFactory : WebApplicationFactory<Program>
         File.WriteAllText(ConfigPath, ConfigurationFile.Serialize(configuration));
 
     public FakeDriverFactory Driver { get; } = new();
+
+    /// <summary>Drivers reales que se registran además del simulado (p.ej. Modbus contra un esclavo en memoria).</summary>
+    public List<IDriverFactory> ExtraDrivers { get; } = [];
 
     /// <summary>Carpeta propia del agente de prueba (configuración e histórico).</summary>
     public string Directory { get; } = System.IO.Directory.CreateTempSubdirectory("plcmon-agent-").FullName;
@@ -69,7 +73,7 @@ internal sealed class AgentFactory : WebApplicationFactory<Program>
         builder.ConfigureServices(services =>
         {
             services.RemoveAll<DriverRegistry>();
-            services.AddSingleton(new DriverRegistry([Driver]));
+            services.AddSingleton(new DriverRegistry([Driver, .. ExtraDrivers]));
         });
     }
 

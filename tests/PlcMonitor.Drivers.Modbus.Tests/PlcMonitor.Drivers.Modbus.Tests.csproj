@@ -1,0 +1,5 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <ItemGroup>
+    <ProjectReference Include="..\..\src\PlcMonitor.Drivers.Modbus\PlcMonitor.Drivers.Modbus.csproj" />
+  </ItemGroup>
+</Project>

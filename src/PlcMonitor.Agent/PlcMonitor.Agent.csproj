@@ -16,6 +16,7 @@
     <ProjectReference Include="..\PlcMonitor.Engine\PlcMonitor.Engine.csproj" />
     <ProjectReference Include="..\PlcMonitor.Historian\PlcMonitor.Historian.csproj" />
     <ProjectReference Include="..\PlcMonitor.OpcUa\PlcMonitor.OpcUa.csproj" />
+    <ProjectReference Include="..\PlcMonitor.Drivers.Modbus\PlcMonitor.Drivers.Modbus.csproj" />
     <ProjectReference Include="..\PlcMonitor.Drivers.S7Absolute\PlcMonitor.Drivers.S7Absolute.csproj" />
     <ProjectReference Include="..\PlcMonitor.Drivers.S7Symbolic\PlcMonitor.Drivers.S7Symbolic.csproj" />
   </ItemGroup>

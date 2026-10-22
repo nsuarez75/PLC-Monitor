@@ -8,9 +8,12 @@
       PLCMON_IT_SYMBOL          símbolo legible para la prueba de lectura (opcional)
       PLCMON_IT_ABSOLUTE_HOST   IP de un PLC con PUT/GET habilitado (opcional)
       PLCMON_IT_ABSOLUTE_ADDR   dirección absoluta legible, p.ej. DB1.DBW0 (opcional)
+      PLCMON_IT_MODBUS_SETTINGS ajustes JSON del driver modbus, p.ej. {"host":"192.168.0.20","unitId":1} (opcional)
+      PLCMON_IT_MODBUS_ADDR     dirección Modbus legible, p.ej. HR0 (opcional)
   -->
   <ItemGroup>
     <ProjectReference Include="..\..\src\PlcMonitor.Core\PlcMonitor.Core.csproj" />
+    <ProjectReference Include="..\..\src\PlcMonitor.Drivers.Modbus\PlcMonitor.Drivers.Modbus.csproj" />
     <ProjectReference Include="..\..\src\PlcMonitor.Drivers.S7Absolute\PlcMonitor.Drivers.S7Absolute.csproj" />
     <ProjectReference Include="..\..\src\PlcMonitor.Drivers.S7Symbolic\PlcMonitor.Drivers.S7Symbolic.csproj" />
   </ItemGroup>

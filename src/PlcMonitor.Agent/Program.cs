@@ -2,6 +2,7 @@ using Microsoft.AspNetCore.Server.Kestrel.Core;
 using Microsoft.Extensions.Configuration.Memory;
 using PlcMonitor.Agent;
 using PlcMonitor.Core;
+using PlcMonitor.Drivers.Modbus;
 using PlcMonitor.Drivers.S7Absolute;
 using PlcMonitor.Drivers.S7Symbolic;
 
@@ -48,7 +49,7 @@ builder.WebHost.ConfigureKestrel(k => k.ConfigureEndpointDefaults(e => e.Protoco
 
 builder.Services.Configure<AgentOptions>(builder.Configuration.GetSection("Agent"));
 builder.Services.Configure<AgentSecurityOptions>(builder.Configuration.GetSection("Agent:Security"));
-builder.Services.AddSingleton(new DriverRegistry([new S7SymbolicDriverFactory(), new S7AbsoluteDriverFactory()]));
+builder.Services.AddSingleton(new DriverRegistry([new S7SymbolicDriverFactory(), new S7AbsoluteDriverFactory(), new ModbusDriverFactory()]));
 builder.Services.AddSingleton<EngineHost>();
 builder.Services.AddHostedService(sp => sp.GetRequiredService<EngineHost>());
 builder.Services.AddGrpc(o => o.Interceptors.Add<TokenAuthInterceptor>());
