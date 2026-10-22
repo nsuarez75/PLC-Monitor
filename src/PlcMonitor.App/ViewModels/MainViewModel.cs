@@ -16,6 +16,7 @@ public enum AppPage
     Tags,
     Trends,
     Transforms,
+    OpcUa,
     Agents,
 }
 
@@ -131,7 +132,7 @@ public sealed partial class MainViewModel : ObservableObject, IAgentContext, IAs
     /// nada: cada una sigue como se dejó (la tendencia abierta, lo editado sin guardar…).
     /// </summary>
     [ObservableProperty]
-    [NotifyPropertyChangedFor(nameof(IsTagsPage), nameof(IsTrendsPage), nameof(IsTransformsPage), nameof(IsAgentsPage))]
+    [NotifyPropertyChangedFor(nameof(IsTagsPage), nameof(IsTrendsPage), nameof(IsTransformsPage), nameof(IsOpcUaPage), nameof(IsAgentsPage))]
     public partial AppPage Page { get; set; }
 
     public bool IsTagsPage => Page == AppPage.Tags;
@@ -139,6 +140,8 @@ public sealed partial class MainViewModel : ObservableObject, IAgentContext, IAs
     public bool IsTrendsPage => Page == AppPage.Trends;
 
     public bool IsTransformsPage => Page == AppPage.Transforms;
+
+    public bool IsOpcUaPage => Page == AppPage.OpcUa;
 
     public bool IsAgentsPage => Page == AppPage.Agents;
 
@@ -172,6 +175,20 @@ public sealed partial class MainViewModel : ObservableObject, IAgentContext, IAs
     /// <summary>Vuelve a la pestaña Tags; lo editado en Transformaciones sigue ahí.</summary>
     [RelayCommand]
     private void CloseTransforms() => Page = AppPage.Tags;
+
+    /// <summary>Servidor OPC UA del agente conectado; null si aún no se ha abierto o sin conexión.</summary>
+    [ObservableProperty]
+    public partial OpcUaViewModel? OpcUaPanel { get; set; }
+
+    /// <summary>Va a la pestaña OPC UA (la crea la primera vez) y lee el estado del servidor del agente.</summary>
+    [RelayCommand(CanExecute = nameof(IsConnected))]
+    private async Task OpenOpcUaAsync()
+    {
+        var panel = OpcUaPanel ??= new OpcUaViewModel(this);
+        Page = AppPage.OpcUa;
+        if (!panel.IsDirty)
+            await panel.RefreshAsync();
+    }
 
     public BrowseViewModel Browse { get; }
 
@@ -230,7 +247,7 @@ public sealed partial class MainViewModel : ObservableObject, IAgentContext, IAs
     [ObservableProperty]
     [NotifyPropertyChangedFor(nameof(ConnectionText), nameof(IsReconnecting), nameof(IsOnline))]
     [NotifyCanExecuteChangedFor(nameof(ConnectCommand), nameof(DisconnectCommand), nameof(NewDeviceCommand), nameof(EditDeviceCommand), nameof(DeleteDeviceCommand),
-        nameof(OpenTransformsCommand))]
+        nameof(OpenTransformsCommand), nameof(OpenOpcUaCommand))]
     public partial bool IsConnected { get; set; }
 
     [ObservableProperty]
@@ -433,7 +450,8 @@ public sealed partial class MainViewModel : ObservableObject, IAgentContext, IAs
         Editor = null;
         TransformsPanel?.Dispose();
         TransformsPanel = null;
-        if (Page == AppPage.Transforms)
+        OpcUaPanel = null;
+        if (Page is AppPage.Transforms or AppPage.OpcUa)
             Page = AppPage.Tags;
         Devices.Clear();
         _tagIndex.Clear();
