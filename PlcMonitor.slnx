@@ -11,6 +11,7 @@
     <Project Path="src/PlcMonitor.Drivers.S7Symbolic/PlcMonitor.Drivers.S7Symbolic.csproj" />
     <Project Path="src/PlcMonitor.Engine/PlcMonitor.Engine.csproj" />
     <Project Path="src/PlcMonitor.Historian/PlcMonitor.Historian.csproj" />
+    <Project Path="src/PlcMonitor.OpcUa/PlcMonitor.OpcUa.csproj" />
   </Folder>
   <Folder Name="/tests/">
     <Project Path="tests/PlcMonitor.Agent.Tests/PlcMonitor.Agent.Tests.csproj" />
@@ -23,5 +24,6 @@
     <Project Path="tests/PlcMonitor.Engine.Tests/PlcMonitor.Engine.Tests.csproj" />
     <Project Path="tests/PlcMonitor.Historian.Tests/PlcMonitor.Historian.Tests.csproj" />
     <Project Path="tests/PlcMonitor.IntegrationTests/PlcMonitor.IntegrationTests.csproj" />
+    <Project Path="tests/PlcMonitor.OpcUa.Tests/PlcMonitor.OpcUa.Tests.csproj" />
   </Folder>
 </Solution>

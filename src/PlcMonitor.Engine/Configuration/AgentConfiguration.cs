@@ -13,6 +13,50 @@ public sealed class AgentConfiguration
 
     /// <summary>Transformaciones de valores que los tags usan por su nombre (<see cref="TagConfiguration.Transform"/>).</summary>
     public List<ValueTransform> Transforms { get; init; } = [];
+
+    /// <summary>Servidor OPC UA del agente (desactivado por defecto).</summary>
+    public OpcUaSettings OpcUa { get; set; } = new();
+}
+
+/// <summary>
+/// Servidor OPC UA: publica los tags de todos los dispositivos. Solo canales firmados y cifrados y usuarios con
+/// contraseña (sin acceso anónimo).
+/// </summary>
+public sealed class OpcUaSettings
+{
+    public const int DefaultPort = 4840;
+
+    public bool Enabled { get; set; }
+
+    public int Port { get; set; } = DefaultPort;
+
+    /// <summary>
+    /// Tercera llave de escritura: sin ella no se escribe nada por OPC UA aunque el dispositivo tenga WritesEnabled, el
+    /// tag sea Writable y el usuario tenga rol de escritura.
+    /// </summary>
+    public bool AllowWrites { get; set; }
+
+    public List<OpcUaUser> Users { get; init; } = [];
+}
+
+/// <summary>Usuario del servidor OPC UA. De la contraseña solo se guarda el hash.</summary>
+public sealed class OpcUaUser
+{
+    public string Name { get; set; } = "";
+
+    public OpcUaRole Role { get; set; } = OpcUaRole.Read;
+
+    /// <summary>Hash de la contraseña (PBKDF2). Nunca se manda a los clientes de la API.</summary>
+    public string PasswordHash { get; set; } = "";
+}
+
+public enum OpcUaRole
+{
+    /// <summary>Leer, suscribirse, explorar y leer el histórico.</summary>
+    Read,
+
+    /// <summary>Además escribir (si el servidor y el tag lo permiten).</summary>
+    Write,
 }
 
 /// <summary>Transformación de valores enteros a texto (p.ej. 0 = Parado, 1 = Marcha). La aplican los clientes al mostrar el valor.</summary>

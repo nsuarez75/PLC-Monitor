@@ -197,6 +197,50 @@ public class MainWindowTests
     });
 
     [Fact]
+    public Task Opc_ua_page_shows_status_users_and_clients() => HeadlessApp.RunAsync(() =>
+    {
+        Avalonia.Application.Current!.RequestedThemeVariant = Avalonia.Styling.ThemeVariant.Light;
+        var vm = ViewModelWithData();
+        var window = new MainWindow { DataContext = vm };
+        window.Show();
+        var panel = new OpcUaViewModel(vm);
+        var info = new OpcUaInfo
+        {
+            Enabled = true,
+            Port = 4840,
+            AllowWrites = false,
+            State = OpcUaState.Running,
+            EndpointUrl = "opc.tcp://pc-linea:4840",
+            CertificateThumbprint = "5B6DC3EF56191242F38DD65DEE9033239B3D9CDC",
+            Users = { new OpcUaUser { Name = "ignition", Role = OpcUaRole.Read }, new OpcUaUser { Name = "operador", Role = OpcUaRole.Write } },
+            Certificates =
+            {
+                new OpcUaCertificate { Thumbprint = "19A47C9E966FDC7A593A25C669F074C86C81B770", Subject = "CN=Ignition OPC UA Client, O=Inductive Automation", ApplicationUri = "urn:pc-scada:ignition:opcua", NotAfter = Timestamp.FromDateTime(new DateTime(2036, 5, 1, 0, 0, 0, DateTimeKind.Utc)) },
+                new OpcUaCertificate { Thumbprint = "815860D4E766301B215B6ADE58CD63B46C1602C7", Subject = "CN=UaExpert@portatil", ApplicationUri = "urn:portatil:UnifiedAutomation:UaExpert", NotAfter = Timestamp.FromDateTime(new DateTime(2031, 1, 1, 0, 0, 0, DateTimeKind.Utc)), Trusted = true },
+            },
+        };
+        panel.Apply(info);
+        vm.OpcUaPanel = panel;
+        vm.Page = AppPage.OpcUa;
+        window.UpdateLayout();
+
+        var texts = window.GetVisualDescendants().OfType<TextBlock>().Select(t => t.Text).Where(t => t is not null).ToArray();
+        texts.ShouldContain("Servidor OPC UA");
+        texts.ShouldContain("En marcha");
+        texts.ShouldContain("Pendiente de aceptar");
+        texts.ShouldContain("Ignition OPC UA Client");
+        texts.ShouldContain("Aceptar");
+        var height = window.Height;
+        window.Height = 1350;
+        window.UpdateLayout();
+        Capture(window, "opcua.png");
+        Avalonia.Application.Current.RequestedThemeVariant = Avalonia.Styling.ThemeVariant.Dark;
+        Capture(window, "opcua-dark.png");
+        Avalonia.Application.Current.RequestedThemeVariant = Avalonia.Styling.ThemeVariant.Light;
+        window.Height = height;
+    });
+
+    [Fact]
     public Task Agents_panel_shows_profiles_and_activity() => HeadlessApp.RunAsync(() =>
     {
         Avalonia.Application.Current!.RequestedThemeVariant = Avalonia.Styling.ThemeVariant.Light;

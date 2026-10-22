@@ -16,6 +16,9 @@ internal static class AgentScripts
     public const string WindowsService = "PLCMonitorAgent";
     public const string WindowsDirExpression = @"$env:ProgramFiles\PLC-Monitor\agent";
 
+    /// <summary>Puerto por defecto del servidor OPC UA del agente: se abre en el firewall al instalar.</summary>
+    public const int OpcUaPort = 4840;
+
     /// <summary>agent.settings.json: token completo, token de solo lectura (opcional) y escucha https con el certificado propio.</summary>
     public static string SettingsJson(string tokenSha256, int port, string pfxPassword, string? readOnlyTokenSha256 = null) => $$"""
         {
@@ -41,9 +44,10 @@ internal static class AgentScripts
         systemctl stop {{LinuxService}} 2>/dev/null || true
         mkdir -p "$D"
         [ -s "$A" ] || { echo "No llegó el ejecutable del agente" >&2; exit 3; }
-        # Se conserva la configuración del equipo (agent.json, la clave de sus contraseñas y la seguridad) y el histórico; lo
-        # demás (incluidos los ficheros de las versiones en varios ficheros) se sustituye por el ejecutable único.
-        find "$D" -mindepth 1 -maxdepth 1 ! -name agent.json ! -name agent.key ! -name agent.settings.json ! -name agent.pfx ! -name history -exec rm -rf {} +
+        # Se conserva la configuración del equipo (agent.json, la clave de sus contraseñas y la seguridad), el histórico y la
+        # PKI de OPC UA (certificado del servidor y clientes aceptados); lo demás (incluidos los ficheros de las versiones
+        # en varios ficheros) se sustituye por el ejecutable único.
+        find "$D" -mindepth 1 -maxdepth 1 ! -name agent.json ! -name agent.key ! -name agent.settings.json ! -name agent.pfx ! -name history ! -name opcua -exec rm -rf {} +
         install -m 0755 "$A" "$D/plcmon-agent"
         rm -f "$A"
         {{(security is null ? "" : $"""
@@ -82,8 +86,11 @@ internal static class AgentScripts
         systemctl daemon-reload
         systemctl enable {{LinuxService}} >/dev/null 2>&1
         systemctl restart {{LinuxService}}
-        if command -v ufw >/dev/null 2>&1 && ufw status 2>/dev/null | grep -q 'Status: active'; then ufw allow {{port}}/tcp >/dev/null; echo "ufw: abierto el puerto {{port}}/tcp"; fi
-        if command -v firewall-cmd >/dev/null 2>&1 && firewall-cmd --state >/dev/null 2>&1; then firewall-cmd --permanent --add-port={{port}}/tcp >/dev/null && firewall-cmd --reload >/dev/null; echo "firewalld: abierto el puerto {{port}}/tcp"; fi
+        # Puerto del agente y el de OPC UA (aunque el servidor OPC UA esté desactivado: así se puede activar desde la app).
+        for P in {{port}} {{OpcUaPort}}; do
+          if command -v ufw >/dev/null 2>&1 && ufw status 2>/dev/null | grep -q 'Status: active'; then ufw allow $P/tcp >/dev/null; echo "ufw: abierto el puerto $P/tcp"; fi
+          if command -v firewall-cmd >/dev/null 2>&1 && firewall-cmd --state >/dev/null 2>&1; then firewall-cmd --permanent --add-port=$P/tcp >/dev/null && firewall-cmd --reload >/dev/null; echo "firewalld: abierto el puerto $P/tcp"; fi
+        done
         for i in $(seq 1 30); do systemctl is-active --quiet {{LinuxService}} && break; sleep 1; done
         systemctl is-active {{LinuxService}}
         """;
@@ -115,8 +122,10 @@ internal static class AgentScripts
             [ -f "$D/agent.key" ] && cp -p "$D/agent.key" /opt/plc-monitor/agent.key.backup && echo "Clave de las contraseñas guardada en /opt/plc-monitor/agent.key.backup" || true
             """ : "")}}
         rm -rf "$D"
-        if command -v ufw >/dev/null 2>&1 && ufw status 2>/dev/null | grep -q 'Status: active'; then ufw delete allow {{port}}/tcp >/dev/null 2>&1 || true; fi
-        if command -v firewall-cmd >/dev/null 2>&1 && firewall-cmd --state >/dev/null 2>&1; then firewall-cmd --permanent --remove-port={{port}}/tcp >/dev/null 2>&1 && firewall-cmd --reload >/dev/null || true; fi
+        for P in {{port}} {{OpcUaPort}}; do
+          if command -v ufw >/dev/null 2>&1 && ufw status 2>/dev/null | grep -q 'Status: active'; then ufw delete allow $P/tcp >/dev/null 2>&1 || true; fi
+          if command -v firewall-cmd >/dev/null 2>&1 && firewall-cmd --state >/dev/null 2>&1; then firewall-cmd --permanent --remove-port=$P/tcp >/dev/null 2>&1 && firewall-cmd --reload >/dev/null || true; fi
+        done
         echo desinstalado
         """;
 
@@ -164,7 +173,7 @@ internal static class AgentScripts
         # Un antivirus o el indexador pueden tener el ejecutable abierto un instante: se reintenta unos segundos.
         for ($i = 1; ; $i++) {
           try {
-            Get-ChildItem -Path $D -Force | Where-Object { $_.Name -notin 'agent.json', 'agent.key', 'agent.settings.json', 'agent.pfx', 'history', 'logs' } | Remove-Item -Recurse -Force
+            Get-ChildItem -Path $D -Force | Where-Object { $_.Name -notin 'agent.json', 'agent.key', 'agent.settings.json', 'agent.pfx', 'history', 'logs', 'opcua' } | Remove-Item -Recurse -Force
             Move-Item -Path $A -Destination (Join-Path $D 'plcmon-agent.exe') -Force
             break
           } catch {
@@ -186,6 +195,10 @@ internal static class AgentScripts
         if (-not (Get-NetFirewallRule -DisplayName 'PLC-Monitor Agent' -ErrorAction SilentlyContinue)) {
           New-NetFirewallRule -DisplayName 'PLC-Monitor Agent' -Direction Inbound -Protocol TCP -LocalPort {{port}} -Action Allow | Out-Null
           'Firewall: abierto el puerto {{port}}/tcp'
+        }
+        if (-not (Get-NetFirewallRule -DisplayName 'PLC-Monitor OPC UA' -ErrorAction SilentlyContinue)) {
+          New-NetFirewallRule -DisplayName 'PLC-Monitor OPC UA' -Direction Inbound -Protocol TCP -LocalPort {{OpcUaPort}} -Action Allow | Out-Null
+          'Firewall: abierto el puerto {{OpcUaPort}}/tcp (OPC UA)'
         }
         Start-Service -Name {{WindowsService}}
         (Get-Service -Name {{WindowsService}}).WaitForStatus('Running', '00:00:30')
@@ -217,6 +230,7 @@ internal static class AgentScripts
         }
         {{WindowsWaitForExit}}
         Get-NetFirewallRule -DisplayName 'PLC-Monitor Agent' -ErrorAction SilentlyContinue | Remove-NetFirewallRule
+        Get-NetFirewallRule -DisplayName 'PLC-Monitor OPC UA' -ErrorAction SilentlyContinue | Remove-NetFirewallRule
         {{(keepConfiguration ? """
             if (Test-Path "$D\agent.json") { Copy-Item "$D\agent.json" "$env:ProgramData\PLC-Monitor-agent.json.backup" -Force; "Configuración guardada en $env:ProgramData\PLC-Monitor-agent.json.backup" }
             if (Test-Path "$D\agent.key") { Copy-Item "$D\agent.key" "$env:ProgramData\PLC-Monitor-agent.key.backup" -Force; "Clave de las contraseñas guardada en $env:ProgramData\PLC-Monitor-agent.key.backup" }

@@ -1,0 +1,15 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <!-- FakeDriver.cs (enlazado): campos que solo usan los tests del motor -->
+    <NoWarn>$(NoWarn);CS0649</NoWarn>
+  </PropertyGroup>
+  <ItemGroup>
+    <PackageReference Include="OPCFoundation.NetStandard.Opc.Ua.Client" />
+  </ItemGroup>
+  <ItemGroup>
+    <ProjectReference Include="..\..\src\PlcMonitor.OpcUa\PlcMonitor.OpcUa.csproj" />
+  </ItemGroup>
+  <ItemGroup>
+    <Compile Include="..\PlcMonitor.Engine.Tests\FakeDriver.cs" Link="FakeDriver.cs" />
+  </ItemGroup>
+</Project>

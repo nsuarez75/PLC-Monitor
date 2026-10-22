@@ -6,6 +6,7 @@ using PlcMonitor.Abstractions;
 using PlcMonitor.Core;
 using PlcMonitor.Engine;
 using PlcMonitor.Engine.Configuration;
+using PlcMonitor.OpcUa;
 using Api = PlcMonitor.Agent.Contracts;
 
 namespace PlcMonitor.Agent;
@@ -266,6 +267,80 @@ public sealed class AgentGrpcService(EngineHost host, DriverRegistry registry, I
         var deleted = await Guard(() => host.Historian.DeleteAsync(keys, request.From.ToDateTimeOffset(), request.To.ToDateTimeOffset(), context.CancellationToken));
         _audit.LogInformation("Histórico borrado por {User}: {Deleted} muestras de {Device}/{Tags}", AgentCaller.Describe(context), deleted, request.Device, string.Join(", ", request.Tags));
         return new Api.DeleteHistoryReply { Deleted = deleted };
+    }
+
+    public override Task<Api.OpcUaInfo> GetOpcUa(Empty request, ServerCallContext context) => Task.FromResult(OpcUaInfo());
+
+    public override async Task<Api.OpcUaInfo> PutOpcUa(Api.PutOpcUaRequest request, ServerCallContext context)
+    {
+        // Contraseña vacía = se conserva la que tenía ese usuario; nunca se guarda en claro.
+        var current = Engine.GetOpcUa().Users.ToDictionary(u => u.Name, StringComparer.OrdinalIgnoreCase);
+        var settings = new OpcUaSettings
+        {
+            Enabled = request.Enabled,
+            Port = request.Port == 0 ? OpcUaSettings.DefaultPort : request.Port,
+            AllowWrites = request.AllowWrites,
+            Users =
+            [
+                .. request.Users.Select(u => new OpcUaUser
+                {
+                    Name = u.Name.Trim(),
+                    Role = u.Role == Api.OpcUaRole.Write ? OpcUaRole.Write : OpcUaRole.Read,
+                    PasswordHash = !string.IsNullOrEmpty(u.Password) ? OpcUaPassword.Hash(u.Password)
+                        : current.TryGetValue(u.Name.Trim(), out var old) ? old.PasswordHash : "",
+                }),
+            ],
+        };
+        var saved = await Guard(() => Engine.SetOpcUaAsync(settings));
+        await host.SaveConfigurationAsync(context.CancellationToken);
+        await host.OpcUa.ApplyAsync(saved, context.CancellationToken);
+        _audit.LogInformation("Ajustes OPC UA cambiados por {User}: {State}, puerto {Port}, escritura {Writes}, usuarios {Users}", AgentCaller.Describe(context),
+            saved.Enabled ? "activo" : "desactivado", saved.Port, saved.AllowWrites ? "permitida" : "no permitida",
+            string.Join(", ", saved.Users.Select(u => $"{u.Name} ({(u.Role == OpcUaRole.Write ? "escritura" : "lectura")})")));
+        return OpcUaInfo();
+    }
+
+    public override Task<Api.OpcUaInfo> TrustOpcUaCertificate(Api.OpcUaCertificateRequest request, ServerCallContext context)
+    {
+        if (!host.OpcUa.TrustClientCertificate(request.Thumbprint))
+            throw new RpcException(new Status(StatusCode.NotFound, $"No hay ningún certificado rechazado con la huella {request.Thumbprint}."));
+        _audit.LogInformation("Certificado OPC UA {Thumbprint} aceptado por {User}", request.Thumbprint, AgentCaller.Describe(context));
+        return Task.FromResult(OpcUaInfo());
+    }
+
+    public override Task<Api.OpcUaInfo> DeleteOpcUaCertificate(Api.OpcUaCertificateRequest request, ServerCallContext context)
+    {
+        if (!host.OpcUa.RemoveClientCertificate(request.Thumbprint))
+            throw new RpcException(new Status(StatusCode.NotFound, $"No hay ningún certificado con la huella {request.Thumbprint}."));
+        _audit.LogInformation("Certificado OPC UA {Thumbprint} quitado por {User}", request.Thumbprint, AgentCaller.Describe(context));
+        return Task.FromResult(OpcUaInfo());
+    }
+
+    /// <summary>Ajustes (sin contraseñas), estado y certificados de los clientes.</summary>
+    private Api.OpcUaInfo OpcUaInfo()
+    {
+        var settings = Engine.GetOpcUa();
+        var status = host.OpcUa.Status;
+        var info = new Api.OpcUaInfo
+        {
+            Enabled = settings.Enabled,
+            Port = settings.Port,
+            AllowWrites = settings.AllowWrites,
+            State = (Api.OpcUaState)(int)status.State,
+            Detail = status.Detail ?? "",
+            EndpointUrl = status.EndpointUrl ?? "",
+            CertificateThumbprint = status.CertificateThumbprint ?? "",
+        };
+        info.Users.AddRange(settings.Users.Select(u => new Api.OpcUaUser { Name = u.Name, Role = u.Role == OpcUaRole.Write ? Api.OpcUaRole.Write : Api.OpcUaRole.Read }));
+        info.Certificates.AddRange(host.OpcUa.ListClientCertificates().Select(c => new Api.OpcUaCertificate
+        {
+            Thumbprint = c.Thumbprint,
+            Subject = c.Subject,
+            ApplicationUri = c.ApplicationUri ?? "",
+            NotAfter = Timestamp.FromDateTimeOffset(c.NotAfter),
+            Trusted = c.Trusted,
+        }));
+        return info;
     }
 
     private Api.Device ToProto(DeviceStatus status) => ProtoMapper.ToProto(status, Engine.GetTags(status.Device).Count);

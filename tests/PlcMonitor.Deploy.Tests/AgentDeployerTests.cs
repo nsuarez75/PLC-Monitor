@@ -87,7 +87,8 @@ public sealed class AgentDeployerTests : IDisposable
         script.ShouldContain("useradd --system");
         script.ShouldContain("ExecStart=/opt/plc-monitor/agent/plcmon-agent");
         script.ShouldContain("TimeoutStopSec=15"); // margen para parar ordenadamente aunque el sistema baje el valor por defecto
-        script.ShouldContain("ufw allow 5311/tcp");
+        script.ShouldContain("for P in 5311 4840; do"); // puerto del agente y el de OPC UA
+        script.ShouldContain("ufw allow $P/tcp");
 
         var settings = Decode(script, "agent.settings.json");
         using var json = JsonDocument.Parse(settings);
@@ -309,9 +310,18 @@ public sealed class AgentDeployerTests : IDisposable
     }
 
     [Fact]
-    public void Windows_update_keeps_the_logs()
+    public void Windows_update_keeps_the_logs_and_the_opc_ua_pki()
     {
-        AgentScripts.WindowsInstall(@"C:\Temp\a.exe", null, 5311).ShouldContain("'history', 'logs'");
+        AgentScripts.WindowsInstall(@"C:\Temp\a.exe", null, 5311).ShouldContain("'history', 'logs', 'opcua'");
+    }
+
+    [Fact]
+    public void The_opc_ua_port_is_opened_on_install_and_closed_on_uninstall()
+    {
+        var windows = AgentScripts.WindowsInstall(@"C:\Temp\a.exe", null, 5311);
+        windows.ShouldContain("New-NetFirewallRule -DisplayName 'PLC-Monitor OPC UA' -Direction Inbound -Protocol TCP -LocalPort 4840");
+        AgentScripts.WindowsUninstall(false).ShouldContain("Get-NetFirewallRule -DisplayName 'PLC-Monitor OPC UA'");
+        AgentScripts.LinuxUninstall(false, 5311).ShouldContain("for P in 5311 4840; do");
     }
 
     [Fact]
@@ -454,10 +464,10 @@ public sealed class AgentDeployerTests : IDisposable
     }
 
     [Fact]
-    public void Linux_install_replaces_everything_but_configuration_and_history()
+    public void Linux_install_replaces_everything_but_configuration_history_and_opc_ua_pki()
     {
         var script = AgentScripts.LinuxInstall("/tmp/plcmon-agent-x", null, 5311);
-        script.ShouldContain("! -name agent.json ! -name agent.key ! -name agent.settings.json ! -name agent.pfx ! -name history -exec rm -rf {} +");
+        script.ShouldContain("! -name agent.json ! -name agent.key ! -name agent.settings.json ! -name agent.pfx ! -name history ! -name opcua -exec rm -rf {} +");
         script.ShouldContain("install -m 0755 \"$A\" \"$D/plcmon-agent\"");
         script.ShouldContain("Environment=DOTNET_BUNDLE_EXTRACT_BASE_DIR=/opt/plc-monitor/agent/.bundle");
         script.ShouldNotContain("tar ");

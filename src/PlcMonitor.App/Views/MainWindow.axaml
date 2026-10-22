@@ -79,6 +79,12 @@
             <TextBlock Text="Transformaciones" Classes="barlabel" />
           </StackPanel>
         </Button>
+        <Button Classes="ghost tab" Classes.on="{Binding IsOpcUaPage}" Command="{Binding OpenOpcUaCommand}" ToolTip.Tip="Servidor OPC UA del agente: publicar los tags para Ignition, UaExpert…">
+          <StackPanel Orientation="Horizontal" Spacing="6">
+            <c:Icon Kind="link" Width="16" Height="16" />
+            <TextBlock Text="OPC UA" Classes="barlabel" />
+          </StackPanel>
+        </Button>
         <Button Classes="ghost tab" Classes.on="{Binding IsAgentsPage}" Command="{Binding OpenAgentsCommand}" ToolTip.Tip="Gestionar agentes (instalar en equipos por SSH)">
           <StackPanel Orientation="Horizontal" Spacing="6">
             <c:Icon Kind="server" Width="16" Height="16" />
@@ -542,9 +548,10 @@
       </Panel>
     </Grid>
 
-    <!-- ░░ Páginas Tendencias, Transformaciones y Agentes ░░ -->
+    <!-- ░░ Páginas Tendencias, Transformaciones, OPC UA y Agentes ░░ -->
     <v:TrendsView DataContext="{Binding Trends}" IsVisible="{Binding $parent[Window].((vm:MainViewModel)DataContext).IsTrendsPage}" />
     <v:TransformsView DataContext="{Binding TransformsPanel}" IsVisible="{Binding $parent[Window].((vm:MainViewModel)DataContext).IsTransformsPage}" />
+    <v:OpcUaView DataContext="{Binding OpcUaPanel}" IsVisible="{Binding $parent[Window].((vm:MainViewModel)DataContext).IsOpcUaPage}" />
     <v:AgentsView DataContext="{Binding Agents}" IsVisible="{Binding $parent[Window].((vm:MainViewModel)DataContext).IsAgentsPage}" />
     </Panel>
   </DockPanel>

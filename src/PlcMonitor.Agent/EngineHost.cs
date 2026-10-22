@@ -3,6 +3,7 @@ using PlcMonitor.Core;
 using PlcMonitor.Engine;
 using PlcMonitor.Engine.Configuration;
 using PlcMonitor.Historian;
+using PlcMonitor.OpcUa;
 
 namespace PlcMonitor.Agent;
 
@@ -20,6 +21,7 @@ public sealed class EngineHost(IOptions<AgentOptions> options, DriverRegistry re
     private readonly SemaphoreSlim _saveLock = new(1, 1);
     private TagEngine? _engine;
     private HistorianService? _historian;
+    private OpcUaServerHost? _opcUa;
     private int _disposed;
 
     public string ConfigPath { get; } = Path.GetFullPath(options.Value.ConfigPath, AppContext.BaseDirectory);
@@ -33,6 +35,9 @@ public sealed class EngineHost(IOptions<AgentOptions> options, DriverRegistry re
 
     /// <summary>Historiador (su carpeta es relativa a la del fichero de configuración).</summary>
     public HistorianService Historian => _historian ?? throw new InvalidOperationException("El motor no está arrancado.");
+
+    /// <summary>Servidor OPC UA (su PKI va en opcua/ junto al fichero de configuración).</summary>
+    public OpcUaServerHost OpcUa => _opcUa ?? throw new InvalidOperationException("El motor no está arrancado.");
 
     public async Task StartAsync(CancellationToken cancellationToken)
     {
@@ -60,10 +65,15 @@ public sealed class EngineHost(IOptions<AgentOptions> options, DriverRegistry re
         await _historian.StartAsync();
         await _engine.StartAsync();
         Started = DateTimeOffset.UtcNow;
+        // Si el servidor OPC UA no arranca (puerto ocupado...) el agente sigue: el motivo queda en su estado y en el log.
+        _opcUa = new OpcUaServerHost(_engine, _historian, Path.GetDirectoryName(ConfigPath)!, loggerFactory);
+        await _opcUa.ApplyAsync(configuration.OpcUa ?? new OpcUaSettings(), cancellationToken);
     }
 
     public async Task StopAsync(CancellationToken cancellationToken)
     {
+        if (_opcUa is not null)
+            await _opcUa.DisposeAsync();
         if (_engine is not null)
             await _engine.StopAsync();
         if (_historian is not null)
@@ -112,6 +122,8 @@ public sealed class EngineHost(IOptions<AgentOptions> options, DriverRegistry re
         // El contenedor lo libera dos veces: como singleton y como servicio alojado.
         if (Interlocked.Exchange(ref _disposed, 1) == 1)
             return;
+        if (_opcUa is not null)
+            await _opcUa.DisposeAsync();
         if (_historian is not null)
             await _historian.DisposeAsync();
         if (_engine is not null)

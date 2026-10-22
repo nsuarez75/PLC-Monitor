@@ -38,6 +38,7 @@ public sealed class TokenAuthInterceptor(IOptions<AgentSecurityOptions> options,
     internal static readonly HashSet<string> FullAccessMethods = new(StringComparer.Ordinal)
     {
         "Write", "SetDeviceEnabled", "PutDevice", "DeleteDevice", "PutTransforms", "RenameHistory", "DeleteHistory",
+        "PutOpcUa", "TrustOpcUaCertificate", "DeleteOpcUaCertificate",
     };
 
     public override Task<TResponse> UnaryServerHandler<TRequest, TResponse>(

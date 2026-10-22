@@ -1,0 +1,169 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:vm="using:PlcMonitor.App.ViewModels"
+             xmlns:c="using:PlcMonitor.App.Controls"
+             x:Class="PlcMonitor.App.Views.OpcUaView"
+             x:DataType="vm:OpcUaViewModel"
+             Background="{DynamicResource App.Background}">
+  <DockPanel Margin="20,16">
+    <Grid DockPanel.Dock="Top" ColumnDefinitions="*,Auto" Margin="0,0,0,14">
+      <StackPanel Spacing="2">
+        <TextBlock Text="Servidor OPC UA" Classes="title" />
+        <TextBlock Classes="muted" TextWrapping="Wrap"
+                   Text="El agente publica los tags de todos sus dispositivos para Ignition, UaExpert u otros clientes OPC UA. Solo canales firmados y cifrados y usuarios con contraseña." />
+      </StackPanel>
+      <Button Grid.Column="1" Classes="secondary" Command="{Binding RefreshCommand}" VerticalAlignment="Top" ToolTip.Tip="Volver a leer el estado y los certificados de los clientes">
+        <StackPanel Orientation="Horizontal" Spacing="6">
+          <c:Icon Kind="refresh" />
+          <TextBlock Text="Actualizar" />
+        </StackPanel>
+      </Button>
+    </Grid>
+
+    <!-- Guardar / descartar -->
+    <StackPanel DockPanel.Dock="Bottom" Spacing="10" Margin="0,14,0,0">
+      <Border Classes="card" Padding="12" IsVisible="{Binding Errors, Converter={x:Static StringConverters.IsNotNullOrEmpty}}">
+        <StackPanel Orientation="Horizontal" Spacing="8">
+          <c:Icon Kind="alert" Width="14" Height="14" Foreground="{DynamicResource App.Bad}" VerticalAlignment="Top" Margin="0,2,0,0" />
+          <TextBlock Text="{Binding Errors}" Classes="error" TextWrapping="Wrap" MaxWidth="760" />
+        </StackPanel>
+      </Border>
+      <StackPanel Orientation="Horizontal" Spacing="8" HorizontalAlignment="Right">
+        <TextBlock Text="Con el token de solo lectura no se puede cambiar nada" Classes="muted" VerticalAlignment="Center" IsVisible="{Binding !CanEdit}" Margin="0,0,8,0" />
+        <TextBlock Text="Cambios sin guardar" Classes="muted" VerticalAlignment="Center" IsVisible="{Binding IsDirty}" Margin="0,0,8,0" />
+        <Button Classes="secondary" Command="{Binding DiscardCommand}" Content="Descartar" />
+        <Button Classes="accent" Command="{Binding SaveCommand}">
+          <StackPanel Orientation="Horizontal" Spacing="6">
+            <c:Icon Kind="save" />
+            <TextBlock Text="Guardar en el agente" />
+          </StackPanel>
+        </Button>
+      </StackPanel>
+    </StackPanel>
+
+    <ScrollViewer>
+      <StackPanel Spacing="14" MaxWidth="980" HorizontalAlignment="Left">
+
+        <!-- Estado -->
+        <Border Classes="card" Padding="20">
+          <StackPanel Spacing="10">
+            <TextBlock Text="ESTADO" Classes="caption" />
+            <StackPanel Orientation="Horizontal" Spacing="8">
+              <Ellipse Width="9" Height="9" VerticalAlignment="Center" Fill="{DynamicResource App.TextMuted}" IsVisible="{Binding !IsRunning}" />
+              <Ellipse Width="9" Height="9" VerticalAlignment="Center" Fill="{DynamicResource App.Good}" IsVisible="{Binding IsRunning}" />
+              <TextBlock Text="{Binding StateText}" FontWeight="SemiBold" VerticalAlignment="Center" />
+            </StackPanel>
+            <TextBlock Text="{Binding Detail}" Classes="error" TextWrapping="Wrap" IsVisible="{Binding IsError}" />
+            <Grid ColumnDefinitions="170,*" RowDefinitions="Auto,Auto" RowSpacing="8" ColumnSpacing="16" IsVisible="{Binding IsRunning}">
+              <TextBlock Text="URL para los clientes" VerticalAlignment="Center" FontWeight="Medium" />
+              <SelectableTextBlock Grid.Column="1" Text="{Binding EndpointUrl}" Classes="mono" VerticalAlignment="Center" />
+              <TextBlock Grid.Row="1" Text="Huella del servidor" VerticalAlignment="Center" FontWeight="Medium" />
+              <SelectableTextBlock Grid.Row="1" Grid.Column="1" Text="{Binding CertificateThumbprint}" Classes="mono" FontSize="12" VerticalAlignment="Center"
+                                   ToolTip.Tip="El cliente pedirá confiar en este certificado: comprueba que la huella coincide" />
+            </Grid>
+          </StackPanel>
+        </Border>
+
+        <!-- Ajustes -->
+        <Border Classes="card" Padding="20" IsEnabled="{Binding CanEdit}">
+          <StackPanel Spacing="12">
+            <TextBlock Text="AJUSTES" Classes="caption" />
+            <CheckBox Content="Servidor OPC UA activo" IsChecked="{Binding Enabled}" />
+            <Grid ColumnDefinitions="170,*" ColumnSpacing="16">
+              <TextBlock Text="Puerto" VerticalAlignment="Center" FontWeight="Medium" />
+              <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="10">
+                <NumericUpDown Value="{Binding Port}" Minimum="1" Maximum="65535" FormatString="0" Width="140" />
+                <TextBlock Text="4840 es el estándar (el instalador lo abre en el firewall)" Classes="muted" FontSize="12" VerticalAlignment="Center" />
+              </StackPanel>
+            </Grid>
+            <StackPanel Spacing="4">
+              <CheckBox Content="Permitir escribir en los PLC por OPC UA" IsChecked="{Binding AllowWrites}" />
+              <TextBlock Classes="muted" FontSize="12" TextWrapping="Wrap" Margin="28,0,0,0"
+                         Text="Tercera llave: además hace falta escritura activada en el dispositivo, el tag marcado como escribible y un usuario con permiso de escritura. Cada escritura queda en la auditoría del agente." />
+            </StackPanel>
+          </StackPanel>
+        </Border>
+
+        <!-- Usuarios -->
+        <Border Classes="card" Padding="20" IsEnabled="{Binding CanEdit}">
+          <StackPanel Spacing="10">
+            <Grid ColumnDefinitions="*,Auto">
+              <StackPanel Spacing="2">
+                <TextBlock Text="USUARIOS" Classes="caption" />
+                <TextBlock Classes="muted" FontSize="12" Text="Sin acceso anónimo. Las contraseñas se guardan cifradas (hash) en el agente." />
+              </StackPanel>
+              <Button Grid.Column="1" Classes="secondary" Command="{Binding AddUserCommand}" VerticalAlignment="Top">
+                <StackPanel Orientation="Horizontal" Spacing="6">
+                  <c:Icon Kind="plus" Width="14" Height="14" />
+                  <TextBlock Text="Añadir usuario" />
+                </StackPanel>
+              </Button>
+            </Grid>
+            <Grid ColumnDefinitions="220,*,170,Auto" ColumnSpacing="10" Classes="tablehead">
+              <TextBlock Text="USUARIO" />
+              <TextBlock Grid.Column="1" Text="CONTRASEÑA" />
+              <TextBlock Grid.Column="2" Text="PERMISO" />
+            </Grid>
+            <ItemsControl ItemsSource="{Binding Users}">
+              <ItemsControl.ItemTemplate>
+                <DataTemplate x:DataType="vm:OpcUaUserItem">
+                  <Grid ColumnDefinitions="220,*,170,Auto" ColumnSpacing="10" Margin="0,0,0,6">
+                    <TextBox Text="{Binding Name}" />
+                    <TextBox Grid.Column="1" Text="{Binding Password}" PasswordChar="•" PlaceholderText="{Binding PasswordHint}" />
+                    <CheckBox Grid.Column="2" Content="Puede escribir" IsChecked="{Binding Writer}" VerticalAlignment="Center" />
+                    <Button Grid.Column="3" Classes="ghost danger" ToolTip.Tip="Quitar usuario"
+                            Command="{Binding $parent[ItemsControl].((vm:OpcUaViewModel)DataContext).RemoveUserCommand}" CommandParameter="{Binding}">
+                      <c:Icon Kind="x" Width="14" Height="14" />
+                    </Button>
+                  </Grid>
+                </DataTemplate>
+              </ItemsControl.ItemTemplate>
+            </ItemsControl>
+          </StackPanel>
+        </Border>
+
+        <!-- Certificados de clientes -->
+        <Border Classes="card" Padding="20">
+          <StackPanel Spacing="10">
+            <StackPanel Spacing="2">
+              <TextBlock Text="CLIENTES" Classes="caption" />
+              <TextBlock Classes="muted" FontSize="12" TextWrapping="Wrap"
+                         Text="Un cliente nuevo queda pendiente hasta que se acepta su certificado. Conecta desde el cliente, pulsa «Actualizar» y acéptalo comprobando la huella." />
+            </StackPanel>
+            <TextBlock Classes="muted" FontSize="12" IsVisible="{Binding !HasCertificates}" Text="Aún no se ha conectado ningún cliente." />
+            <ItemsControl ItemsSource="{Binding Certificates}">
+              <ItemsControl.ItemTemplate>
+                <DataTemplate x:DataType="vm:OpcUaCertificateItem">
+                  <Border Padding="10,8" Margin="0,0,0,6" CornerRadius="8" Background="{DynamicResource App.SurfaceAlt}">
+                    <Grid ColumnDefinitions="*,Auto">
+                      <StackPanel Spacing="2">
+                        <StackPanel Orientation="Horizontal" Spacing="8">
+                          <TextBlock Text="{Binding Name}" FontWeight="SemiBold" />
+                          <TextBlock Text="{Binding StateText}" Classes="muted" FontSize="12" VerticalAlignment="Center" />
+                        </StackPanel>
+                        <TextBlock Text="{Binding Details}" Classes="muted" FontSize="12" TextWrapping="Wrap" />
+                        <SelectableTextBlock Text="{Binding Thumbprint}" Classes="mono" FontSize="11.5" />
+                      </StackPanel>
+                      <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="6" VerticalAlignment="Center"
+                                  IsEnabled="{Binding $parent[UserControl].((vm:OpcUaViewModel)DataContext).CanEdit}">
+                        <Button Classes="accent" Command="{Binding TrustCommand}" IsVisible="{Binding !Trusted}">
+                          <StackPanel Orientation="Horizontal" Spacing="6">
+                            <c:Icon Kind="check" Width="14" Height="14" />
+                            <TextBlock Text="Aceptar" />
+                          </StackPanel>
+                        </Button>
+                        <Button Classes="ghost danger" Command="{Binding RemoveCommand}" ToolTip.Tip="Quitar: el cliente dejará de poder conectar">
+                          <c:Icon Kind="trash" Width="14" Height="14" />
+                        </Button>
+                      </StackPanel>
+                    </Grid>
+                  </Border>
+                </DataTemplate>
+              </ItemsControl.ItemTemplate>
+            </ItemsControl>
+          </StackPanel>
+        </Border>
+      </StackPanel>
+    </ScrollViewer>
+  </DockPanel>
+</UserControl>
