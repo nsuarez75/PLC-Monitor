@@ -136,6 +136,13 @@ public sealed partial class MainViewModel : ObservableObject, IAgentContext, IAs
     [NotifyPropertyChangedFor(nameof(IsTagsPage), nameof(IsTrendsPage), nameof(IsTransformsPage), nameof(IsOpcUaPage), nameof(IsAgentsPage))]
     public partial AppPage Page { get; set; }
 
+    // La pestaña OPC UA solo se lee sola mientras está a la vista.
+    partial void OnPageChanged(AppPage value)
+    {
+        if (value != AppPage.OpcUa)
+            OpcUaPanel?.StopAutoRefresh();
+    }
+
     public bool IsTagsPage => Page == AppPage.Tags;
 
     public bool IsTrendsPage => Page == AppPage.Trends;
@@ -189,6 +196,8 @@ public sealed partial class MainViewModel : ObservableObject, IAgentContext, IAs
         Page = AppPage.OpcUa;
         if (!panel.IsDirty)
             await panel.RefreshAsync();
+        if (Page == AppPage.OpcUa)
+            panel.StartAutoRefresh();
     }
 
     public BrowseViewModel Browse { get; }
@@ -473,6 +482,7 @@ public sealed partial class MainViewModel : ObservableObject, IAgentContext, IAs
         Editor = null;
         TransformsPanel?.Dispose();
         TransformsPanel = null;
+        OpcUaPanel?.Dispose();
         OpcUaPanel = null;
         if (Page is AppPage.Transforms or AppPage.OpcUa)
             Page = AppPage.Tags;

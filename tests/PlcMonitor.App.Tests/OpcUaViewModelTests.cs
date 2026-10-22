@@ -14,6 +14,11 @@ public sealed class OpcUaViewModelTests : IDisposable
     private readonly string _profilesPath = Path.Combine(Path.GetTempPath(), $"plcmon-agents-{Guid.NewGuid():N}.json");
     private readonly FakeDialogs _dialogs = new();
 
+    public OpcUaViewModelTests()
+    {
+        OpcUaViewModel.AutoRefreshInterval = TimeSpan.FromMilliseconds(100);
+    }
+
     private async Task<MainViewModel> ConnectAsync(AgentFactory agent)
     {
         var vm = new MainViewModel(new InMemoryConnector(agent), new ImmediateDispatcher(), _dialogs, new AppSettings(), _settingsPath, _profilesPath);
@@ -88,6 +93,52 @@ public sealed class OpcUaViewModelTests : IDisposable
         _dialogs.Questions.ShouldHaveSingleItem().ShouldContain("¿Permitir escribir en los PLC desde OPC UA?");
         panel.IsDirty.ShouldBeTrue();
         (await vm.Client!.GetOpcUaAsync(new Google.Protobuf.WellKnownTypes.Empty())).AllowWrites.ShouldBeFalse();
+    }
+
+    [Fact]
+    public async Task While_visible_the_page_refreshes_itself_without_touching_edits()
+    {
+        await using var agent = new AgentFactory();
+        await using var vm = await ConnectAsync(agent);
+        await vm.OpenOpcUaCommand.ExecuteAsync(null);
+        var panel = vm.OpcUaPanel!;
+        panel.Port = 4999; // cambio sin guardar
+        var port = FreePort();
+
+        // Otro equipo (o la CLI) activa el servidor: la pestaña lo ve sola.
+        await vm.Client!.PutOpcUaAsync(new PutOpcUaRequest
+        {
+            Enabled = true,
+            Port = port,
+            Users = { new OpcUaUser { Name = "ignition", Password = "clave-de-prueba" } },
+        });
+        await Wait.UntilAsync(() => panel.IsRunning, "estado en marcha sin pulsar «Actualizar»");
+
+        panel.EndpointUrl.ShouldEndWith($":{port}");
+        panel.Port.ShouldBe(4999);
+        panel.IsDirty.ShouldBeTrue();
+    }
+
+    [Fact]
+    public async Task Leaving_the_page_stops_refreshing()
+    {
+        await using var agent = new AgentFactory();
+        await using var vm = await ConnectAsync(agent);
+        await vm.OpenOpcUaCommand.ExecuteAsync(null);
+        var panel = vm.OpcUaPanel!;
+
+        vm.ShowTagsCommand.Execute(null);
+        await vm.Client!.PutOpcUaAsync(new PutOpcUaRequest
+        {
+            Enabled = true,
+            Port = FreePort(),
+            Users = { new OpcUaUser { Name = "ignition", Password = "clave-de-prueba" } },
+        });
+        await Task.Delay(500);
+
+        panel.IsRunning.ShouldBeFalse();
+        await vm.OpenOpcUaCommand.ExecuteAsync(null);
+        panel.IsRunning.ShouldBeTrue(panel.Detail);
     }
 
     [Fact]
