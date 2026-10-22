@@ -11,11 +11,16 @@ namespace PlcMonitor.App.ViewModels;
 /// <summary>
 /// Servidor OPC UA del agente conectado: activarlo, puerto, tercera llave de escritura, usuarios y certificados de los
 /// clientes (Ignition, UaExpert…). Los ajustes se editan aquí y se envían juntos al guardar; el estado y los
-/// certificados se leen al abrir y con «Actualizar».
+/// certificados se leen al abrir, con «Actualizar» y solos cada pocos segundos mientras la pestaña está a la vista (así
+/// un cliente nuevo aparece pendiente sin pulsar nada).
 /// </summary>
-public sealed partial class OpcUaViewModel : ObservableObject
+public sealed partial class OpcUaViewModel : ObservableObject, IDisposable
 {
     private readonly MainViewModel _main;
+    private CancellationTokenSource? _autoRefresh;
+
+    /// <summary>Cada cuánto se vuelven a leer el estado y los clientes con la pestaña a la vista.</summary>
+    internal static TimeSpan AutoRefreshInterval { get; set; } = TimeSpan.FromSeconds(5);
 
     public OpcUaViewModel(MainViewModel main)
     {
@@ -110,6 +115,57 @@ public sealed partial class OpcUaViewModel : ObservableObject
             IsBusy = false;
         }
     }
+
+    /// <summary>
+    /// Empieza a leer el estado y los clientes cada <see cref="AutoRefreshInterval"/> (pestaña a la vista). No toca
+    /// lo que se esté editando.
+    /// </summary>
+    public void StartAutoRefresh()
+    {
+        if (_autoRefresh is not null)
+            return;
+        _autoRefresh = new CancellationTokenSource();
+        _ = AutoRefreshAsync(_autoRefresh.Token);
+    }
+
+    /// <summary>Deja de leer solo (otra pestaña, desconexión).</summary>
+    public void StopAutoRefresh()
+    {
+        _autoRefresh?.Cancel();
+        _autoRefresh?.Dispose();
+        _autoRefresh = null;
+    }
+
+    private async Task AutoRefreshAsync(CancellationToken token)
+    {
+        try
+        {
+            while (true)
+            {
+                await Task.Delay(AutoRefreshInterval, token);
+                if (IsBusy || _main.Client is not { } client)
+                    continue;
+                try
+                {
+                    Apply(await client.GetOpcUaAsync(new Empty(), cancellationToken: token), keepEdits: true);
+                }
+                catch (RpcException ex) when (ex.StatusCode != StatusCode.Cancelled)
+                {
+                    // Sin conexión con el agente lo avisa la barra de estado; se reintenta en el siguiente ciclo.
+                }
+            }
+        }
+        catch (OperationCanceledException)
+        {
+            // Pestaña cerrada o desconexión.
+        }
+        catch (RpcException ex) when (ex.StatusCode == StatusCode.Cancelled)
+        {
+            // Cancelada a mitad de una lectura.
+        }
+    }
+
+    public void Dispose() => StopAutoRefresh();
 
     /// <summary>Muestra lo que devuelve el agente; los ajustes solo si no hay cambios sin guardar.</summary>
     internal void Apply(OpcUaInfo info, bool keepEdits = false)
