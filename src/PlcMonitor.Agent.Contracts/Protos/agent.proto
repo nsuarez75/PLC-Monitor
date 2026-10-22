@@ -140,6 +140,9 @@ message AgentInfo {
   HistorianInfo historian = 7;
   // Acceso de quien llama, según el token con el que entró.
   AccessLevel access = 8;
+  // Puertos serie del equipo del agente (COM3, /dev/ttyUSB0, /dev/serial/by-id/...) para Modbus RTU. Vacío en agentes
+  // anteriores a la 1.15.
+  repeated string serial_ports = 9;
 }
 
 enum AccessLevel {

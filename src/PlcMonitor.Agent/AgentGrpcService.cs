@@ -4,6 +4,7 @@ using Google.Protobuf.WellKnownTypes;
 using Grpc.Core;
 using PlcMonitor.Abstractions;
 using PlcMonitor.Core;
+using PlcMonitor.Drivers.Modbus;
 using PlcMonitor.Engine;
 using PlcMonitor.Engine.Configuration;
 using PlcMonitor.OpcUa;
@@ -31,6 +32,7 @@ public sealed class AgentGrpcService(EngineHost host, DriverRegistry registry, I
             ConfigPath = host.ConfigPath,
             Access = AgentCaller.From(context).Access == AgentAccess.Full ? Api.AccessLevel.Full : Api.AccessLevel.Read,
         };
+        info.SerialPorts.AddRange(ModbusSerialPorts.List());
         var stats = host.Historian.GetStats();
         info.Historian = new Api.HistorianInfo
         {

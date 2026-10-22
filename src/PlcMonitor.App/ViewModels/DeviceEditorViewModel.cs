@@ -24,6 +24,7 @@ public sealed partial class DeviceEditorViewModel : ObservableObject
         _drivers = drivers ?? throw new ArgumentNullException(nameof(drivers));
         _saved = saved;
         DriverIds = [.. drivers.Select(d => d.Id)];
+        DriverOptions = [.. drivers.Select(d => new SettingOption(d.Id, string.IsNullOrWhiteSpace(d.Name) ? d.Id : d.Name))];
         Title = "Nuevo dispositivo";
         Enabled = true;
         DriverId = DriverIds.FirstOrDefault() ?? "";
@@ -50,6 +51,7 @@ public sealed partial class DeviceEditorViewModel : ObservableObject
         }
         _groups.AddRange(config.ScanGroups);
         TagSummary = $"{_groups.Sum(g => g.Tags.Count)} tags en {_groups.Count} grupos (se conservan)";
+        LoadForm(SettingsJson);
     }
 
     /// <summary>Nombre actual (null en un alta).</summary>
@@ -61,15 +63,45 @@ public sealed partial class DeviceEditorViewModel : ObservableObject
 
     public ObservableCollection<string> DriverIds { get; }
 
+    /// <summary>Drivers con su nombre para el desplegable.</summary>
+    public IReadOnlyList<SettingOption> DriverOptions { get; }
+
+    public SettingOption? SelectedDriver
+    {
+        get => DriverOptions.FirstOrDefault(o => o.Value == DriverId);
+        set
+        {
+            if (value is not null)
+                DriverId = value.Value;
+        }
+    }
+
     [ObservableProperty]
     [NotifyCanExecuteChangedFor(nameof(SaveCommand))]
     public partial string Name { get; set; } = "";
 
     [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(SelectedDriver))]
     public partial string DriverId { get; set; } = "";
 
     [ObservableProperty]
     public partial string SettingsJson { get; set; } = "{}";
+
+    /// <summary>Formulario de los ajustes del driver; null si el driver no tiene (solo JSON).</summary>
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(HasForm), nameof(IsJsonVisible))]
+    public partial DriverSettingsForm? Form { get; set; }
+
+    public bool HasForm => Form is not null;
+
+    /// <summary>Editar los ajustes como JSON en vez de con el formulario.</summary>
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(IsJsonVisible), nameof(IsFormVisible))]
+    public partial bool ShowJson { get; set; }
+
+    public bool IsJsonVisible => ShowJson || Form is null;
+
+    public bool IsFormVisible => !ShowJson && Form is not null;
 
     [ObservableProperty]
     public partial bool Enabled { get; set; }
@@ -104,7 +136,65 @@ public sealed partial class DeviceEditorViewModel : ObservableObject
     partial void OnDriverIdChanged(string value)
     {
         if (IsNew && _drivers.FirstOrDefault(d => d.Id == value) is { } driver)
+        {
             SettingsJson = Pretty(driver.DefaultSettingsJson);
+            LoadForm(SettingsJson);
+        }
+    }
+
+    /// <summary>Al pasar del JSON al formulario se relee el JSON (si es válido); al revés, el JSON refleja el formulario.</summary>
+    partial void OnShowJsonChanged(bool value)
+    {
+        if (Form is null)
+            return;
+        if (value)
+        {
+            SettingsJson = Form.ToJson();
+            return;
+        }
+        try
+        {
+            Form.Load(SettingsJson);
+            Errors = "";
+        }
+        catch (JsonException ex)
+        {
+            Errors = $"El JSON no es válido: {ex.Message}";
+            ShowJson = true;
+        }
+    }
+
+    private void LoadForm(string json)
+    {
+        var form = DriverSettingsForm.For(DriverId, LoadSerialPortsAsync);
+        try
+        {
+            form?.Load(json);
+        }
+        catch (JsonException)
+        {
+            // Ajustes que no son un objeto JSON: se corrigen a mano.
+            form = null;
+        }
+        Form = null;
+        ShowJson = false;
+        Form = form;
+    }
+
+    /// <summary>Puertos serie del equipo del agente; null si no se pudo preguntar.</summary>
+    private async Task<IReadOnlyList<string>?> LoadSerialPortsAsync()
+    {
+        if (_context.Client is not { } client)
+            return null;
+        try
+        {
+            var info = await client.GetInfoAsync(new Google.Protobuf.WellKnownTypes.Empty(), deadline: DateTime.UtcNow.AddSeconds(10));
+            return [.. info.SerialPorts];
+        }
+        catch (RpcException)
+        {
+            return null;
+        }
     }
 
     private bool CanSave() => !IsBusy && !string.IsNullOrWhiteSpace(Name);
@@ -118,6 +208,8 @@ public sealed partial class DeviceEditorViewModel : ObservableObject
         Errors = "";
         try
         {
+            if (IsFormVisible)
+                SettingsJson = Form!.ToJson();
             var config = new DeviceConfig
             {
                 Name = Name.Trim(),
