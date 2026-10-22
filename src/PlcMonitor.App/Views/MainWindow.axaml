@@ -220,6 +220,33 @@
                         <c:Icon Kind="x" Width="14" Height="14" />
                       </Button>
                     </Grid>
+                    <!-- Modbus: la dirección se compone con desplegables (y se puede escribir a mano) -->
+                    <StackPanel Spacing="4" IsVisible="{Binding IsModbus}">
+                      <WrapPanel Orientation="Horizontal">
+                        <ComboBox ItemsSource="{x:Static vm:AddTagViewModel.ModbusTables}" SelectedItem="{Binding ModbusTable}" Width="250" Margin="0,0,8,6" />
+                        <NumericUpDown Value="{Binding ModbusNumber}" Minimum="0" Maximum="65536" FormatString="0" Width="130" Margin="0,0,8,6"
+                                       ToolTip.Tip="Número del registro o del bit, como lo numera el dispositivo (desde 0 o desde 1)" />
+                        <ComboBox ItemsSource="{x:Static vm:AddTagViewModel.ModbusTypes}" SelectedItem="{Binding ModbusType}" Width="250" Margin="0,0,8,6"
+                                  IsVisible="{Binding IsRegisterTable}" />
+                        <StackPanel Orientation="Horizontal" Spacing="6" Margin="0,0,8,6" IsVisible="{Binding IsBitType}">
+                          <TextBlock Text="bit" Classes="muted" VerticalAlignment="Center" />
+                          <NumericUpDown Value="{Binding ModbusBit}" Minimum="0" Maximum="15" FormatString="0" Width="100" />
+                        </StackPanel>
+                        <StackPanel Orientation="Horizontal" Spacing="6" Margin="0,0,8,6" IsVisible="{Binding IsStringType}">
+                          <TextBlock Text="caracteres" Classes="muted" VerticalAlignment="Center" />
+                          <NumericUpDown Value="{Binding ModbusStringLength}" Minimum="1" Maximum="250" FormatString="0" Width="100" />
+                        </StackPanel>
+                        <ComboBox ItemsSource="{x:Static vm:AddTagViewModel.ModbusOrders}" SelectedItem="{Binding ModbusOrder}" Width="190" Margin="0,0,8,6"
+                                  IsVisible="{Binding HasByteOrder}" ToolTip.Tip="Orden de bytes de este tag (si no, el del dispositivo)" />
+                        <StackPanel Orientation="Horizontal" Spacing="6" Margin="0,0,0,6"
+                                    ToolTip.Tip="Dar de alta varios tags seguidos a partir de esta dirección (p.ej. 20 registros)">
+                          <TextBlock Text="cantidad" Classes="muted" VerticalAlignment="Center" />
+                          <NumericUpDown Value="{Binding RangeCount}" Minimum="1" Maximum="500" FormatString="0" Width="110" />
+                        </StackPanel>
+                      </WrapPanel>
+                      <TextBlock Text="{Binding RangePreview}" Classes="muted" FontSize="12"
+                                 IsVisible="{Binding RangePreview, Converter={x:Static StringConverters.IsNotNullOrEmpty}}" />
+                    </StackPanel>
                     <Grid ColumnDefinitions="2*,*,Auto,Auto" ColumnSpacing="8">
                       <TextBox Text="{Binding Address}" Classes="mono" PlaceholderText="Dirección (p.ej. DB1.DBW10)">
                         <TextBox.KeyBindings>
@@ -248,7 +275,7 @@
                       <TextBlock Text="cada" Classes="muted" VerticalAlignment="Center" Margin="0,0,8,6" />
                       <NumericUpDown Value="{Binding IntervalMs}" Minimum="50" Increment="250" FormatString="0" Width="130" Margin="0,0,8,6" />
                       <TextBlock Text="ms (si el grupo es nuevo)" Classes="muted" VerticalAlignment="Center" Margin="0,0,16,6" />
-                      <CheckBox Content="Escribible" IsChecked="{Binding Writable}" Margin="0,0,0,6" />
+                      <CheckBox Content="Escribible" IsChecked="{Binding Writable}" IsEnabled="{Binding CanBeWritable}" Margin="0,0,0,6" />
                     </WrapPanel>
                     <TextBlock Text="{Binding Hint}" Classes="muted" FontSize="12" TextWrapping="Wrap" />
                   </StackPanel>
