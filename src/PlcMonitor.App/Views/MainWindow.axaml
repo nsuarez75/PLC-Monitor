@@ -20,7 +20,7 @@
           <StackPanel VerticalAlignment="Center">
             <TextBlock Text="PLC-Monitor" FontWeight="Bold" FontSize="14" />
             <TextBlock Text="{Binding AgentDescription}" Classes="muted" FontSize="11" IsVisible="{Binding IsConnected}" />
-            <TextBlock Text="Diagnóstico de PLCs Siemens S7" Classes="muted" FontSize="11" IsVisible="{Binding !IsConnected}" />
+            <TextBlock Text="Diagnóstico de PLCs" Classes="muted" FontSize="11" IsVisible="{Binding !IsConnected}" />
           </StackPanel>
         </StackPanel>
 
@@ -220,6 +220,33 @@
                         <c:Icon Kind="x" Width="14" Height="14" />
                       </Button>
                     </Grid>
+                    <!-- Modbus: la dirección se compone con desplegables (y se puede escribir a mano) -->
+                    <StackPanel Spacing="4" IsVisible="{Binding IsModbus}">
+                      <WrapPanel Orientation="Horizontal">
+                        <ComboBox ItemsSource="{x:Static vm:AddTagViewModel.ModbusTables}" SelectedItem="{Binding ModbusTable}" Width="250" Margin="0,0,8,6" />
+                        <NumericUpDown Value="{Binding ModbusNumber}" Minimum="0" Maximum="65536" FormatString="0" Width="130" Margin="0,0,8,6"
+                                       ToolTip.Tip="Número del registro o del bit, como lo numera el dispositivo (desde 0 o desde 1)" />
+                        <ComboBox ItemsSource="{x:Static vm:AddTagViewModel.ModbusTypes}" SelectedItem="{Binding ModbusType}" Width="250" Margin="0,0,8,6"
+                                  IsVisible="{Binding IsRegisterTable}" />
+                        <StackPanel Orientation="Horizontal" Spacing="6" Margin="0,0,8,6" IsVisible="{Binding IsBitType}">
+                          <TextBlock Text="bit" Classes="muted" VerticalAlignment="Center" />
+                          <NumericUpDown Value="{Binding ModbusBit}" Minimum="0" Maximum="15" FormatString="0" Width="100" />
+                        </StackPanel>
+                        <StackPanel Orientation="Horizontal" Spacing="6" Margin="0,0,8,6" IsVisible="{Binding IsStringType}">
+                          <TextBlock Text="caracteres" Classes="muted" VerticalAlignment="Center" />
+                          <NumericUpDown Value="{Binding ModbusStringLength}" Minimum="1" Maximum="250" FormatString="0" Width="100" />
+                        </StackPanel>
+                        <ComboBox ItemsSource="{x:Static vm:AddTagViewModel.ModbusOrders}" SelectedItem="{Binding ModbusOrder}" Width="190" Margin="0,0,8,6"
+                                  IsVisible="{Binding HasByteOrder}" ToolTip.Tip="Orden de bytes de este tag (si no, el del dispositivo)" />
+                        <StackPanel Orientation="Horizontal" Spacing="6" Margin="0,0,0,6"
+                                    ToolTip.Tip="Dar de alta varios tags seguidos a partir de esta dirección (p.ej. 20 registros)">
+                          <TextBlock Text="cantidad" Classes="muted" VerticalAlignment="Center" />
+                          <NumericUpDown Value="{Binding RangeCount}" Minimum="1" Maximum="500" FormatString="0" Width="110" />
+                        </StackPanel>
+                      </WrapPanel>
+                      <TextBlock Text="{Binding RangePreview}" Classes="muted" FontSize="12"
+                                 IsVisible="{Binding RangePreview, Converter={x:Static StringConverters.IsNotNullOrEmpty}}" />
+                    </StackPanel>
                     <Grid ColumnDefinitions="2*,*,Auto,Auto" ColumnSpacing="8">
                       <TextBox Text="{Binding Address}" Classes="mono" PlaceholderText="Dirección (p.ej. DB1.DBW10)">
                         <TextBox.KeyBindings>
@@ -248,7 +275,7 @@
                       <TextBlock Text="cada" Classes="muted" VerticalAlignment="Center" Margin="0,0,8,6" />
                       <NumericUpDown Value="{Binding IntervalMs}" Minimum="50" Increment="250" FormatString="0" Width="130" Margin="0,0,8,6" />
                       <TextBlock Text="ms (si el grupo es nuevo)" Classes="muted" VerticalAlignment="Center" Margin="0,0,16,6" />
-                      <CheckBox Content="Escribible" IsChecked="{Binding Writable}" Margin="0,0,0,6" />
+                      <CheckBox Content="Escribible" IsChecked="{Binding Writable}" IsEnabled="{Binding CanBeWritable}" Margin="0,0,0,6" />
                     </WrapPanel>
                     <TextBlock Text="{Binding Hint}" Classes="muted" FontSize="12" TextWrapping="Wrap" />
                   </StackPanel>
@@ -555,13 +582,35 @@
                   <TextBlock Text="Nombre" VerticalAlignment="Center" FontWeight="Medium" />
                   <TextBox Grid.Column="1" Text="{Binding Name}" PlaceholderText="prensa1" />
                   <TextBlock Grid.Row="1" Text="Driver" VerticalAlignment="Center" FontWeight="Medium" />
-                  <ComboBox Grid.Row="1" Grid.Column="1" ItemsSource="{Binding DriverIds}" SelectedItem="{Binding DriverId}" MinWidth="240" />
-                  <StackPanel Grid.Row="2" Spacing="2" Margin="0,6,0,0">
-                    <TextBlock Text="Ajustes" FontWeight="Medium" />
-                    <TextBlock Text="JSON del driver" Classes="muted" FontSize="11.5" />
-                    <TextBlock Text="La contraseña guardada se ve como ********; déjala así para conservarla" Classes="muted" FontSize="11.5" TextWrapping="Wrap" Margin="0,6,0,0" />
+                  <StackPanel Grid.Row="1" Grid.Column="1" Orientation="Horizontal" Spacing="20">
+                    <ComboBox ItemsSource="{Binding DriverOptions}" SelectedItem="{Binding SelectedDriver}" MinWidth="300" />
+                    <CheckBox Content="Editar como JSON" IsChecked="{Binding ShowJson}" IsVisible="{Binding HasForm}"
+                              ToolTip.Tip="Los mismos ajustes en el formato de agent.json, para pegarlos o copiarlos" />
                   </StackPanel>
-                  <TextBox Grid.Row="2" Grid.Column="1" Text="{Binding SettingsJson}" AcceptsReturn="True" Classes="mono" MinHeight="150" FontSize="12.5" />
+                  <!-- Ajustes: formulario del driver (Siemens simbólico, absoluto o Modbus) o JSON, en la misma fila -->
+                  <Panel Grid.Row="2" Grid.ColumnSpan="2">
+                    <ContentControl Content="{Binding Form}" IsVisible="{Binding IsFormVisible}">
+                      <ContentControl.DataTemplates>
+                        <DataTemplate DataType="vm:ModbusSettingsForm">
+                          <v:ModbusSettingsView />
+                        </DataTemplate>
+                        <DataTemplate DataType="vm:S7AbsoluteSettingsForm">
+                          <v:S7AbsoluteSettingsView />
+                        </DataTemplate>
+                        <DataTemplate DataType="vm:S7SymbolicSettingsForm">
+                          <v:S7SymbolicSettingsView />
+                        </DataTemplate>
+                      </ContentControl.DataTemplates>
+                    </ContentControl>
+                    <Grid ColumnDefinitions="170,*" ColumnSpacing="16" IsVisible="{Binding IsJsonVisible}">
+                      <StackPanel Spacing="2" Margin="0,6,0,0">
+                        <TextBlock Text="Ajustes" FontWeight="Medium" />
+                        <TextBlock Text="JSON del driver" Classes="muted" FontSize="11.5" />
+                        <TextBlock Text="La contraseña guardada se ve como ********; déjala así para conservarla" Classes="muted" FontSize="11.5" TextWrapping="Wrap" Margin="0,6,0,0" />
+                      </StackPanel>
+                      <TextBox Grid.Column="1" Text="{Binding SettingsJson}" AcceptsReturn="True" Classes="mono" MinHeight="150" FontSize="12.5" />
+                    </Grid>
+                  </Panel>
                   <TextBlock Grid.Row="3" Text="Opciones" VerticalAlignment="Center" FontWeight="Medium" />
                   <StackPanel Grid.Row="3" Grid.Column="1" Orientation="Horizontal" Spacing="20">
                     <CheckBox Content="Activo" IsChecked="{Binding Enabled}" />

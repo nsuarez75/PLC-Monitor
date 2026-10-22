@@ -1,0 +1,48 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:vm="using:PlcMonitor.App.ViewModels"
+             x:Class="PlcMonitor.App.Views.S7AbsoluteSettingsView"
+             x:DataType="vm:S7AbsoluteSettingsForm">
+  <!-- Ajustes del driver S7 absoluto (PUT/GET): misma rejilla que el editor de dispositivos -->
+  <Grid ColumnDefinitions="170,*" RowDefinitions="Auto,Auto,Auto,Auto,Auto" RowSpacing="14" ColumnSpacing="16">
+    <TextBlock Text="PLC" VerticalAlignment="Center" FontWeight="Medium" />
+    <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="8">
+      <TextBox Text="{Binding Host}" PlaceholderText="192.168.0.10" Width="240" />
+      <TextBlock Text="puerto" Classes="muted" VerticalAlignment="Center" Margin="8,0,0,0" />
+      <NumericUpDown Value="{Binding Port}" Minimum="1" Maximum="65535" FormatString="0" Width="130" />
+    </StackPanel>
+
+    <TextBlock Grid.Row="1" Text="CPU" VerticalAlignment="Center" FontWeight="Medium" />
+    <ComboBox Grid.Row="1" Grid.Column="1" ItemsSource="{x:Static vm:S7AbsoluteSettingsForm.CpuOptions}" SelectedItem="{Binding Cpu}" Width="160" />
+
+    <StackPanel Grid.Row="2" Spacing="2" Margin="0,6,0,0">
+      <TextBlock Text="Rack y slot" FontWeight="Medium" />
+      <TextBlock Text="de la CPU en el bastidor" Classes="muted" FontSize="11.5" />
+    </StackPanel>
+    <StackPanel Grid.Row="2" Grid.Column="1" Spacing="4">
+      <StackPanel Orientation="Horizontal" Spacing="8">
+        <TextBlock Text="rack" Classes="muted" VerticalAlignment="Center" />
+        <NumericUpDown Value="{Binding Rack}" Minimum="0" Maximum="7" FormatString="0" Width="100" />
+        <TextBlock Text="slot" Classes="muted" VerticalAlignment="Center" Margin="8,0,0,0" />
+        <NumericUpDown Value="{Binding Slot}" Minimum="0" Maximum="31" FormatString="0" Width="100" />
+      </StackPanel>
+      <TextBlock Text="Lo habitual: slot 2 en S7-300 y 1 en S7-1200/1500. Hace falta «Permitir acceso vía PUT/GET» en la CPU."
+                 Classes="muted" FontSize="11.5" TextWrapping="Wrap" />
+    </StackPanel>
+
+    <TextBlock Grid.Row="3" Text="Timeout" VerticalAlignment="Center" FontWeight="Medium" />
+    <StackPanel Grid.Row="3" Grid.Column="1" Orientation="Horizontal" Spacing="8">
+      <NumericUpDown Value="{Binding TimeoutMs}" Minimum="100" Maximum="60000" Increment="500" FormatString="0" Width="130" />
+      <TextBlock Text="ms" Classes="muted" VerticalAlignment="Center" />
+    </StackPanel>
+
+    <StackPanel Grid.Row="4" Spacing="2" Margin="0,6,0,0">
+      <TextBlock Text="Hueco máximo" FontWeight="Medium" />
+      <TextBlock Text="para leer juntos" Classes="muted" FontSize="11.5" />
+    </StackPanel>
+    <StackPanel Grid.Row="4" Grid.Column="1" Orientation="Horizontal" Spacing="8">
+      <NumericUpDown Value="{Binding ReadGapBytes}" Minimum="0" Maximum="1024" FormatString="0" Width="130" />
+      <TextBlock Text="bytes entre variables del mismo DB o área" Classes="muted" VerticalAlignment="Center" />
+    </StackPanel>
+  </Grid>
+</UserControl>

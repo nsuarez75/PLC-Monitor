@@ -216,7 +216,9 @@ public sealed partial class MainViewModel : ObservableObject, IAgentContext, IAs
     /// <summary>Qué hacer cuando el dispositivo aún no tiene tags.</summary>
     public string EmptyTagsHint => SelectedDeviceCanBrowse
         ? "Añádelos con «Añadir tag» o búscalos en «Explorar» con el PLC conectado."
-        : "Añádelos con «Añadir tag» indicando su dirección (p.ej. DB1.DBW10).";
+        : string.Equals(SelectedDevice?.Driver, AddTagViewModel.ModbusDriver, StringComparison.OrdinalIgnoreCase)
+            ? "Añádelos con «Añadir tag» eligiendo la tabla y el número (p.ej. HR0), uno a uno o un rango de golpe."
+            : "Añádelos con «Añadir tag» indicando su dirección (p.ej. DB1.DBW10).";
 
     /// <summary>Consulta del histórico del dispositivo seleccionado.</summary>
     public HistoryViewModel History { get; }
