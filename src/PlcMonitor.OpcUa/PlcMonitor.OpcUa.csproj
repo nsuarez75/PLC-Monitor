@@ -1,0 +1,14 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <Description>Servidor OPC UA de PLC-Monitor: publica los tags del motor (con escritura controlada e histórico) sobre la pila de la OPC Foundation (licencia MIT).</Description>
+  </PropertyGroup>
+  <ItemGroup>
+    <PackageReference Include="OPCFoundation.NetStandard.Opc.Ua.Server" />
+  </ItemGroup>
+  <ItemGroup>
+    <ProjectReference Include="..\PlcMonitor.Historian\PlcMonitor.Historian.csproj" />
+  </ItemGroup>
+  <ItemGroup>
+    <InternalsVisibleTo Include="PlcMonitor.OpcUa.Tests" />
+  </ItemGroup>
+</Project>
