@@ -722,6 +722,9 @@ public sealed partial class MainViewModel : ObservableObject, IAgentContext, IAs
             case SubscribeEvent.EventOneofCase.Transforms:
                 SetTransforms(ev.Transforms.Transforms);
                 break;
+            case SubscribeEvent.EventOneofCase.DeviceOrder:
+                ApplyOrder(ev.DeviceOrder.Devices);
+                break;
             default:
                 break;
         }
@@ -849,6 +852,49 @@ public sealed partial class MainViewModel : ObservableObject, IAgentContext, IAs
     }
 
     private DeviceViewModel? Find(string? name) => name is null ? null : Devices.FirstOrDefault(d => d.Name == name);
+
+    /// <summary>Coloca los dispositivos en el orden del agente (moviéndolos: la selección y su estado se conservan).</summary>
+    private void ApplyOrder(IEnumerable<string> order)
+    {
+        var index = 0;
+        foreach (var name in order)
+        {
+            if (Find(name) is not { } device)
+                continue;
+            var current = Devices.IndexOf(device);
+            if (current != index)
+                Devices.Move(current, index);
+            index++;
+        }
+    }
+
+    /// <summary>
+    /// Coloca los dispositivos arrastrados antes (o después, con <paramref name="after"/>) de <paramref name="target"/>.
+    /// El orden se guarda en el agente y llega a todos los clientes por la suscripción.
+    /// </summary>
+    public async Task MoveDevicesAsync(IReadOnlyList<DeviceViewModel> dragged, DeviceViewModel target, bool after)
+    {
+        if (Client is not { } client || ListOrder.Move(Devices, dragged, target, after) is not { } order)
+            return;
+        try
+        {
+            var request = new ReorderDevicesRequest { Persist = true };
+            request.Devices.AddRange(order.Select(d => d.Name));
+            await client.ReorderDevicesAsync(request);
+        }
+        catch (RpcException ex) when (ex.StatusCode == StatusCode.Unimplemented)
+        {
+            Report("Este agente no permite reordenar dispositivos: actualízalo.", isError: true);
+        }
+        catch (RpcException ex)
+        {
+            Report(Describe(ex), isError: true);
+        }
+    }
+
+    /// <summary>Soltar los dispositivos arrastrados ahí cambiaría el orden (no sobre sí mismos ni justo al lado).</summary>
+    public bool CanMoveDevices(IReadOnlyList<DeviceViewModel> dragged, DeviceViewModel target, bool after) =>
+        ListOrder.Move(Devices, dragged, target, after) is not null;
 
     private async Task StopSubscriptionAsync()
     {

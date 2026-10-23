@@ -516,6 +516,10 @@ public sealed partial class TagDetailsViewModel : ObservableObject
                     other.History.Trigger.Tag = name;
                     retargeted++;
                 }
+                // Renombrado, conserva su sitio en la tabla.
+                var position = device.TagOrder.IndexOf(_originalName);
+                if (position >= 0)
+                    device.TagOrder[position] = name;
             }
 
             await client.PutDeviceAsync(new PutDeviceRequest { Device = device, Persist = true });

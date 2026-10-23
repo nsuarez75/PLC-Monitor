@@ -302,6 +302,15 @@
   <Style Selector="c|TableRow.off">
     <Setter Property="Opacity" Value="0.5" />
   </Style>
+  <!-- Al reordenar arrastrando: línea donde quedará lo que se suelta (delante o detrás de la fila) -->
+  <Style Selector="ListBox ListBoxItem.dropbefore /template/ ContentPresenter">
+    <Setter Property="BorderBrush" Value="{DynamicResource App.Accent}" />
+    <Setter Property="BorderThickness" Value="0,2,0,0" />
+  </Style>
+  <Style Selector="ListBox ListBoxItem.dropafter /template/ ContentPresenter">
+    <Setter Property="BorderBrush" Value="{DynamicResource App.Accent}" />
+    <Setter Property="BorderThickness" Value="0,0,0,2" />
+  </Style>
   <!-- Fila sobre la que se van a soltar tags arrastrados -->
   <Style Selector="ListBox.table ListBoxItem.droptarget /template/ ContentPresenter">
     <Setter Property="Background" Value="{DynamicResource App.AccentSoft}" />

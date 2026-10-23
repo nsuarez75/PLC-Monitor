@@ -19,8 +19,10 @@ public sealed partial class MainWindow : Window
     private const double DragThreshold = 6;
 
     private static readonly DataFormat<TagViewModel[]> TagsFormat = DataFormat.CreateInProcessFormat<TagViewModel[]>("plcmonitor-tags");
+    private static readonly DataFormat<DeviceViewModel[]> DevicesFormat = DataFormat.CreateInProcessFormat<DeviceViewModel[]>("plcmonitor-devices");
 
     private readonly ListBox _tags;
+    private readonly ListBox _devices;
 
     // Cabecera de grupo sobre la que se ha hecho clic derecho (el menú actúa sobre el grupo y no sobre los tags).
     private TagFolderViewModel? _menuFolder;
@@ -28,6 +30,7 @@ public sealed partial class MainWindow : Window
     // Pulsación sobre un tag que puede acabar en arrastre.
     private PointerPressedEventArgs? _press;
     private TagViewModel? _pressedTag;
+    private DeviceViewModel? _pressedDevice;
     private ListBoxItem? _dropTarget;
 
     public MainWindow()
@@ -43,6 +46,13 @@ public sealed partial class MainWindow : Window
         _tags.AddHandler(DragDrop.DragOverEvent, OnTagsDragOver);
         _tags.AddHandler(DragDrop.DragLeaveEvent, (_, _) => SetDropTarget(null));
         _tags.AddHandler(DragDrop.DropEvent, OnTagsDrop);
+        _devices = this.FindControl<ListBox>("DevicesList")!;
+        _devices.AddHandler(PointerPressedEvent, OnDevicesPointerPressed, RoutingStrategies.Tunnel, handledEventsToo: true);
+        _devices.AddHandler(PointerMovedEvent, OnDevicesPointerMoved, RoutingStrategies.Tunnel, handledEventsToo: true);
+        _devices.AddHandler(PointerReleasedEvent, (_, _) => _press = null, RoutingStrategies.Tunnel, handledEventsToo: true);
+        _devices.AddHandler(DragDrop.DragOverEvent, OnDevicesDragOver);
+        _devices.AddHandler(DragDrop.DragLeaveEvent, (_, _) => SetDropTarget(null));
+        _devices.AddHandler(DragDrop.DropEvent, OnDevicesDrop);
         this.FindControl<ContextMenu>("TagsMenu")!.Opening += OnTagsMenuOpening;
         this.FindControl<ContextMenu>("ColumnsMenu")!.Opening += OnColumnsMenuOpening;
         // La tendencia en vivo avanza con el reloj aunque no lleguen valores nuevos (solo si se está viendo: al volver a
@@ -250,37 +260,116 @@ public sealed partial class MainWindow : Window
         }
     }
 
-    private (DeviceViewModel Device, TagViewModel[] Tags, string Folder)? DropOf(DragEventArgs e)
+    /// <summary>
+    /// Qué pasa al soltar tags donde está el ratón: sobre la cabecera de un grupo, pasan a ese grupo (marca de fila
+    /// entera); sobre un tag, se colocan delante o detrás según la mitad de la fila (marca de línea), y si la tabla está
+    /// agrupada pasan también a su grupo.
+    /// </summary>
+    private (ListBoxItem Item, string Mark, Func<Task> Apply)? TagDropOf(DragEventArgs e)
     {
         if (DataContext is not MainViewModel { SelectedDevice: { } device } || e.DataTransfer.TryGetValue(TagsFormat) is not { Length: > 0 } tags
-            || tags.Any(t => t.Device != device.Name))
+            || tags.Any(t => t.Device != device.Name) || ItemAt(e.Source) is not { } item)
             return null;
-        return DeviceViewModel.DropFolder(RowAt(e.Source), tags) is { } folder ? (device, tags, folder) : null;
+        switch (item.DataContext)
+        {
+            case TagFolderViewModel header when DeviceViewModel.DropFolder(header, tags) is { } folder:
+                return (item, "droptarget", () => device.MoveToFolderAsync(tags, folder));
+            case TagViewModel target:
+                var after = IsLowerHalf(e, item);
+                return device.CanMoveTags(tags, target, after) ? (item, after ? "dropafter" : "dropbefore", () => device.MoveTagsAsync(tags, target, after)) : null;
+            default:
+                return null;
+        }
     }
+
+    private static ListBoxItem? ItemAt(object? source) => (source as Visual)?.FindAncestorOfType<ListBoxItem>(includeSelf: true);
+
+    private static bool IsLowerHalf(DragEventArgs e, ListBoxItem item) => e.GetPosition(item).Y > item.Bounds.Height / 2;
 
     private void OnTagsDragOver(object? sender, DragEventArgs e)
     {
-        var drop = DropOf(e);
+        var drop = TagDropOf(e);
         e.DragEffects = drop is null ? DragDropEffects.None : DragDropEffects.Move;
-        SetDropTarget(drop is null ? null : (e.Source as Visual)?.FindAncestorOfType<ListBoxItem>(includeSelf: true));
+        SetDropTarget(drop?.Item, drop?.Mark);
     }
 
     private void OnTagsDrop(object? sender, DragEventArgs e)
     {
         SetDropTarget(null);
-        if (DropOf(e) is not { } drop)
+        if (TagDropOf(e) is not { } drop)
             return;
         e.DragEffects = DragDropEffects.Move;
-        _ = drop.Device.MoveToFolderAsync(drop.Tags, drop.Folder);
+        _ = drop.Apply();
     }
 
-    private void SetDropTarget(ListBoxItem? item)
+    private void OnDevicesPointerPressed(object? sender, PointerPressedEventArgs e)
     {
-        if (_dropTarget == item)
+        _press = null;
+        if (e.GetCurrentPoint(_devices).Properties.IsLeftButtonPressed && ItemAt(e.Source)?.DataContext is DeviceViewModel device)
+        {
+            _press = e;
+            _pressedDevice = device;
+        }
+    }
+
+    /// <summary>Al mover con el botón pulsado sobre un dispositivo empieza el arrastre para cambiar el orden.</summary>
+    private async void OnDevicesPointerMoved(object? sender, PointerEventArgs e)
+    {
+        if (_press is not { } press || _pressedDevice is not { } device)
             return;
-        _dropTarget?.Classes.Remove("droptarget");
-        _dropTarget = item;
-        _dropTarget?.Classes.Add("droptarget");
+        var delta = e.GetPosition(_devices) - press.GetPosition(_devices);
+        if (Math.Abs(delta.X) < DragThreshold && Math.Abs(delta.Y) < DragThreshold)
+            return;
+        _press = null;
+        var data = new DataTransfer();
+        data.Add(DataTransferItem.Create(DevicesFormat, new[] { device }));
+        try
+        {
+            await DragDrop.DoDragDropAsync(press, data, DragDropEffects.Move);
+        }
+        finally
+        {
+            SetDropTarget(null);
+        }
+    }
+
+    private (ListBoxItem Item, DeviceViewModel[] Devices, DeviceViewModel Target, bool After)? DeviceDropOf(DragEventArgs e)
+    {
+        if (DataContext is not MainViewModel main || e.DataTransfer.TryGetValue(DevicesFormat) is not { Length: > 0 } devices
+            || ItemAt(e.Source) is not { DataContext: DeviceViewModel target } item)
+            return null;
+        var after = IsLowerHalf(e, item);
+        return main.CanMoveDevices(devices, target, after) ? (item, devices, target, after) : null;
+    }
+
+    private void OnDevicesDragOver(object? sender, DragEventArgs e)
+    {
+        var drop = DeviceDropOf(e);
+        e.DragEffects = drop is null ? DragDropEffects.None : DragDropEffects.Move;
+        SetDropTarget(drop?.Item, drop is { After: true } ? "dropafter" : "dropbefore");
+    }
+
+    private void OnDevicesDrop(object? sender, DragEventArgs e)
+    {
+        SetDropTarget(null);
+        if (DeviceDropOf(e) is not { } drop || DataContext is not MainViewModel main)
+            return;
+        e.DragEffects = DragDropEffects.Move;
+        _ = main.MoveDevicesAsync(drop.Devices, drop.Target, drop.After);
+    }
+
+    private string? _dropMark;
+
+    /// <summary>Marca la fila donde se soltaría: entera (droptarget) o con una línea arriba o abajo (dropbefore/dropafter).</summary>
+    private void SetDropTarget(ListBoxItem? item, string? mark = null)
+    {
+        if (_dropTarget == item && _dropMark == mark)
+            return;
+        if (_dropTarget is not null && _dropMark is not null)
+            _dropTarget.Classes.Remove(_dropMark);
+        (_dropTarget, _dropMark) = item is null ? (null, null) : (item, mark);
+        if (_dropTarget is not null && _dropMark is not null)
+            _dropTarget.Classes.Add(_dropMark);
     }
 
     /// <summary>Doble clic en una fila de tags (fuera del campo y los botones de escritura): abre su detalle.</summary>

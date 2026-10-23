@@ -121,7 +121,8 @@
           </Grid>
           <TextBlock DockPanel.Dock="Top" Classes="muted" TextWrapping="Wrap" Margin="4,8" FontSize="12"
                      IsVisible="{Binding !IsConnected}" Text="Conecta con un agente para ver sus PLC." />
-          <ListBox Classes="devices" ItemsSource="{Binding Devices}" SelectedItem="{Binding SelectedDevice}">
+          <ListBox x:Name="DevicesList" Classes="devices" ItemsSource="{Binding Devices}" SelectedItem="{Binding SelectedDevice}" DragDrop.AllowDrop="True"
+                   ToolTip.Tip="Arrastra un dispositivo para cambiar el orden">
             <ListBox.ItemTemplate>
               <DataTemplate x:DataType="vm:DeviceViewModel">
                 <Grid ColumnDefinitions="Auto,*,Auto" RowDefinitions="Auto,Auto" ColumnSpacing="10" RowSpacing="2">
@@ -325,7 +326,7 @@
                       <TextBlock Classes="muted" Text="{Binding EmptyTagsHint}" HorizontalAlignment="Center" />
                     </StackPanel>
                     <ListBox x:Name="TagsList" Classes="table" ItemsSource="{Binding SelectedDevice.Rows}" SelectionMode="Multiple" DragDrop.AllowDrop="True"
-                             ToolTip.Tip="Doble clic para ver el detalle del tag. Clic derecho para editar, ver su histórico, agrupar, activar o desactivar, o quitar (Ctrl o Mayús para elegir varios). Arrastra tags a un grupo para moverlos">
+                             ToolTip.Tip="Doble clic para ver el detalle del tag. Clic derecho para editar, ver su histórico, agrupar, activar o desactivar, o quitar (Ctrl o Mayús para elegir varios). Arrastra tags para cambiar el orden o a la cabecera de un grupo para moverlos a él">
                       <ListBox.ContextMenu>
                         <ContextMenu x:Name="TagsMenu" />
                       </ListBox.ContextMenu>
