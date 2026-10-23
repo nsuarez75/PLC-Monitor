@@ -37,23 +37,102 @@ public sealed class TableRow : Panel
     public static readonly StyledProperty<ICommand?> ResizeCompletedCommandProperty =
         AvaloniaProperty.Register<TableRow, ICommand?>(nameof(ResizeCompletedCommand));
 
+    public static readonly StyledProperty<string> DisplayOrderProperty =
+        AvaloniaProperty.Register<TableRow, string>(nameof(DisplayOrder), "");
+
+    public static readonly StyledProperty<bool> CanReorderProperty =
+        AvaloniaProperty.Register<TableRow, bool>(nameof(CanReorder));
+
+    public static readonly StyledProperty<ICommand?> ReorderCompletedCommandProperty =
+        AvaloniaProperty.Register<TableRow, ICommand?>(nameof(ReorderCompletedCommand));
+
     /// <summary>Ancho mínimo de una columna al arrastrar su borde.</summary>
     public const double MinResizeWidth = 32;
 
     // Distancia al borde, a cada lado, en la que se puede agarrar.
     private const double GripWidth = 5;
 
+    // Lo que hay que mover el ratón para que una pulsación en la cabecera pase a arrastrar la columna.
+    private const double ReorderThreshold = 6;
+
     private static readonly Cursor ResizeCursor = new(StandardCursorType.SizeWestEast);
 
-    private (string Columns, string HideOrder, string Hidden, double[] Values, bool[] Stars, int[] Order, bool[] Off)? _parsed;
+    private static readonly Cursor MoveCursor = new(StandardCursorType.DragMove);
+
+    private (string Columns, string HideOrder, string Hidden, string Display, double[] Values, bool[] Stars, int[] Order, bool[] Off, int[] Sequence)? _parsed;
     private Drag? _drag;
+
+    // Pulsación en una cabecera que puede acabar en arrastre de la columna; Active cuando ya se está moviendo.
+    private (int Column, double StartX, bool Active)? _reorder;
 
     // Arrastre en curso: columnas a cada lado del borde y valores de partida.
     private sealed record Drag(int Left, int Right, double StartX, double[] Values, double[] Widths, double PerStar);
 
     static TableRow()
     {
-        AffectsMeasure<TableRow>(ColumnsProperty, HideOrderProperty, HiddenColumnsProperty, ColumnSpacingProperty, MinStarWidthProperty);
+        AffectsMeasure<TableRow>(ColumnsProperty, HideOrderProperty, HiddenColumnsProperty, DisplayOrderProperty, ColumnSpacingProperty, MinStarWidthProperty);
+    }
+
+    /// <summary>
+    /// Orden en que se muestran las columnas: sus índices separados por comas (los que falten, detrás en su orden).
+    /// Los índices de <see cref="Columns"/>, <see cref="HideOrder"/>, <see cref="HiddenColumns"/> y <c>Grid.Column</c>
+    /// siguen siendo los de siempre. Vacío = el orden natural.
+    /// </summary>
+    public string DisplayOrder
+    {
+        get => GetValue(DisplayOrderProperty);
+        set => SetValue(DisplayOrderProperty, value);
+    }
+
+    /// <summary>Permite cambiar el orden de las columnas arrastrando la cabecera (fuera de los bordes).</summary>
+    public bool CanReorder
+    {
+        get => GetValue(CanReorderProperty);
+        set => SetValue(CanReorderProperty, value);
+    }
+
+    /// <summary>Se ejecuta al soltar una columna arrastrada (para guardar <see cref="DisplayOrder"/>).</summary>
+    public ICommand? ReorderCompletedCommand
+    {
+        get => GetValue(ReorderCompletedCommandProperty);
+        set => SetValue(ReorderCompletedCommandProperty, value);
+    }
+
+    /// <summary>Columnas en el orden en que se muestran.</summary>
+    public IReadOnlyList<int> Sequence
+    {
+        get
+        {
+            Parse();
+            return _parsed!.Value.Sequence;
+        }
+    }
+
+    /// <summary>Columna visible bajo la coordenada x (con un ancho total <paramref name="width"/>), o -1.</summary>
+    public int ColumnAt(double width, double x)
+    {
+        var widths = Layout(width);
+        foreach (var column in Sequence)
+        {
+            if (widths[column] <= 0)
+                continue;
+            var left = Offset(widths, column);
+            if (x >= left - (ColumnSpacing / 2) && x < left + widths[column] + (ColumnSpacing / 2))
+                return column;
+        }
+        return -1;
+    }
+
+    /// <summary><see cref="DisplayOrder"/> tras llevar la columna <paramref name="column"/> al sitio de <paramref name="target"/>.</summary>
+    public string MovedOrder(int column, int target)
+    {
+        var sequence = Sequence.ToList();
+        if (column == target || !sequence.Contains(column) || !sequence.Contains(target))
+            return string.Join(",", sequence);
+        var to = sequence.IndexOf(target);
+        sequence.Remove(column);
+        sequence.Insert(to, column);
+        return string.Join(",", sequence);
     }
 
     /// <summary>Anchos separados por comas: número (fijo) o <c>n*</c> (proporcional).</summary>
@@ -152,7 +231,9 @@ public sealed class TableRow : Panel
             child.Measure(new Size(width, availableSize.Height));
             height = Math.Max(height, child.DesiredSize.Height);
         }
-        var total = double.IsInfinity(availableSize.Width) ? Offset(widths, widths.Length) : availableSize.Width;
+        var total = double.IsInfinity(availableSize.Width)
+            ? widths.Sum() + (ColumnSpacing * Math.Max(0, widths.Count(w => w > 0) - 1))
+            : availableSize.Width;
         return new Size(total, height);
     }
 
@@ -174,7 +255,7 @@ public sealed class TableRow : Panel
     protected override void OnPointerMoved(PointerEventArgs e)
     {
         base.OnPointerMoved(e);
-        if (!CanResize)
+        if (!CanResize && !CanReorder)
             return;
         var x = e.GetPosition(this).X;
         if (_drag is { } drag)
@@ -184,21 +265,43 @@ public sealed class TableRow : Panel
             e.Handled = true;
             return;
         }
-        Cursor = BorderAt(x) >= 0 ? ResizeCursor : null;
+        if (_reorder is { } reorder)
+        {
+            if (!reorder.Active && Math.Abs(x - reorder.StartX) < ReorderThreshold)
+                return;
+            _reorder = reorder with { Active = true };
+            Cursor = MoveCursor;
+            // La columna se mueve en vivo al pasar sobre otra (las filas que enlazan el orden la siguen).
+            var target = ColumnAt(Bounds.Width, x);
+            if (target >= 0 && target != reorder.Column)
+                SetCurrentValue(DisplayOrderProperty, MovedOrder(reorder.Column, target));
+            e.Handled = true;
+            return;
+        }
+        Cursor = CanResize && BorderAt(x) >= 0 ? ResizeCursor : null;
     }
 
     protected override void OnPointerPressed(PointerPressedEventArgs e)
     {
         base.OnPointerPressed(e);
-        if (!CanResize || !e.GetCurrentPoint(this).Properties.IsLeftButtonPressed)
+        if (!e.GetCurrentPoint(this).Properties.IsLeftButtonPressed)
             return;
         var x = e.GetPosition(this).X;
-        var left = BorderAt(x);
-        if (left < 0)
+        var left = CanResize ? BorderAt(x) : -1;
+        if (left >= 0)
+        {
+            var (values, stars, _) = Parse();
+            var widths = Layout(Bounds.Width);
+            _drag = new Drag(left, NextVisible(widths, left), x, values, widths, PerStar(values, stars, widths));
+        }
+        else if (CanReorder && ColumnAt(Bounds.Width, x) is >= 0 and var column)
+        {
+            _reorder = (column, x, false);
+        }
+        else
+        {
             return;
-        var (values, stars, _) = Parse();
-        var widths = Layout(Bounds.Width);
-        _drag = new Drag(left, NextVisible(widths, left), x, values, widths, PerStar(values, stars, widths));
+        }
         e.Pointer.Capture(this);
         e.Handled = true;
     }
@@ -206,12 +309,15 @@ public sealed class TableRow : Panel
     protected override void OnPointerReleased(PointerReleasedEventArgs e)
     {
         base.OnPointerReleased(e);
-        if (_drag is null)
+        if (_drag is null && _reorder is null)
             return;
+        var command = _drag is not null ? ResizeCompletedCommand : _reorder is { Active: true } ? ReorderCompletedCommand : null;
         _drag = null;
+        _reorder = null;
+        Cursor = null;
         e.Pointer.Capture(null);
         e.Handled = true;
-        if (ResizeCompletedCommand is { } command && command.CanExecute(null))
+        if (command is not null && command.CanExecute(null))
             command.Execute(null);
     }
 
@@ -219,13 +325,14 @@ public sealed class TableRow : Panel
     {
         base.OnPointerCaptureLost(e);
         _drag = null;
+        _reorder = null;
     }
 
-    // Columna a la izquierda del borde bajo x (solo entre dos columnas visibles), o -1.
+    // Columna a la izquierda del borde bajo x (solo entre dos columnas visibles contiguas), o -1.
     private int BorderAt(double x)
     {
         var widths = Layout(Bounds.Width);
-        for (var i = 0; i < widths.Length; i++)
+        foreach (var i in Sequence)
         {
             if (widths[i] <= 0 || NextVisible(widths, i) < 0)
                 continue;
@@ -236,12 +343,14 @@ public sealed class TableRow : Panel
         return -1;
     }
 
-    private static int NextVisible(double[] widths, int column)
+    // Siguiente columna visible a la derecha de esta, en el orden en que se muestran; -1 si es la última.
+    private int NextVisible(double[] widths, int column)
     {
-        for (var i = column + 1; i < widths.Length; i++)
+        var sequence = Sequence;
+        for (var p = sequence.ToList().IndexOf(column) + 1; p > 0 && p < sequence.Count; p++)
         {
-            if (widths[i] > 0)
-                return i;
+            if (widths[sequence[p]] > 0)
+                return sequence[p];
         }
         return -1;
     }
@@ -295,11 +404,14 @@ public sealed class TableRow : Panel
 
     private static double ColumnWidth(double[] widths, Control child) => widths[Math.Clamp(Grid.GetColumn(child), 0, widths.Length - 1)];
 
+    // Posición de la columna: lo que ocupan las visibles que se muestran antes que ella.
     private double Offset(double[] widths, int column)
     {
         var x = 0.0;
-        for (var i = 0; i < column; i++)
+        foreach (var i in Sequence)
         {
+            if (i == column)
+                break;
             if (widths[i] > 0)
                 x += widths[i] + ColumnSpacing;
         }
@@ -308,7 +420,7 @@ public sealed class TableRow : Panel
 
     private (double[] Values, bool[] Stars, int[] Order) Parse()
     {
-        if (_parsed is { } p && p.Columns == Columns && p.HideOrder == HideOrder && p.Hidden == HiddenColumns)
+        if (_parsed is { } p && p.Columns == Columns && p.HideOrder == HideOrder && p.Hidden == HiddenColumns && p.Display == DisplayOrder)
             return (p.Values, p.Stars, p.Order);
         var parts = Columns.Split(',', StringSplitOptions.TrimEntries | StringSplitOptions.RemoveEmptyEntries);
         var values = new double[parts.Length];
@@ -323,7 +435,9 @@ public sealed class TableRow : Panel
         var off = new bool[parts.Length];
         foreach (var i in Indices(HiddenColumns, parts.Length))
             off[i] = true;
-        _parsed = (Columns, HideOrder, HiddenColumns, values, stars, order, off);
+        var sequence = Indices(DisplayOrder, parts.Length).Distinct().ToList();
+        sequence.AddRange(Enumerable.Range(0, parts.Length).Except(sequence));
+        _parsed = (Columns, HideOrder, HiddenColumns, DisplayOrder, values, stars, order, off, [.. sequence]);
         return (values, stars, order);
 
         static int[] Indices(string list, int count) => list.Split(',', StringSplitOptions.TrimEntries | StringSplitOptions.RemoveEmptyEntries)

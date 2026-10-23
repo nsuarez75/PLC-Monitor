@@ -164,7 +164,10 @@ public sealed partial class MainWindow : Window
         e.Cancel = menu.Items.Count == 0;
     }
 
-    /// <summary>Menú de la cabecera de la tabla de tags: una casilla por columna (menos la del nombre) y los anchos de serie.</summary>
+    /// <summary>
+    /// Menú de la cabecera de la tabla de tags: una casilla por columna (menos la del nombre), en el orden en que se ven,
+    /// y volver a los anchos y al orden de serie.
+    /// </summary>
     private void OnColumnsMenuOpening(object? sender, System.ComponentModel.CancelEventArgs e)
     {
         var menu = (ContextMenu)sender!;
@@ -174,7 +177,7 @@ public sealed partial class MainWindow : Window
             e.Cancel = true;
             return;
         }
-        for (var i = 1; i < MainViewModel.TagColumnTitles.Count; i++)
+        foreach (var i in main.TagColumnSequence.Where(c => c > 0))
         {
             menu.Items.Add(new MenuItem
             {
@@ -188,6 +191,12 @@ public sealed partial class MainWindow : Window
         menu.Items.Add(new Separator());
         menu.Items.Add(new MenuItem { Header = "Mostrar todas las columnas", Command = main.ShowAllTagColumnsCommand, IsEnabled = main.TagHiddenColumns.Length > 0 });
         menu.Items.Add(new MenuItem { Header = "Restablecer anchos de columna", Command = main.ResetTagColumnsCommand });
+        menu.Items.Add(new MenuItem
+        {
+            Header = "Restablecer orden de columnas",
+            Command = main.ResetTagColumnOrderCommand,
+            IsEnabled = main.TagColumnOrder != MainViewModel.DefaultTagColumnOrder,
+        });
     }
 
     private static MenuItem MoveMenu(DeviceViewModel device, TagViewModel[] selected)

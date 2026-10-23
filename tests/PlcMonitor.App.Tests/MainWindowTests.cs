@@ -126,6 +126,81 @@ public class MainWindowTests
     });
 
     [Fact]
+    public void Display_order_places_the_columns_and_resizing_follows_the_visual_neighbours()
+    {
+        var row = new PlcMonitor.App.Controls.TableRow { Columns = "100,200,300", ColumnSpacing = 10, MinStarWidth = 45 };
+        row.MovedOrder(2, 0).ShouldBe("2,0,1");
+        row.DisplayOrder = "2,0,1";
+
+        row.Sequence.ShouldBe([2, 0, 1]);
+        // 2 en x=0, 0 en x=310 y 1 en x=420.
+        row.ColumnAt(620, 5).ShouldBe(2);
+        row.ColumnAt(620, 320).ShouldBe(0);
+        row.ColumnAt(620, 500).ShouldBe(1);
+        row.ColumnAt(620, 700).ShouldBe(-1);
+        // El borde derecho de la 2 lo comparte con la 0 (su vecina en pantalla), no con nada a la derecha.
+        row.ResizedColumns(620, 2, 50).ShouldBe("50,200,350");
+        row.ResizedColumns(620, 1, 50).ShouldBeNull("la 1 es la última que se ve");
+        // Un orden incompleto o con basura se completa con las que faltan.
+        row.DisplayOrder = "1,x,1";
+        row.Sequence.ShouldBe([1, 0, 2]);
+    }
+
+    [Fact]
+    public Task Dragging_a_header_moves_the_column_and_it_is_remembered() => HeadlessApp.RunAsync(() =>
+    {
+        var settingsPath = Path.GetTempFileName();
+        var vm = ViewModelWithData(settingsPath);
+        var window = new MainWindow { DataContext = vm };
+        window.Width = 1400;
+        window.Show();
+        window.UpdateLayout();
+        var header = window.FindControl<PlcMonitor.App.Controls.TableRow>("TagsHeader")!;
+        var row = window.FindControl<ListBox>("TagsList")!.GetVisualDescendants().OfType<PlcMonitor.App.Controls.TableRow>().First();
+        var widths = header.Layout(header.Bounds.Width);
+        Avalonia.Point At(int column) => Avalonia.VisualExtensions.TranslatePoint(header,
+            new Avalonia.Point(header.Children.First(c => Grid.GetColumn(c) == column).Bounds.Center.X, header.Bounds.Height / 2), window)!.Value;
+
+        // Un clic sin mover no cambia nada.
+        window.MouseDown(At(2), Avalonia.Input.MouseButton.Left);
+        window.MouseUp(At(2), Avalonia.Input.MouseButton.Left);
+        vm.TagColumnOrder.ShouldBe(MainViewModel.DefaultTagColumnOrder);
+
+        // VALOR arrastrada sobre DIRECCIÓN pasa delante de ella.
+        var from = At(2);
+        window.MouseDown(from, Avalonia.Input.MouseButton.Left);
+        window.MouseMove(from - new Avalonia.Point(20, 0));
+        window.MouseMove(At(1));
+        window.MouseUp(At(1), Avalonia.Input.MouseButton.Left);
+        window.UpdateLayout();
+
+        vm.TagColumnOrder.ShouldBe("0,2,1,3,4,5,6");
+        header.Layout(header.Bounds.Width).ShouldBe(widths, 0.5, "los anchos no cambian");
+        row.Sequence.ShouldBe([0, 2, 1, 3, 4, 5, 6], "las filas siguen a la cabecera");
+        var value = row.Children.First(c => Grid.GetColumn(c) == 2).Bounds.X;
+        var address = row.Children.First(c => Grid.GetColumn(c) == 1).Bounds.X;
+        value.ShouldBeLessThan(address);
+        AppSettings.Load(settingsPath).TagColumnOrder.ShouldBe("0,2,1,3,4,5,6");
+        Capture(window, "main-window-reordered-columns.png");
+
+        vm.ResetTagColumnOrderCommand.Execute(null);
+        vm.TagColumnOrder.ShouldBe(MainViewModel.DefaultTagColumnOrder);
+        AppSettings.Load(settingsPath).TagColumnOrder.ShouldBeNull();
+    });
+
+    [Theory]
+    [InlineData("0,2,1,3,4,5,6", "0,2,1,3,4,5,6")]
+    [InlineData("6,5", "6,5,0,1,2,3,4")]
+    [InlineData("1,1,9,x", "1,0,2,3,4,5,6")]
+    [InlineData(null, "0,1,2,3,4,5,6")]
+    public void Saved_column_order_is_completed_or_cleaned_up(string? saved, string applied)
+    {
+        var vm = new MainViewModel(new GrpcAgentConnector(), new ImmediateDispatcher(), new FakeDialogs(), new AppSettings { TagColumnOrder = saved },
+            Path.GetTempFileName(), Path.Combine(Path.GetTempPath(), $"plcmon-agents-{Guid.NewGuid():N}.json"));
+        vm.TagColumnOrder.ShouldBe(applied);
+    }
+
+    [Fact]
     public Task Drop_marks_show_a_line_before_or_after_the_row() => HeadlessApp.RunAsync(() =>
     {
         var window = new MainWindow { DataContext = ViewModelWithData() };
