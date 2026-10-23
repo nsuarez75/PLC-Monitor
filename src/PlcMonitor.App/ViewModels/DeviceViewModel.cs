@@ -39,6 +39,8 @@ public sealed partial class DeviceViewModel : ObservableObject
 
     public bool HasDisabledTags => DisabledCount > 0;
 
+    public string DisabledText => DisabledCount == 1 ? "1 desactivado" : $"{DisabledCount} desactivados";
+
     public bool HasTags => Tags.Count > 0;
 
     public string TagCountText => Tags.Count == 1 ? "1 tag" : $"{Tags.Count} tags";
@@ -60,6 +62,7 @@ public sealed partial class DeviceViewModel : ObservableObject
         OnPropertyChanged(nameof(HasBadTags));
         OnPropertyChanged(nameof(DisabledCount));
         OnPropertyChanged(nameof(HasDisabledTags));
+        OnPropertyChanged(nameof(DisabledText));
         OnPropertyChanged(nameof(HasTags));
         OnPropertyChanged(nameof(TagCountText));
     }

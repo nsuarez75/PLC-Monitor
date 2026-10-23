@@ -186,7 +186,8 @@ public sealed partial class TagViewModel : ObservableObject
     public void RefreshDisplay()
     {
         var entry = _integer is { } n && Transform.Length > 0 ? _context.FindTransform(Transform)?.Entries.FirstOrDefault(e => e.Value == n) : null;
-        DisplayText = entry is not null ? $"{entry.Text} ({ValueText})" : HasValue ? FormatText(ValueText) : ValueText;
+        // Un tag desactivado no tiene valor: la calidad ya dice por qué.
+        DisplayText = IsDisabled ? "—" : entry is not null ? $"{entry.Text} ({ValueText})" : HasValue ? FormatText(ValueText) : ValueText;
     }
 
     /// <summary>Texto de un valor de este tag con sus decimales y su unidad.</summary>
