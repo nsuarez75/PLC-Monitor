@@ -17,6 +17,9 @@ public sealed class AppSettings
     /// <summary>Tema: "system", "light" o "dark".</summary>
     public string Theme { get; set; } = "system";
 
+    /// <summary>Idioma de la interfaz: "es" o "en".</summary>
+    public string Language { get; set; } = Localization.Loc.Spanish;
+
     /// <summary>Anchos de las columnas de la tabla de tags elegidos por el usuario (null = los de serie).</summary>
     public string? TagColumns { get; set; }
 

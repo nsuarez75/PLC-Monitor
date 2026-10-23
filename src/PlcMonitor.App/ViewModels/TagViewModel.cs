@@ -5,11 +5,12 @@ using Grpc.Core;
 using PlcMonitor.Agent.Contracts;
 using PlcMonitor.Agent.Contracts.Client;
 using PlcMonitor.App.Charts;
+using PlcMonitor.App.Localization;
 
 namespace PlcMonitor.App.ViewModels;
 
 /// <summary>Un tag configurado con su último valor.</summary>
-public sealed partial class TagViewModel : ObservableObject
+public sealed partial class TagViewModel : LocalizedObservableObject
 {
     private readonly IAgentContext _context;
 
@@ -97,7 +98,7 @@ public sealed partial class TagViewModel : ObservableObject
     public bool HasRaw => RawText.Length > 0;
 
     /// <summary>Valor para la ventana de detalle: con el bruto si está escalado («5.00 bar (bruto 13824)»).</summary>
-    public string DetailText => HasRaw ? $"{DisplayText} (bruto {RawText})" : DisplayText;
+    public string DetailText => HasRaw ? Loc.F("{0} (bruto {1})", DisplayText, RawText) : DisplayText;
 
     [ObservableProperty]
     [NotifyPropertyChangedFor(nameof(IsTrue), nameof(IsFalse))]
@@ -127,7 +128,7 @@ public sealed partial class TagViewModel : ObservableObject
     public bool IsBad => !IsGood && !IsUncertain && !IsDisabled;
 
     /// <summary>Texto de la columna de calidad.</summary>
-    public string QualityText => IsDisabled ? "Desactivado" : Quality.ToString();
+    public string QualityText => IsDisabled ? Loc.T("Desactivado") : Quality.ToString();
 
     public bool IsBoolean => DataType == nameof(Agent.Contracts.DataType.Boolean);
 
@@ -231,7 +232,7 @@ public sealed partial class TagViewModel : ObservableObject
     {
         if (_context.Client is not { } client)
             return;
-        if (!await _context.Dialogs.ConfirmAsync("Escribir en el PLC", $"¿Escribir «{value}» en {Device}/{Name} ({Address})?\nActual: {ValueText}"))
+        if (!await _context.Dialogs.ConfirmAsync(Loc.T("Escribir en el PLC"), Loc.F("¿Escribir «{0}» en {1}/{2} ({3})?\nActual: {4}", value, Device, Name, Address, ValueText)))
             return;
         try
         {
@@ -244,7 +245,7 @@ public sealed partial class TagViewModel : ObservableObject
             }
             else
             {
-                _context.Report($"No se escribió {Device}/{Name} ({reply.Quality}): {reply.Error}", isError: true);
+                _context.Report(Loc.F("No se escribió {0}/{1} ({2}): {3}", Device, Name, reply.Quality, reply.Error), isError: true);
             }
         }
         catch (RpcException ex)

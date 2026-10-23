@@ -3,6 +3,7 @@ using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using Grpc.Core;
 using PlcMonitor.Agent.Contracts;
+using PlcMonitor.App.Localization;
 
 namespace PlcMonitor.App.ViewModels;
 
@@ -20,7 +21,7 @@ public sealed partial class BrowseItemViewModel(string address, string nativeTyp
 }
 
 /// <summary>Buscador de símbolos del dispositivo seleccionado y alta de tags a partir de ellos.</summary>
-public sealed partial class BrowseViewModel(IAgentContext context, Func<DeviceViewModel?> device) : ObservableObject
+public sealed partial class BrowseViewModel(IAgentContext context, Func<DeviceViewModel?> device) : LocalizedObservableObject
 {
     public ObservableCollection<BrowseItemViewModel> Results { get; } = [];
 
@@ -71,7 +72,7 @@ public sealed partial class BrowseViewModel(IAgentContext context, Func<DeviceVi
         if (context.Client is not { } client || device() is not { } target)
             return;
         IsBusy = true;
-        Summary = refresh ? "Explorando la CPU…" : "Buscando…";
+        Summary = Loc.T(refresh ? "Explorando la CPU…" : "Buscando…");
         try
         {
             var reply = await client.BrowseAsync(new BrowseRequest { Device = target.Name, Filter = Filter, MaxResults = MaxResults, Refresh = refresh });
@@ -84,7 +85,7 @@ public sealed partial class BrowseViewModel(IAgentContext context, Func<DeviceVi
                     IsAdded = existing.Contains(item.Address),
                 });
             }
-            Summary = $"{reply.Items.Count} mostrados de {reply.TotalMatches} coincidencias · {reply.TotalSymbols} símbolos en {target.Name}";
+            Summary = Loc.F("{0} mostrados de {1} coincidencias · {2} símbolos en {3}", reply.Items.Count, reply.TotalMatches, reply.TotalSymbols, target.Name);
         }
         catch (RpcException ex)
         {

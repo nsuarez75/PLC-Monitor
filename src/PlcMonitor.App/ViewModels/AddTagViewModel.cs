@@ -2,6 +2,7 @@ using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using Grpc.Core;
 using PlcMonitor.Agent.Contracts;
+using PlcMonitor.App.Localization;
 
 namespace PlcMonitor.App.ViewModels;
 
@@ -10,7 +11,7 @@ namespace PlcMonitor.App.ViewModels;
 /// los demás. «Probar» lee la dirección del PLC antes de añadirla (el agente la valida al leer). En Modbus la dirección
 /// se compone con desplegables (tabla, número, tipo, orden de bytes) y se puede dar de alta un rango de golpe.
 /// </summary>
-public sealed partial class AddTagViewModel(IAgentContext context, Func<DeviceViewModel?> device, Func<string?, Driver?> driverOf) : ObservableObject
+public sealed partial class AddTagViewModel(IAgentContext context, Func<DeviceViewModel?> device, Func<string?, Driver?> driverOf) : LocalizedObservableObject
 {
     /// <summary>Id del driver absoluto (PUT/GET).</summary>
     public const string AbsoluteDriver = "s7-absolute";
@@ -136,7 +137,7 @@ public sealed partial class AddTagViewModel(IAgentContext context, Func<DeviceVi
             if (!IsRange)
                 return "";
             var addresses = RangeAddresses();
-            return $"{addresses.Count} tags: {addresses[0]} … {addresses[^1]}";
+            return Loc.F("{0} tags: {1} … {2}", addresses.Count, addresses[0], addresses[^1]);
         }
     }
 
@@ -237,14 +238,14 @@ public sealed partial class AddTagViewModel(IAgentContext context, Func<DeviceVi
             var id = device()?.Driver;
             if (string.Equals(id, ModbusDriver, StringComparison.OrdinalIgnoreCase))
             {
-                return "Modbus: HR0 · HR100:FLOAT · HR100:FLOAT:CDAB · IR5:UINT16 · C0 · DI3 · HR10.3 (bit) · HR20:STRING[10] · 40001 · 30005:INT32. " +
-                    "HR, IR, C y DI siguen la numeración del dispositivo (desde 0 o desde 1); 40001, 30001… siempre empiezan en 1.";
+                return Loc.T("Modbus: HR0 · HR100:FLOAT · HR100:FLOAT:CDAB · IR5:UINT16 · C0 · DI3 · HR10.3 (bit) · HR20:STRING[10] · 40001 · 30005:INT32. ") +
+                    Loc.T("HR, IR, C y DI siguen la numeración del dispositivo (desde 0 o desde 1); 40001, 30001… siempre empiezan en 1.");
             }
             if (string.Equals(id, AbsoluteDriver, StringComparison.OrdinalIgnoreCase))
-                return "Dirección absoluta: DB1.DBX0.3 (bit) · DB1.DBW10 (Word) · DB1.INT10 · DB1.DINT12 · DB1.REAL20 · DB5.STRING30[20] · M10.1 · MW20 · IW64 · QX4.0. Los DB deben ser no optimizados.";
+                return Loc.T("Dirección absoluta: DB1.DBX0.3 (bit) · DB1.DBW10 (Word) · DB1.INT10 · DB1.DINT12 · DB1.REAL20 · DB5.STRING30[20] · M10.1 · MW20 · IW64 · QX4.0. Los DB deben ser no optimizados.");
             return driverOf(id) is { CanBrowse: true }
-                ? "Ruta del símbolo, p.ej. \"Motor_DB\".Velocidad o \"Datos\".Lista[3]. También puedes buscarlo en «Explorar»."
-                : "Dirección del tag tal como la entiende el driver del dispositivo.";
+                ? Loc.T("Ruta del símbolo, p.ej. \"Motor_DB\".Velocidad o \"Datos\".Lista[3]. También puedes buscarlo en «Explorar».")
+                : Loc.T("Dirección del tag tal como la entiende el driver del dispositivo.");
         }
     }
 
@@ -301,8 +302,8 @@ public sealed partial class AddTagViewModel(IAgentContext context, Func<DeviceVi
             var good = reply.Values.Count(v => v.Quality == Quality.Good);
             var sample = string.Join(" · ", reply.Values.Take(6).Select(v => v.Quality == Quality.Good ? v.Text : "✖")) + (reply.Values.Count > 6 ? " …" : "");
             TestResult = TestIsError
-                ? $"✖ {good} de {addresses.Count} leídos; {bad.Address}: {Error(bad.Value!)}"
-                : $"✔ {addresses.Count} leídos ({reply.Values[0].DataType}): {sample}";
+                ? Loc.F("✖ {0} de {1} leídos; {2}: {3}", good, addresses.Count, bad.Address, Error(bad.Value!))
+                : Loc.F("✔ {0} leídos ({1}): {2}", addresses.Count, reply.Values[0].DataType, sample);
         }
         catch (RpcException ex)
         {

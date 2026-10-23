@@ -1,5 +1,6 @@
 <UserControl xmlns="https://github.com/avaloniaui"
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:loc="using:PlcMonitor.App.Localization"
              xmlns:ch="using:PlcMonitor.App.Charts"
              xmlns:c="using:PlcMonitor.App.Controls"
              xmlns:v="using:PlcMonitor.App.Views"
@@ -29,10 +30,10 @@
         </ItemsControl.ItemTemplate>
       </ItemsControl>
       <StackPanel Orientation="Horizontal" Spacing="8" VerticalAlignment="Center">
-        <CheckBox Content="Cursores" IsChecked="{Binding ShowCursors}" IsVisible="{Binding IsTrend}"
-                  ToolTip.Tip="Dos cursores, A y B, para medir el tiempo entre dos instantes y cuánto cambia cada tag" />
-        <CheckBox Content="Un eje por tag" IsChecked="{Binding SeparateAxes}" IsVisible="{Binding CanSeparateAxes}"
-                  ToolTip.Tip="Cada tag con su propia escala, a la izquierda y con su color" />
+        <CheckBox Content="{loc:T 'Cursores'}" IsChecked="{Binding ShowCursors}" IsVisible="{Binding IsTrend}"
+                  ToolTip.Tip="{loc:T 'Dos cursores, A y B, para medir el tiempo entre dos instantes y cuánto cambia cada tag'}" />
+        <CheckBox Content="{loc:T 'Un eje por tag'}" IsChecked="{Binding SeparateAxes}" IsVisible="{Binding CanSeparateAxes}"
+                  ToolTip.Tip="{loc:T 'Cada tag con su propia escala, a la izquierda y con su color'}" />
         <CheckBox Content="{Binding AxisText}" IsChecked="{Binding AutoY}" IsVisible="{Binding HasYAxis}" />
         <StackPanel Orientation="Horizontal" Spacing="6">
           <StackPanel.IsVisible>
@@ -41,23 +42,23 @@
               <Binding Path="HasYAxis" />
             </MultiBinding>
           </StackPanel.IsVisible>
-          <TextBlock Text="mín" Classes="muted" VerticalAlignment="Center" />
+          <TextBlock Text="{loc:T 'mín'}" Classes="muted" VerticalAlignment="Center" />
           <NumericUpDown Value="{Binding YMinInput}" Width="120" FormatString="0.###" Increment="1" />
-          <TextBlock Text="máx" Classes="muted" VerticalAlignment="Center" />
+          <TextBlock Text="{loc:T 'máx'}" Classes="muted" VerticalAlignment="Center" />
           <NumericUpDown Value="{Binding YMaxInput}" Width="120" FormatString="0.###" Increment="1" />
         </StackPanel>
-        <Button Classes="secondary" Command="{Binding ResetZoomCommand}" IsVisible="{Binding IsZoomed}" ToolTip.Tip="Quitar el zoom y ver toda la ventana">
+        <Button Classes="secondary" Command="{Binding ResetZoomCommand}" IsVisible="{Binding IsZoomed}" ToolTip.Tip="{loc:T 'Quitar el zoom y ver toda la ventana'}">
           <StackPanel Orientation="Horizontal" Spacing="6">
             <c:Icon Kind="maximize" />
-            <TextBlock Text="Ajustar" />
+            <TextBlock Text="{loc:T 'Ajustar'}" />
           </StackPanel>
         </Button>
-        <CheckBox Content="Estadísticas" IsChecked="{Binding ShowStats}" IsVisible="{Binding CanShowStats}"
-                  ToolTip.Tip="Mín, máx, media ponderada en el tiempo, σ y más de cada tag en la ventana que se ve (con el zoom)" />
-        <Button x:Name="SavePng" Classes="ghost" ToolTip.Tip="Exportar la gráfica a PNG (con título, periodo y leyenda, fondo blanco)">
+        <CheckBox Content="{loc:T 'Estadísticas'}" IsChecked="{Binding ShowStats}" IsVisible="{Binding CanShowStats}"
+                  ToolTip.Tip="{loc:T 'Mín, máx, media ponderada en el tiempo, σ y más de cada tag en la ventana que se ve (con el zoom)'}" />
+        <Button x:Name="SavePng" Classes="ghost" ToolTip.Tip="{loc:T 'Exportar la gráfica a PNG (con título, periodo y leyenda, fondo blanco)'}">
           <c:Icon Kind="image" />
         </Button>
-        <Button x:Name="CopyPng" Classes="ghost" ToolTip.Tip="Copiar la imagen de la gráfica al portapapeles">
+        <Button x:Name="CopyPng" Classes="ghost" ToolTip.Tip="{loc:T 'Copiar la imagen de la gráfica al portapapeles'}">
           <c:Icon Kind="copy" />
         </Button>
       </StackPanel>
@@ -70,15 +71,15 @@
     <Border DockPanel.Dock="Bottom" Classes="card" Margin="0,8,0,0" Padding="0,0,0,6" IsVisible="{Binding StatsVisible}">
       <DockPanel>
         <Grid DockPanel.Dock="Top" ColumnDefinitions="*,Auto" Margin="12,8,8,4">
-          <TextBlock Text="ESTADÍSTICAS DE LA VENTANA VISIBLE" Classes="muted" FontSize="11" FontWeight="SemiBold" VerticalAlignment="Center" />
+          <TextBlock Text="{loc:T 'ESTADÍSTICAS DE LA VENTANA VISIBLE'}" Classes="muted" FontSize="11" FontWeight="SemiBold" VerticalAlignment="Center" />
           <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="4">
-            <Button x:Name="CopyStats" Classes="ghost" ToolTip.Tip="Copiar la tabla (para pegarla en una hoja de cálculo)">
+            <Button x:Name="CopyStats" Classes="ghost" ToolTip.Tip="{loc:T 'Copiar la tabla (para pegarla en una hoja de cálculo)'}">
               <StackPanel Orientation="Horizontal" Spacing="6">
                 <c:Icon Kind="copy" />
-                <TextBlock Text="Copiar" />
+                <TextBlock Text="{loc:T 'Copiar'}" />
               </StackPanel>
             </Button>
-            <Button x:Name="SaveStats" Classes="ghost" ToolTip.Tip="Guardar las estadísticas en un CSV">
+            <Button x:Name="SaveStats" Classes="ghost" ToolTip.Tip="{loc:T 'Guardar las estadísticas en un CSV'}">
               <StackPanel Orientation="Horizontal" Spacing="6">
                 <c:Icon Kind="download" />
                 <TextBlock Text="CSV" />
@@ -89,16 +90,16 @@
         <ScrollViewer HorizontalScrollBarVisibility="Auto" VerticalScrollBarVisibility="Auto" MaxHeight="200">
           <StackPanel Margin="12,0">
             <Grid Classes="tablehead" ColumnDefinitions="180,170,170,120,90,100,100,90,80,70" ColumnSpacing="10" Margin="0,2,0,4">
-              <TextBlock Text="TAG" />
-              <TextBlock Grid.Column="1" Text="MÍN" />
-              <TextBlock Grid.Column="2" Text="MÁX" />
-              <TextBlock Grid.Column="3" Text="MEDIA" />
+              <TextBlock Text="{loc:T 'TAG'}" />
+              <TextBlock Grid.Column="1" Text="{loc:T 'MÍN'}" />
+              <TextBlock Grid.Column="2" Text="{loc:T 'MÁX'}" />
+              <TextBlock Grid.Column="3" Text="{loc:T 'MEDIA'}" />
               <TextBlock Grid.Column="4" Text="σ" />
-              <TextBlock Grid.Column="5" Text="PRIMERO" />
-              <TextBlock Grid.Column="6" Text="ÚLTIMO" />
+              <TextBlock Grid.Column="5" Text="{loc:T 'PRIMERO'}" />
+              <TextBlock Grid.Column="6" Text="{loc:T 'ÚLTIMO'}" />
               <TextBlock Grid.Column="7" Text="Δ" />
-              <TextBlock Grid.Column="8" Text="MUESTRAS" />
-              <TextBlock Grid.Column="9" Text="FLANCOS ↑" />
+              <TextBlock Grid.Column="8" Text="{loc:T 'MUESTRAS'}" />
+              <TextBlock Grid.Column="9" Text="{loc:T 'FLANCOS ↑'}" />
             </Grid>
             <ItemsControl ItemsSource="{Binding Stats}">
               <ItemsControl.ItemTemplate>

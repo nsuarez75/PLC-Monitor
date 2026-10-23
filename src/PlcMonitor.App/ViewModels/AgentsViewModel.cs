@@ -2,6 +2,7 @@ using System.Collections.ObjectModel;
 using System.Globalization;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
+using PlcMonitor.App.Localization;
 using PlcMonitor.App.Services;
 using PlcMonitor.Deploy;
 using Renci.SshNet.Common;
@@ -12,7 +13,7 @@ namespace PlcMonitor.App.ViewModels;
 /// Gestión de agentes: perfiles (cómo conectar) y, para este equipo o los accesibles por SSH, instalar, actualizar,
 /// consultar, ver el log y desinstalar el agente. Las contraseñas solo viven mientras dura la operación.
 /// </summary>
-public sealed partial class AgentsViewModel : ObservableObject
+public sealed partial class AgentsViewModel : LocalizedObservableObject
 {
     private readonly MainViewModel _main;
     private readonly Func<SshTarget, CancellationToken, Task<ISshSession>> _sshFactory;
@@ -110,15 +111,15 @@ public sealed partial class AgentsViewModel : ObservableObject
     public bool ShowSudoPassword => !LocalMachine || !OperatingSystem.IsWindows();
 
     public string MachineHelp => !LocalMachine
-        ? "Para instalar, actualizar o desinstalar el agente. Linux (con sudo) o Windows con OpenSSH (usuario administrador)."
+        ? Loc.T("Para instalar, actualizar o desinstalar el agente. Linux (con sudo) o Windows con OpenSSH (usuario administrador).")
         : OperatingSystem.IsWindows()
-            ? "El agente se instala en este equipo como servicio de Windows. Windows pedirá permiso de administrador (UAC)."
-            : "El agente se instala en este equipo como servicio systemd. Si no indicas la contraseña de sudo, se pedirá con la ventana del sistema.";
+            ? Loc.T("El agente se instala en este equipo como servicio de Windows. Windows pedirá permiso de administrador (UAC).")
+            : Loc.T("El agente se instala en este equipo como servicio systemd. Si no indicas la contraseña de sudo, se pedirá con la ventana del sistema.");
 
-    public string SudoPlaceholder => LocalMachine ? "vacía: la pide el sistema" : "solo si es distinta";
+    public string SudoPlaceholder => Loc.T(LocalMachine ? "vacía: la pide el sistema" : "solo si es distinta");
 
     /// <summary>Equipo de la operación, para los mensajes.</summary>
-    private string TargetName => LocalMachine ? "este equipo" : SshHost.Trim();
+    private string TargetName => LocalMachine ? Loc.T("este equipo") : SshHost.Trim();
 
     partial void OnPackageFolderChanged(string value) => _main.AgentPackagesFolder = value;
 
@@ -151,7 +152,7 @@ public sealed partial class AgentsViewModel : ObservableObject
     [RelayCommand]
     private void New()
     {
-        var profile = new AgentProfile { Name = "Nuevo agente", Url = "", SshUser = Environment.UserName };
+        var profile = new AgentProfile { Name = Loc.T("Nuevo agente"), Url = "", SshUser = Environment.UserName };
         Profiles.Add(profile);
         Selected = profile;
     }
@@ -166,7 +167,7 @@ public sealed partial class AgentsViewModel : ObservableObject
         Apply(profile);
         _main.SaveProfiles();
         RefreshSelected();
-        _main.Report($"Agente «{profile.Name}» guardado");
+        _main.Report(Loc.F("Agente «{0}» guardado", profile.Name));
     }
 
     [RelayCommand]
@@ -174,7 +175,7 @@ public sealed partial class AgentsViewModel : ObservableObject
     {
         if (Selected is not { } profile)
             return;
-        if (!await _main.Dialogs.ConfirmAsync("Quitar agente", $"¿Quitar «{profile.Name}» de la lista?\nNo se desinstala nada del equipo."))
+        if (!await _main.Dialogs.ConfirmAsync(Loc.T("Quitar agente"), Loc.F("¿Quitar «{0}» de la lista?\nNo se desinstala nada del equipo.", profile.Name)))
             return;
         Profiles.Remove(profile);
         if (_main.SelectedProfile == profile)
@@ -187,7 +188,7 @@ public sealed partial class AgentsViewModel : ObservableObject
 
     /// <summary>Instala o actualiza el agente en el equipo y guarda en el perfil la URL, el token y la huella.</summary>
     [RelayCommand(CanExecute = nameof(CanUseSsh))]
-    private Task InstallAsync() => RunSshAsync("Instalando", async (deployer, profile, ct) =>
+    private Task InstallAsync() => RunSshAsync(Loc.T("Instalando"), async (deployer, profile, ct) =>
     {
         var folders = string.IsNullOrWhiteSpace(PackageFolder) ? AgentPackages.DefaultFolders().ToArray() : [PackageFolder.Trim()];
         var result = await deployer.InstallAsync(
@@ -203,13 +204,13 @@ public sealed partial class AgentsViewModel : ObservableObject
         }
         else if (string.IsNullOrEmpty(profile.Token))
         {
-            AddLog("⚠ El equipo ya tenía credenciales y este perfil no las conoce: marca «Regenerar credenciales» y vuelve a instalar.");
+            AddLog(Loc.T("⚠ El equipo ya tenía credenciales y este perfil no las conoce: marca «Regenerar credenciales» y vuelve a instalar."));
         }
         profile.Platform = result.Platform.Description;
         profile.InstalledAt = DateTimeOffset.Now;
         RegenerateCredentials = false;
         ShowReadOnlyToken(result.ReadOnlyToken);
-        _main.Report($"Agente instalado en {TargetName} ({result.Url})");
+        _main.Report(Loc.F("Agente instalado en {0} ({1})", TargetName, result.Url));
     });
 
     /// <summary>
@@ -219,11 +220,11 @@ public sealed partial class AgentsViewModel : ObservableObject
     [RelayCommand(CanExecute = nameof(CanUseSsh))]
     private async Task RenewCredentialsAsync()
     {
-        if (!await _main.Dialogs.ConfirmAsync("Renovar credenciales",
-                $"¿Renovar el token y el certificado del agente de {TargetName}?\nLos anteriores dejan de valer: los demás equipos y la CLI que los usen "
-                + $"perderán el acceso.{(CreateReadOnlyToken ? "\nSe crea un token de solo lectura nuevo." : "\nSi había token de solo lectura, también deja de valer.")}"))
+        if (!await _main.Dialogs.ConfirmAsync(Loc.T("Renovar credenciales"),
+                Loc.F("¿Renovar el token y el certificado del agente de {0}?\nLos anteriores dejan de valer: los demás equipos y la CLI que los usen perderán el acceso.", TargetName)
+                + (CreateReadOnlyToken ? Loc.T("\nSe crea un token de solo lectura nuevo.") : Loc.T("\nSi había token de solo lectura, también deja de valer."))))
             return;
-        await RunSshAsync("Renovando credenciales", async (deployer, profile, ct) =>
+        await RunSshAsync(Loc.T("Renovando credenciales"), async (deployer, profile, ct) =>
         {
             var result = await deployer.RenewCredentialsAsync(
                 LocalMachine ? "127.0.0.1" : SshHost.Trim(),
@@ -235,7 +236,7 @@ public sealed partial class AgentsViewModel : ObservableObject
             profile.CertificateThumbprint = result.CertificateThumbprint;
             ShowReadOnlyToken(result.ReadOnlyToken);
             CreateReadOnlyToken = false;
-            _main.Report($"Credenciales del agente de {TargetName} renovadas");
+            _main.Report(Loc.F("Credenciales del agente de {0} renovadas", TargetName));
         });
     }
 
@@ -244,22 +245,22 @@ public sealed partial class AgentsViewModel : ObservableObject
     {
         if (token is null)
             return;
-        AddLog("Token de solo lectura (cópialo ahora: la app no lo guarda):");
+        AddLog(Loc.T("Token de solo lectura (cópialo ahora: la app no lo guarda):"));
         AddLog(token);
     }
 
     [RelayCommand(CanExecute = nameof(CanUseSsh))]
-    private Task StatusAsync() => RunSshAsync("Consultando", async (deployer, profile, ct) =>
+    private Task StatusAsync() => RunSshAsync(Loc.T("Consultando"), async (deployer, profile, ct) =>
     {
         var status = await deployer.GetStatusAsync(ct);
         profile.Platform = status.Platform.Description;
-        AddLog(!status.Installed ? "El agente no está instalado en este equipo."
-            : status.Running ? $"El agente está en marcha{(status.Since is null ? "" : $" desde {status.Since}")}."
-            : $"El agente está instalado pero no en marcha (estado: {status.ServiceState}).");
+        AddLog(!status.Installed ? Loc.T("El agente no está instalado en este equipo.")
+            : status.Running ? Loc.F("El agente está en marcha{0}.", status.Since is null ? "" : Loc.F(" desde {0}", status.Since))
+            : Loc.F("El agente está instalado pero no en marcha (estado: {0}).", status.ServiceState));
     });
 
     [RelayCommand(CanExecute = nameof(CanUseSsh))]
-    private Task LogsAsync() => RunSshAsync("Leyendo el log", async (deployer, _, ct) =>
+    private Task LogsAsync() => RunSshAsync(Loc.T("Leyendo el log"), async (deployer, _, ct) =>
     {
         var text = await deployer.GetLogsAsync(NullIfEmpty(SshPassword), NullIfEmpty(SudoPassword), 200, ct);
         foreach (var line in text.Split('\n', StringSplitOptions.RemoveEmptyEntries))
@@ -269,16 +270,16 @@ public sealed partial class AgentsViewModel : ObservableObject
     [RelayCommand(CanExecute = nameof(CanUseSsh))]
     private async Task UninstallAsync()
     {
-        if (!await _main.Dialogs.ConfirmAsync("Desinstalar agente",
-                $"¿Desinstalar el agente de {TargetName}?\nSe para el servicio y se borran sus ficheros{(KeepConfiguration ? " (se guarda una copia de agent.json)" : "")}."))
+        if (!await _main.Dialogs.ConfirmAsync(Loc.T("Desinstalar agente"),
+                Loc.F("¿Desinstalar el agente de {0}?\nSe para el servicio y se borran sus ficheros{1}.", TargetName, KeepConfiguration ? Loc.T(" (se guarda una copia de agent.json)") : "")))
             return;
-        await RunSshAsync("Desinstalando", async (deployer, profile, ct) =>
+        await RunSshAsync(Loc.T("Desinstalando"), async (deployer, profile, ct) =>
         {
             await deployer.UninstallAsync(KeepConfiguration, NullIfEmpty(SshPassword), NullIfEmpty(SudoPassword), AgentPort, ct);
             profile.InstalledAt = null;
             profile.Token = null;
             profile.CertificateThumbprint = null;
-            _main.Report($"Agente desinstalado de {TargetName}");
+            _main.Report(Loc.F("Agente desinstalado de {0}", TargetName));
         });
     }
 
@@ -290,18 +291,18 @@ public sealed partial class AgentsViewModel : ObservableObject
         Apply(profile);
         IsBusy = true;
         Log.Clear();
-        AddLog(LocalMachine ? $"{action}: en este equipo (sin SSH)…" : $"{action}: conectando por SSH con {SshUser}@{SshHost}:{SshPort}…");
+        AddLog(LocalMachine ? Loc.F("{0}: en este equipo (sin SSH)…", action) : Loc.F("{0}: conectando por SSH con {1}@{2}:{3}…", action, SshUser, SshHost, SshPort));
         try
         {
             using var session = LocalMachine ? _localFactory() : await OpenSshAsync(profile);
             var deployer = new AgentDeployer(session, new InlineProgress(AddLog));
             await operation(deployer, profile, CancellationToken.None);
-            AddLog("✔ Hecho");
+            AddLog(Loc.T("✔ Hecho"));
         }
         catch (Exception ex) when (ex is DeployException or SshException or SshHostKeyMismatchException or IOException
                                        or System.Net.Sockets.SocketException or TimeoutException or InvalidOperationException)
         {
-            AddLog($"✖ {Explain(ex)}");
+            AddLog("✖ " + Explain(ex));
             _main.Report(Explain(ex), isError: true);
         }
         finally
@@ -319,16 +320,16 @@ public sealed partial class AgentsViewModel : ObservableObject
         var target = new SshTarget(SshHost.Trim(), SshPort, SshUser.Trim(), NullIfEmpty(SshPassword), NullIfEmpty(SshKeyFile), ExpectedHostKey: profile.SshHostKey);
         var session = await _sshFactory(target, CancellationToken.None);
         if (profile.SshHostKey is null)
-            AddLog($"Huella SSH del equipo (queda fijada): SHA256:{session.HostKeyFingerprint}");
+            AddLog(Loc.F("Huella SSH del equipo (queda fijada): SHA256:{0}", session.HostKeyFingerprint));
         profile.SshHostKey = session.HostKeyFingerprint;
         return session;
     }
 
     private static string Explain(Exception ex) => ex switch
     {
-        SshAuthenticationException => "El equipo rechaza el usuario, la clave o la contraseña SSH.",
-        System.Net.Sockets.SocketException => $"No se puede abrir la conexión SSH: {ex.Message}",
-        SshOperationTimeoutException or TimeoutException => "El equipo no responde por SSH (tiempo agotado).",
+        SshAuthenticationException => Loc.T("El equipo rechaza el usuario, la clave o la contraseña SSH."),
+        System.Net.Sockets.SocketException => Loc.F("No se puede abrir la conexión SSH: {0}", ex.Message),
+        SshOperationTimeoutException or TimeoutException => Loc.T("El equipo no responde por SSH (tiempo agotado)."),
         _ => ex.Message,
     };
 
@@ -356,13 +357,13 @@ public sealed partial class AgentsViewModel : ObservableObject
     {
         var parts = new List<string>();
         if (p.LocalMachine)
-            parts.Add("Este equipo");
-        parts.Add(p.CertificateThumbprint is null ? "Sin TLS" : "TLS con certificado fijado");
-        parts.Add(string.IsNullOrEmpty(p.Token) ? "sin token" : "con token");
+            parts.Add(Loc.T("Este equipo"));
+        parts.Add(Loc.T(p.CertificateThumbprint is null ? "Sin TLS" : "TLS con certificado fijado"));
+        parts.Add(Loc.T(string.IsNullOrEmpty(p.Token) ? "sin token" : "con token"));
         if (p.Platform is not null)
             parts.Add(p.Platform);
         if (p.InstalledAt is { } at)
-            parts.Add($"instalado el {at.ToLocalTime().ToString("dd/MM/yyyy HH:mm", CultureInfo.InvariantCulture)}");
+            parts.Add(Loc.F("instalado el {0}", at.ToLocalTime().ToString("dd/MM/yyyy HH:mm", CultureInfo.InvariantCulture)));
         return string.Join(" · ", parts);
     }
 

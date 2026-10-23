@@ -4,6 +4,7 @@ using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using Grpc.Core;
 using PlcMonitor.Agent.Contracts;
+using PlcMonitor.App.Localization;
 
 namespace PlcMonitor.App.ViewModels;
 
@@ -11,7 +12,7 @@ namespace PlcMonitor.App.ViewModels;
 /// Panel de transformaciones del agente: valores enteros que se muestran como texto (0 = Parado, 1 = Marcha...).
 /// Los cambios se editan aquí y se envían todos juntos al guardar; el agente los valida antes de aplicarlos.
 /// </summary>
-public sealed partial class TransformsViewModel : ObservableObject, IDisposable
+public sealed partial class TransformsViewModel : LocalizedObservableObject, IDisposable
 {
     private readonly MainViewModel _main;
 
@@ -74,9 +75,9 @@ public sealed partial class TransformsViewModel : ObservableObject, IDisposable
     [RelayCommand]
     private void Add()
     {
-        var name = "Nueva transformación";
+        var name = Loc.T("Nueva transformación");
         for (var n = 2; Items.Any(i => string.Equals(i.Name, name, StringComparison.CurrentCultureIgnoreCase)); n++)
-            name = $"Nueva transformación {n}";
+            name = Loc.F("Nueva transformación {0}", n);
         var item = new TransformItem(this, new ValueTransform { Name = name }, [], isNew: true);
         item.Entries.Add(new TransformEntryItem(item) { Value = "0" });
         item.Entries.Add(new TransformEntryItem(item) { Value = "1" });
@@ -93,10 +94,10 @@ public sealed partial class TransformsViewModel : ObservableObject, IDisposable
             return;
         if (item.Usage.Count > 0)
         {
-            Errors = $"«{item.OriginalName}» la usan {item.UsageText}: quítasela antes a esos tags (doble clic en el tag → «Mostrar valor como»).";
+            Errors = Loc.F("«{0}» la usan {1}: quítasela antes a esos tags (doble clic en el tag → «Mostrar valor como»).", item.OriginalName, item.UsageText);
             return;
         }
-        if (!await _main.Dialogs.ConfirmAsync("Borrar transformación", $"¿Borrar «{item.Name}»? Se aplica al guardar."))
+        if (!await _main.Dialogs.ConfirmAsync(Loc.T("Borrar transformación"), Loc.F("¿Borrar «{0}»? Se aplica al guardar.", item.Name)))
             return;
         var index = Items.IndexOf(item);
         Items.Remove(item);
@@ -130,7 +131,7 @@ public sealed partial class TransformsViewModel : ObservableObject, IDisposable
         var clash = renames.Keys.FirstOrDefault(old => transforms.Any(t => string.Equals(t.Name, old, StringComparison.OrdinalIgnoreCase)));
         if (clash is not null)
         {
-            Errors = $"Otra transformación se llama ahora «{clash}», que es el nombre antiguo de una que usan algunos tags: guarda primero un cambio y después el otro.";
+            Errors = Loc.F("Otra transformación se llama ahora «{0}», que es el nombre antiguo de una que usan algunos tags: guarda primero un cambio y después el otro.", clash);
             return;
         }
 
@@ -160,7 +161,7 @@ public sealed partial class TransformsViewModel : ObservableObject, IDisposable
             request.Transforms.AddRange(transforms);
             var saved = await client.PutTransformsAsync(request);
             IsDirty = false;
-            _main.Report(saved.Transforms.Count == 1 ? "1 transformación guardada" : $"{saved.Transforms.Count} transformaciones guardadas");
+            _main.Report(saved.Transforms.Count == 1 ? Loc.T("1 transformación guardada") : Loc.F("{0} transformaciones guardadas", saved.Transforms.Count));
         }
         catch (RpcException ex) when (ex.StatusCode == StatusCode.InvalidArgument)
         {
@@ -188,22 +189,22 @@ public sealed partial class TransformsViewModel : ObservableObject, IDisposable
         foreach (var item in Items)
         {
             var name = item.Name.Trim();
-            var where = name.Length == 0 ? "Una transformación" : $"«{name}»";
+            var where = name.Length == 0 ? Loc.T("Una transformación") : Loc.F("«{0}»", name);
             if (name.Length == 0)
-                errors.Add("Hay una transformación sin nombre.");
+                errors.Add(Loc.T("Hay una transformación sin nombre."));
             else if (!names.Add(name))
-                errors.Add($"{where}: hay otra con el mismo nombre.");
+                errors.Add(Loc.F("{0}: hay otra con el mismo nombre.", where));
             var transform = new ValueTransform { Name = name };
             var values = new HashSet<long>();
             foreach (var entry in item.Entries.Where(e => !e.IsBlank))
             {
                 if (!long.TryParse(entry.Value.Trim(), NumberStyles.AllowLeadingSign, CultureInfo.InvariantCulture, out var value))
                 {
-                    errors.Add($"{where}: «{entry.Value.Trim()}» no es un número entero.");
+                    errors.Add(Loc.F("{0}: «{1}» no es un número entero.", where, entry.Value.Trim()));
                     continue;
                 }
                 if (!values.Add(value))
-                    errors.Add($"{where}: el valor {value} está repetido.");
+                    errors.Add(Loc.F("{0}: el valor {1} está repetido.", where, value));
                 transform.Entries.Add(new TransformEntry { Value = value, Text = entry.Text.Trim() });
             }
             transforms.Add(transform);
@@ -215,7 +216,7 @@ public sealed partial class TransformsViewModel : ObservableObject, IDisposable
 }
 
 /// <summary>Una transformación en edición.</summary>
-public sealed partial class TransformItem : ObservableObject
+public sealed partial class TransformItem : LocalizedObservableObject
 {
     private readonly TransformsViewModel _owner;
 
@@ -245,13 +246,13 @@ public sealed partial class TransformItem : ObservableObject
 
     public string UsageText => Usage.Count switch
     {
-        0 => "ningún tag",
-        1 => $"1 tag ({Usage[0].Device}/{Usage[0].Name})",
-        <= 3 => $"{Usage.Count} tags ({string.Join(", ", Usage.Select(t => $"{t.Device}/{t.Name}"))})",
-        _ => $"{Usage.Count} tags ({string.Join(", ", Usage.Take(3).Select(t => $"{t.Device}/{t.Name}"))}…)",
+        0 => Loc.T("ningún tag"),
+        1 => Loc.F("1 tag ({0}/{1})", Usage[0].Device, Usage[0].Name),
+        <= 3 => Loc.F("{0} tags ({1})", Usage.Count, string.Join(", ", Usage.Select(t => $"{t.Device}/{t.Name}"))),
+        _ => Loc.F("{0} tags ({1}…)", Usage.Count, string.Join(", ", Usage.Take(3).Select(t => $"{t.Device}/{t.Name}"))),
     };
 
-    public string UsageSummary => Usage.Count == 0 ? "Sin usar" : Usage.Count == 1 ? "1 tag" : $"{Usage.Count} tags";
+    public string UsageSummary => Usage.Count == 0 ? Loc.T("Sin usar") : Usage.Count == 1 ? Loc.T("1 tag") : Loc.F("{0} tags", Usage.Count);
 
     [RelayCommand]
     private void AddEntry()

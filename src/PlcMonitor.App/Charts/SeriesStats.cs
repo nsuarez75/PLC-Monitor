@@ -1,5 +1,6 @@
 using System.Globalization;
 using System.Text;
+using PlcMonitor.App.Localization;
 
 namespace PlcMonitor.App.Charts;
 
@@ -192,7 +193,7 @@ public static class SeriesStats
     /// <summary>Tabla separada por tabuladores con los textos de la pantalla (para pegar en una hoja de cálculo).</summary>
     public static string ToTable(IEnumerable<SeriesStatsRow> rows)
     {
-        var text = new StringBuilder("Tag\tMín\tMáx\tMedia\tσ\tPrimero\tÚltimo\tΔ\tMuestras\tFlancos ↑\n");
+        var text = new StringBuilder(Loc.T("Tag\tMín\tMáx\tMedia\tσ\tPrimero\tÚltimo\tΔ\tMuestras\tFlancos ↑") + "\n");
         foreach (var r in rows)
             text.AppendJoin('\t', r.Name, r.MinText, r.MaxText, r.MeanText, r.StdDevText, r.FirstText, r.LastText, r.DeltaText, r.SamplesText, r.EdgesText).Append('\n');
         return text.ToString();

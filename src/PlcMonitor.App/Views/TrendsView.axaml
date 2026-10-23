@@ -1,5 +1,6 @@
 <UserControl xmlns="https://github.com/avaloniaui"
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:loc="using:PlcMonitor.App.Localization"
              xmlns:vm="using:PlcMonitor.App.ViewModels"
              xmlns:svc="using:PlcMonitor.App.Services"
              xmlns:c="using:PlcMonitor.App.Controls"
@@ -16,13 +17,13 @@
       <DockPanel>
         <DockPanel DockPanel.Dock="Bottom" MaxHeight="300" Margin="0,12,0,0">
           <Grid DockPanel.Dock="Top" ColumnDefinitions="*,Auto" Margin="4,0,0,10">
-            <TextBlock Text="PANELES" Classes="caption" VerticalAlignment="Center" />
-            <Button Grid.Column="1" Classes="ghost" Command="{Binding NewPanelCommand}" ToolTip.Tip="Nuevo panel: varias vistas en una rejilla">
+            <TextBlock Text="{loc:T 'PANELES'}" Classes="caption" VerticalAlignment="Center" />
+            <Button Grid.Column="1" Classes="ghost" Command="{Binding NewPanelCommand}" ToolTip.Tip="{loc:T 'Nuevo panel: varias vistas en una rejilla'}">
               <c:Icon Kind="plus" />
             </Button>
           </Grid>
           <TextBlock DockPanel.Dock="Top" Classes="muted" FontSize="11.5" Margin="4,0,0,0" TextWrapping="Wrap" IsVisible="{Binding !HasPanels}"
-                     Text="Junta varias vistas en una sola pantalla." />
+                     Text="{loc:T 'Junta varias vistas en una sola pantalla.'}" />
           <ListBox Classes="devices" ItemsSource="{Binding Panels}" SelectedItem="{Binding SelectedPanel}">
             <ListBox.ItemTemplate>
               <DataTemplate x:DataType="vm:TrendPanelItem">
@@ -35,8 +36,8 @@
           </ListBox>
         </DockPanel>
         <Grid DockPanel.Dock="Top" ColumnDefinitions="*,Auto" Margin="4,0,0,10">
-          <TextBlock Text="TENDENCIAS" Classes="caption" VerticalAlignment="Center" />
-          <Button Grid.Column="1" Classes="ghost" Command="{Binding NewCommand}" ToolTip.Tip="Nueva vista de tendencia">
+          <TextBlock Text="{loc:T 'TENDENCIAS'}" Classes="caption" VerticalAlignment="Center" />
+          <Button Grid.Column="1" Classes="ghost" Command="{Binding NewCommand}" ToolTip.Tip="{loc:T 'Nueva vista de tendencia'}">
             <c:Icon Kind="plus" />
           </Button>
         </Grid>
@@ -63,11 +64,11 @@
         <!-- Sin vistas -->
         <Border Classes="card" Padding="24" VerticalAlignment="Top" IsVisible="{Binding !HasViews}">
           <StackPanel Spacing="12">
-            <TextBlock Text="Aún no hay vistas de tendencia para este agente." />
+            <TextBlock Text="{loc:T 'Aún no hay vistas de tendencia para este agente.'}" />
             <Button Classes="accent" Command="{Binding NewCommand}" HorizontalAlignment="Left">
               <StackPanel Orientation="Horizontal" Spacing="6">
                 <c:Icon Kind="plus" />
-                <TextBlock Text="Nueva tendencia" />
+                <TextBlock Text="{loc:T 'Nueva tendencia'}" />
               </StackPanel>
             </Button>
           </StackPanel>
@@ -78,11 +79,11 @@
           <StackPanel Spacing="14">
             <Border Classes="card" Padding="20">
               <StackPanel Spacing="12">
-                <TextBlock Text="VISTA" Classes="caption" />
+                <TextBlock Text="{loc:T 'VISTA'}" Classes="caption" />
                 <Grid ColumnDefinitions="170,*" RowDefinitions="Auto,Auto,Auto" RowSpacing="10" ColumnSpacing="16">
-                  <TextBlock Text="Nombre" VerticalAlignment="Center" FontWeight="Medium" />
-                  <TextBox Grid.Column="1" Text="{Binding Name}" PlaceholderText="Presión línea 3" />
-                  <TextBlock Grid.Row="1" Text="Tipo de gráfica" VerticalAlignment="Center" FontWeight="Medium" />
+                  <TextBlock Text="{loc:T 'Nombre'}" VerticalAlignment="Center" FontWeight="Medium" />
+                  <TextBox Grid.Column="1" Text="{Binding Name}" PlaceholderText="{loc:T 'Presión línea 3'}" />
+                  <TextBlock Grid.Row="1" Text="{loc:T 'Tipo de gráfica'}" VerticalAlignment="Center" FontWeight="Medium" />
                   <ComboBox Grid.Row="1" Grid.Column="1" ItemsSource="{x:Static vm:ChartKindChoice.All}" SelectedItem="{Binding Kind}" MinWidth="280" MaxWidth="560">
                     <ComboBox.ItemTemplate>
                       <DataTemplate x:DataType="vm:ChartKindChoice">
@@ -103,50 +104,50 @@
                 </Grid>
                 <!-- Opciones según el tipo: una fila por opción, las que no aplican se ocultan. -->
                 <Grid ColumnDefinitions="170,*" ColumnSpacing="16" IsVisible="{Binding CanUseHistory}">
-                  <TextBlock Text="Datos" VerticalAlignment="Center" FontWeight="Medium" />
-                  <ComboBox Grid.Column="1" ItemsSource="{x:Static vm:TrendsViewModel.DataSources}" SelectedItem="{Binding DataSource}" MinWidth="280" />
+                  <TextBlock Text="{loc:T 'Datos'}" VerticalAlignment="Center" FontWeight="Medium" />
+                  <ComboBox Grid.Column="1" ItemsSource="{x:Static vm:TrendsViewModel.DataSources}" DisplayMemberBinding="{Binding Text}" SelectedItem="{Binding DataSource}" MinWidth="280" />
                 </Grid>
                 <Grid ColumnDefinitions="170,*" RowDefinitions="Auto,Auto" RowSpacing="4" ColumnSpacing="16" IsVisible="{Binding UsesCsv}">
-                  <TextBlock Text="Fichero" VerticalAlignment="Center" FontWeight="Medium" />
+                  <TextBlock Text="{loc:T 'Fichero'}" VerticalAlignment="Center" FontWeight="Medium" />
                   <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="10">
                     <Button Classes="secondary" Command="{Binding ChooseCsvCommand}">
                       <StackPanel Orientation="Horizontal" Spacing="6">
                         <c:Icon Kind="folder" />
-                        <TextBlock Text="Elegir CSV…" />
+                        <TextBlock Text="{loc:T 'Elegir CSV…'}" />
                       </StackPanel>
                     </Button>
                     <TextBlock Text="{Binding CsvText}" VerticalAlignment="Center" TextTrimming="CharacterEllipsis" ToolTip.Tip="{Binding CsvPath}" />
                   </StackPanel>
                   <TextBlock Grid.Row="1" Grid.Column="1" Classes="muted" FontSize="11.5" TextWrapping="Wrap"
-                             Text="Un CSV exportado desde la pestaña Histórico de un dispositivo; no hace falta estar conectado. Elige abajo qué tags del fichero quieres ver." />
+                             Text="{loc:T 'Un CSV exportado desde la pestaña Histórico de un dispositivo; no hace falta estar conectado. Elige abajo qué tags del fichero quieres ver.'}" />
                 </Grid>
                 <TextBlock Text="{Binding CsvError}" Classes="error" TextWrapping="Wrap" Margin="186,0,0,0"
                            IsVisible="{Binding CsvError, Converter={x:Static StringConverters.IsNotNullOrEmpty}}" />
                 <Grid ColumnDefinitions="170,*" RowDefinitions="Auto,Auto" RowSpacing="4" ColumnSpacing="16" IsVisible="{Binding ShowHistoryRange}">
-                  <TextBlock Text="Periodo" VerticalAlignment="Center" FontWeight="Medium" />
+                  <TextBlock Text="{loc:T 'Periodo'}" VerticalAlignment="Center" FontWeight="Medium" />
                   <WrapPanel Grid.Column="1">
-                    <ComboBox ItemsSource="{x:Static vm:TrendHistory.Ranges}" SelectedItem="{Binding HistoryRange}" MinWidth="170" Margin="0,0,12,4" />
+                    <ComboBox ItemsSource="{x:Static vm:TrendHistory.Ranges}" DisplayMemberBinding="{Binding Text}" SelectedItem="{Binding HistoryRange}" MinWidth="170" Margin="0,0,12,4" />
                     <StackPanel Orientation="Horizontal" Spacing="8" IsVisible="{Binding IsCustomRange}" Margin="0,0,0,4">
-                      <TextBlock Text="desde" Classes="muted" VerticalAlignment="Center" />
+                      <TextBlock Text="{loc:T 'desde'}" Classes="muted" VerticalAlignment="Center" />
                       <TextBox Text="{Binding HistoryFromText}" Width="150" PlaceholderText="17/10/2026 06:00" />
-                      <TextBlock Text="hasta" Classes="muted" VerticalAlignment="Center" />
+                      <TextBlock Text="{loc:T 'hasta'}" Classes="muted" VerticalAlignment="Center" />
                       <TextBox Text="{Binding HistoryToText}" Width="150" PlaceholderText="17/10/2026 14:00" />
                     </StackPanel>
                   </WrapPanel>
                   <TextBlock Grid.Row="1" Grid.Column="1" Classes="muted" FontSize="11.5" TextWrapping="Wrap"
-                             Text="Se lee del histórico del agente al abrir la vista (solo los tags que se historizan); «Actualizar» lo vuelve a leer." />
+                             Text="{loc:T 'Se lee del histórico del agente al abrir la vista (solo los tags que se historizan); «Actualizar» lo vuelve a leer.'}" />
                 </Grid>
                 <Grid ColumnDefinitions="170,*" ColumnSpacing="16" IsVisible="{Binding UsesLiveWindow}">
-                  <TextBlock Text="Ventana" VerticalAlignment="Center" FontWeight="Medium" />
-                  <ComboBox Grid.Column="1" ItemsSource="{x:Static vm:LiveTrendViewModel.Windows}" SelectedItem="{Binding Window}" MinWidth="110" />
+                  <TextBlock Text="{loc:T 'Ventana'}" VerticalAlignment="Center" FontWeight="Medium" />
+                  <ComboBox Grid.Column="1" ItemsSource="{x:Static vm:LiveTrendViewModel.Windows}" DisplayMemberBinding="{Binding Text}" SelectedItem="{Binding Window}" MinWidth="110" />
                 </Grid>
                 <Grid ColumnDefinitions="170,*" ColumnSpacing="16" IsVisible="{Binding IsBarsKind}">
-                  <TextBlock Text="Barras" VerticalAlignment="Center" FontWeight="Medium" />
+                  <TextBlock Text="{loc:T 'Barras'}" VerticalAlignment="Center" FontWeight="Medium" />
                   <WrapPanel Grid.Column="1">
-                    <ComboBox ItemsSource="{x:Static vm:PeriodBarsViewModel.Metrics}" SelectedItem="{Binding BarMetric}" MinWidth="190" Margin="0,0,8,6" ToolTip.Tip="Qué se calcula en cada periodo" />
-                    <TextBlock Text="por" Classes="muted" VerticalAlignment="Center" Margin="0,0,8,6" />
-                    <ComboBox ItemsSource="{x:Static vm:PeriodBarsViewModel.Periods}" SelectedItem="{Binding BarPeriod}" MinWidth="120" Margin="0,0,8,6" />
-                    <ComboBox ItemsSource="{x:Static vm:PeriodBarsViewModel.Ranges}" SelectedItem="{Binding BarRange}" MinWidth="150" Margin="0,0,8,6"
+                    <ComboBox ItemsSource="{x:Static vm:PeriodBarsViewModel.Metrics}" DisplayMemberBinding="{Binding Text}" SelectedItem="{Binding BarMetric}" MinWidth="190" Margin="0,0,8,6" ToolTip.Tip="{loc:T 'Qué se calcula en cada periodo'}" />
+                    <TextBlock Text="{loc:T 'por'}" Classes="muted" VerticalAlignment="Center" Margin="0,0,8,6" />
+                    <ComboBox ItemsSource="{x:Static vm:PeriodBarsViewModel.Periods}" DisplayMemberBinding="{Binding Text}" SelectedItem="{Binding BarPeriod}" MinWidth="120" Margin="0,0,8,6" />
+                    <ComboBox ItemsSource="{x:Static vm:PeriodBarsViewModel.Ranges}" DisplayMemberBinding="{Binding Text}" SelectedItem="{Binding BarRange}" MinWidth="150" Margin="0,0,8,6"
                               IsVisible="{Binding UsesHistory}" />
                   </WrapPanel>
                 </Grid>
@@ -157,23 +158,23 @@
                       <Binding Path="IsShiftPeriod" />
                     </MultiBinding>
                   </Grid.IsVisible>
-                  <TextBlock Text="Primer turno" VerticalAlignment="Center" FontWeight="Medium" />
+                  <TextBlock Text="{loc:T 'Primer turno'}" VerticalAlignment="Center" FontWeight="Medium" />
                   <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="8">
-                    <TextBlock Text="empieza a las" Classes="muted" VerticalAlignment="Center" />
+                    <TextBlock Text="{loc:T 'empieza a las'}" Classes="muted" VerticalAlignment="Center" />
                     <NumericUpDown Value="{Binding ShiftStartHour}" Minimum="0" Maximum="23" Increment="1" FormatString="0" Width="110" />
-                    <TextBlock Text="h (T1, T2 y T3, de 8 h cada uno)" Classes="muted" VerticalAlignment="Center" />
+                    <TextBlock Text="{loc:T 'h (T1, T2 y T3, de 8 h cada uno)'}" Classes="muted" VerticalAlignment="Center" />
                   </StackPanel>
                 </Grid>
                 <Grid ColumnDefinitions="170,*" ColumnSpacing="16" IsVisible="{Binding IsGaugesKind}">
-                  <TextBlock Text="Indicador" VerticalAlignment="Center" FontWeight="Medium" />
-                  <ComboBox Grid.Column="1" ItemsSource="{x:Static vm:TrendsViewModel.GaugeStyles}" SelectedItem="{Binding GaugeStyle}" MinWidth="160" />
+                  <TextBlock Text="{loc:T 'Indicador'}" VerticalAlignment="Center" FontWeight="Medium" />
+                  <ComboBox Grid.Column="1" ItemsSource="{x:Static vm:TrendsViewModel.GaugeStyles}" DisplayMemberBinding="{Binding Text}" SelectedItem="{Binding GaugeStyle}" MinWidth="160" />
                 </Grid>
                 <Grid ColumnDefinitions="170,*" RowDefinitions="Auto,Auto" RowSpacing="4" ColumnSpacing="16" IsVisible="{Binding HasLimits}">
                   <TextBlock Text="{Binding LimitsText}" VerticalAlignment="Center" FontWeight="Medium" />
                   <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="8">
-                    <TextBlock Text="inferior" Classes="muted" VerticalAlignment="Center" />
+                    <TextBlock Text="{loc:T 'inferior'}" Classes="muted" VerticalAlignment="Center" />
                     <NumericUpDown Value="{Binding LowLimit}" Width="130" FormatString="0.###" PlaceholderText="—" />
-                    <TextBlock Text="superior" Classes="muted" VerticalAlignment="Center" Margin="8,0,0,0" />
+                    <TextBlock Text="{loc:T 'superior'}" Classes="muted" VerticalAlignment="Center" Margin="8,0,0,0" />
                     <NumericUpDown Value="{Binding HighLimit}" Width="130" FormatString="0.###" PlaceholderText="—" />
                   </StackPanel>
                   <TextBlock Grid.Row="1" Grid.Column="1" Text="{Binding LimitsHint}" Classes="muted" FontSize="11.5" TextWrapping="Wrap" />
@@ -182,16 +183,16 @@
                   <TextBlock Text="{Binding AxisCaption}"
                              VerticalAlignment="Center" FontWeight="Medium" />
                   <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="8">
-                    <CheckBox Content="Automático" IsChecked="{Binding AutoY}" />
-                    <TextBlock Text="mín" Classes="muted" VerticalAlignment="Center" IsVisible="{Binding IsManualY}" Margin="8,0,0,0" />
+                    <CheckBox Content="{loc:T 'Automático'}" IsChecked="{Binding AutoY}" />
+                    <TextBlock Text="{loc:T 'mín'}" Classes="muted" VerticalAlignment="Center" IsVisible="{Binding IsManualY}" Margin="8,0,0,0" />
                     <NumericUpDown Value="{Binding YMin}" Width="130" IsVisible="{Binding IsManualY}" />
-                    <TextBlock Text="máx" Classes="muted" VerticalAlignment="Center" IsVisible="{Binding IsManualY}" />
+                    <TextBlock Text="{loc:T 'máx'}" Classes="muted" VerticalAlignment="Center" IsVisible="{Binding IsManualY}" />
                     <NumericUpDown Value="{Binding YMax}" Width="130" IsVisible="{Binding IsManualY}" />
                   </StackPanel>
                 </Grid>
                 <Grid ColumnDefinitions="170,*" ColumnSpacing="16" IsVisible="{Binding IsTrendKind}">
-                  <TextBlock Text="Ejes" VerticalAlignment="Center" FontWeight="Medium" />
-                  <CheckBox Grid.Column="1" Content="Un eje Y por tag (cada uno con su escala)" IsChecked="{Binding SeparateAxes}" />
+                  <TextBlock Text="{loc:T 'Ejes'}" VerticalAlignment="Center" FontWeight="Medium" />
+                  <CheckBox Grid.Column="1" Content="{loc:T 'Un eje Y por tag (cada uno con su escala)'}" IsChecked="{Binding SeparateAxes}" />
                 </Grid>
                 <TextBlock Text="{Binding KindError}" Classes="error" TextWrapping="Wrap"
                            IsVisible="{Binding KindError, Converter={x:Static StringConverters.IsNotNullOrEmpty}}" />
@@ -201,37 +202,37 @@
             <!-- Disparo: solo se ven los valores mientras se cumple, con tiempo antes y después -->
             <Border Classes="card" Padding="20" IsVisible="{Binding CanTrigger}">
               <StackPanel Spacing="12">
-                <TextBlock Text="DISPARO" Classes="caption" />
-                <CheckBox Content="Mostrar solo mientras un tag cumpla una condición" IsChecked="{Binding TriggerEnabled}" />
+                <TextBlock Text="{loc:T 'DISPARO'}" Classes="caption" />
+                <CheckBox Content="{loc:T 'Mostrar solo mientras un tag cumpla una condición'}" IsChecked="{Binding TriggerEnabled}" />
                 <Grid ColumnDefinitions="170,*" RowDefinitions="Auto,Auto,Auto,Auto" RowSpacing="10" ColumnSpacing="16" IsVisible="{Binding TriggerEnabled}">
-                  <TextBlock Text="Tag de disparo" VerticalAlignment="Center" FontWeight="Medium" />
-                  <ComboBox Grid.Column="1" ItemsSource="{Binding TriggerChoices}" SelectedItem="{Binding TriggerTag}" MinWidth="280" PlaceholderText="Elige un tag del agente">
+                  <TextBlock Text="{loc:T 'Tag de disparo'}" VerticalAlignment="Center" FontWeight="Medium" />
+                  <ComboBox Grid.Column="1" ItemsSource="{Binding TriggerChoices}" SelectedItem="{Binding TriggerTag}" MinWidth="280" PlaceholderText="{loc:T 'Elige un tag del agente'}">
                     <ComboBox.ItemTemplate>
                       <DataTemplate x:DataType="vm:TrendTagChoice">
                         <TextBlock Text="{Binding Text}" TextTrimming="CharacterEllipsis" />
                       </DataTemplate>
                     </ComboBox.ItemTemplate>
                   </ComboBox>
-                  <TextBlock Grid.Row="1" Text="Mostrar mientras" VerticalAlignment="Center" FontWeight="Medium" />
+                  <TextBlock Grid.Row="1" Text="{loc:T 'Mostrar mientras'}" VerticalAlignment="Center" FontWeight="Medium" />
                   <StackPanel Grid.Row="1" Grid.Column="1" Orientation="Horizontal" Spacing="8">
-                    <TextBlock Text="valga" Classes="muted" VerticalAlignment="Center" IsVisible="{Binding IsBooleanTrigger}" />
-                    <ComboBox ItemsSource="{x:Static vm:TagDetailsViewModel.BoolChoices}" SelectedItem="{Binding TriggerBool}" MinWidth="100" IsVisible="{Binding IsBooleanTrigger}" />
-                    <ComboBox ItemsSource="{x:Static vm:TagDetailsViewModel.Conditions}" SelectedItem="{Binding TriggerCondition}" MinWidth="70" IsVisible="{Binding IsValueTrigger}" />
-                    <TextBox Text="{Binding TriggerValue}" Width="140" PlaceholderText="valor" IsVisible="{Binding IsValueTrigger}" />
+                    <TextBlock Text="{loc:T 'valga'}" Classes="muted" VerticalAlignment="Center" IsVisible="{Binding IsBooleanTrigger}" />
+                    <ComboBox ItemsSource="{x:Static vm:TagDetailsViewModel.BoolChoices}" DisplayMemberBinding="{Binding Text}" SelectedItem="{Binding TriggerBool}" MinWidth="100" IsVisible="{Binding IsBooleanTrigger}" />
+                    <ComboBox ItemsSource="{x:Static vm:TagDetailsViewModel.Conditions}" DisplayMemberBinding="{Binding Text}" SelectedItem="{Binding TriggerCondition}" MinWidth="70" IsVisible="{Binding IsValueTrigger}" />
+                    <TextBox Text="{Binding TriggerValue}" Width="140" PlaceholderText="{loc:T 'valor'}" IsVisible="{Binding IsValueTrigger}" />
                   </StackPanel>
-                  <TextBlock Grid.Row="2" Text="Antes del disparo" VerticalAlignment="Center" FontWeight="Medium" />
+                  <TextBlock Grid.Row="2" Text="{loc:T 'Antes del disparo'}" VerticalAlignment="Center" FontWeight="Medium" />
                   <StackPanel Grid.Row="2" Grid.Column="1" Orientation="Horizontal" Spacing="8">
                     <NumericUpDown Value="{Binding TriggerBeforeSeconds}" Minimum="0" Maximum="3600" Increment="5" FormatString="0.#" Width="140" />
-                    <TextBlock Text="s que se muestran de antes de cumplirse" Classes="muted" VerticalAlignment="Center" />
+                    <TextBlock Text="{loc:T 's que se muestran de antes de cumplirse'}" Classes="muted" VerticalAlignment="Center" />
                   </StackPanel>
-                  <TextBlock Grid.Row="3" Text="Después" VerticalAlignment="Center" FontWeight="Medium" />
+                  <TextBlock Grid.Row="3" Text="{loc:T 'Después'}" VerticalAlignment="Center" FontWeight="Medium" />
                   <StackPanel Grid.Row="3" Grid.Column="1" Orientation="Horizontal" Spacing="8">
                     <NumericUpDown Value="{Binding TriggerHoldSeconds}" Minimum="0" Maximum="3600" Increment="5" FormatString="0.#" Width="140" />
-                    <TextBlock Text="s más tras dejar de cumplirse" Classes="muted" VerticalAlignment="Center" />
+                    <TextBlock Text="{loc:T 's más tras dejar de cumplirse'}" Classes="muted" VerticalAlignment="Center" />
                   </StackPanel>
                 </Grid>
                 <TextBlock Classes="muted" FontSize="11.5" TextWrapping="Wrap" IsVisible="{Binding TriggerEnabled}"
-                           Text="Fuera de esos tramos la gráfica queda en blanco. Se calcula con lo recibido en vivo (la última hora), como el histórico por disparo del agente." />
+                           Text="{loc:T 'Fuera de esos tramos la gráfica queda en blanco. Se calcula con lo recibido en vivo (la última hora), como el histórico por disparo del agente.'}" />
                 <TextBlock Text="{Binding TriggerError}" Classes="error" TextWrapping="Wrap"
                            IsVisible="{Binding TriggerError, Converter={x:Static StringConverters.IsNotNullOrEmpty}}" />
               </StackPanel>
@@ -240,19 +241,19 @@
             <Border Classes="card" Padding="20">
               <Grid ColumnDefinitions="*,*" ColumnSpacing="20">
                 <StackPanel Spacing="10">
-                  <TextBlock Text="TAGS DE LA VISTA" Classes="caption" />
+                  <TextBlock Text="{loc:T 'TAGS DE LA VISTA'}" Classes="caption" />
                   <TextBlock Text="{Binding XAxisText}" FontWeight="Medium" IsVisible="{Binding IsXYKind}" TextWrapping="Wrap" />
-                  <TextBlock Classes="muted" Text="Ninguno todavía: añádelos de la lista de la derecha."
+                  <TextBlock Classes="muted" Text="{loc:T 'Ninguno todavía: añádelos de la lista de la derecha.'}"
                              IsVisible="{Binding !Tags.Count}" TextWrapping="Wrap" />
                   <ItemsControl ItemsSource="{Binding Tags}">
                     <ItemsControl.ItemTemplate>
                       <DataTemplate x:DataType="svc:TrendTagRef">
                         <Grid ColumnDefinitions="*,Auto,Auto" Margin="0,0,0,4">
                           <TextBlock Text="{Binding}" VerticalAlignment="Center" TextTrimming="CharacterEllipsis" />
-                          <Button Grid.Column="1" Classes="ghost" ToolTip.Tip="Usar como eje X" Content="Eje X" FontSize="11.5"
+                          <Button Grid.Column="1" Classes="ghost" ToolTip.Tip="{loc:T 'Usar como eje X'}" Content="{loc:T 'Eje X'}" FontSize="11.5"
                                   IsVisible="{Binding $parent[UserControl].((vm:TrendsViewModel)DataContext).IsXYKind}"
                                   Command="{Binding $parent[UserControl].((vm:TrendsViewModel)DataContext).MakeXAxisCommand}" CommandParameter="{Binding}" />
-                          <Button Grid.Column="2" Classes="ghost danger" ToolTip.Tip="Quitar de la vista"
+                          <Button Grid.Column="2" Classes="ghost danger" ToolTip.Tip="{loc:T 'Quitar de la vista'}"
                                   Command="{Binding $parent[UserControl].((vm:TrendsViewModel)DataContext).RemoveTagCommand}" CommandParameter="{Binding}">
                             <c:Icon Kind="x" Width="14" Height="14" />
                           </Button>
@@ -265,14 +266,14 @@
                   <Grid ColumnDefinitions="*,Auto">
                     <TextBlock Text="{Binding AvailableCaption}" Classes="caption" VerticalAlignment="Center" />
                     <Button Grid.Column="1" Classes="ghost" Command="{Binding AddAllCommand}" FontSize="12"
-                            IsVisible="{Binding Available.Count, Converter={x:Static vm:Converters.IsPositive}}" ToolTip.Tip="Añadir a la vista todos los de la lista">
+                            IsVisible="{Binding Available.Count, Converter={x:Static vm:Converters.IsPositive}}" ToolTip.Tip="{loc:T 'Añadir a la vista todos los de la lista'}">
                       <StackPanel Orientation="Horizontal" Spacing="4">
                         <c:Icon Kind="plus" Width="12" Height="12" />
-                        <TextBlock Text="Añadir todos" />
+                        <TextBlock Text="{loc:T 'Añadir todos'}" />
                       </StackPanel>
                     </Button>
                   </Grid>
-                  <TextBox Text="{Binding Search}" PlaceholderText="Buscar dispositivo o tag">
+                  <TextBox Text="{Binding Search}" PlaceholderText="{loc:T 'Buscar dispositivo o tag'}">
                     <TextBox.InnerLeftContent>
                       <c:Icon Kind="search" Width="14" Height="14" Margin="8,0,0,0" Foreground="{DynamicResource App.TextMuted}" />
                     </TextBox.InnerLeftContent>
@@ -286,7 +287,7 @@
                           <Grid ColumnDefinitions="*,Auto,Auto" ColumnSpacing="8" Margin="0,0,0,4">
                             <TextBlock Text="{Binding Text}" VerticalAlignment="Center" TextTrimming="CharacterEllipsis" />
                             <TextBlock Grid.Column="1" Text="{Binding DataType}" Classes="muted" FontSize="11.5" VerticalAlignment="Center" />
-                            <Button Grid.Column="2" Classes="ghost" ToolTip.Tip="Añadir a la vista"
+                            <Button Grid.Column="2" Classes="ghost" ToolTip.Tip="{loc:T 'Añadir a la vista'}"
                                     Command="{Binding $parent[UserControl].((vm:TrendsViewModel)DataContext).AddTagCommand}" CommandParameter="{Binding}">
                               <c:Icon Kind="plus" Width="14" Height="14" />
                             </Button>
@@ -303,20 +304,20 @@
               <Button Classes="accent" Command="{Binding OpenCommand}">
                 <StackPanel Orientation="Horizontal" Spacing="6">
                   <c:Icon Kind="play" />
-                  <TextBlock Text="Abrir" />
+                  <TextBlock Text="{loc:T 'Abrir'}" />
                 </StackPanel>
               </Button>
-              <TextBlock Text="Leyendo el histórico…" Classes="muted" VerticalAlignment="Center" IsVisible="{Binding IsLoading}" />
+              <TextBlock Text="{loc:T 'Leyendo el histórico…'}" Classes="muted" VerticalAlignment="Center" IsVisible="{Binding IsLoading}" />
               <Button Classes="secondary" Command="{Binding SaveCommand}">
                 <StackPanel Orientation="Horizontal" Spacing="6">
                   <c:Icon Kind="save" />
-                  <TextBlock Text="Guardar" />
+                  <TextBlock Text="{loc:T 'Guardar'}" />
                 </StackPanel>
               </Button>
               <Button Classes="ghost danger" Command="{Binding DeleteCommand}">
                 <StackPanel Orientation="Horizontal" Spacing="6">
                   <c:Icon Kind="trash" />
-                  <TextBlock Text="Borrar" />
+                  <TextBlock Text="{loc:T 'Borrar'}" />
                 </StackPanel>
               </Button>
             </StackPanel>
@@ -328,14 +329,14 @@
           <StackPanel Spacing="14">
             <Border Classes="card" Padding="20">
               <StackPanel Spacing="12">
-                <TextBlock Text="PANEL" Classes="caption" />
+                <TextBlock Text="{loc:T 'PANEL'}" Classes="caption" />
                 <Grid ColumnDefinitions="170,*" RowDefinitions="Auto,Auto,Auto" RowSpacing="10" ColumnSpacing="16">
-                  <TextBlock Text="Nombre" VerticalAlignment="Center" FontWeight="Medium" />
-                  <TextBox Grid.Column="1" Text="{Binding PanelName}" PlaceholderText="Línea 3" />
-                  <TextBlock Grid.Row="1" Text="Columnas" VerticalAlignment="Center" FontWeight="Medium" />
-                  <ComboBox Grid.Row="1" Grid.Column="1" ItemsSource="{x:Static vm:TrendsViewModel.ColumnChoices}" SelectedItem="{Binding PanelColumns}" MinWidth="160" />
-                  <CheckBox Grid.Row="2" Grid.Column="1" Content="Sincronizar el zoom de las gráficas de tiempo" IsChecked="{Binding PanelSyncZoom}"
-                            ToolTip.Tip="Al ampliar un tramo en una tendencia o un cronograma se amplía el mismo en las demás" />
+                  <TextBlock Text="{loc:T 'Nombre'}" VerticalAlignment="Center" FontWeight="Medium" />
+                  <TextBox Grid.Column="1" Text="{Binding PanelName}" PlaceholderText="{loc:T 'Línea 3'}" />
+                  <TextBlock Grid.Row="1" Text="{loc:T 'Columnas'}" VerticalAlignment="Center" FontWeight="Medium" />
+                  <ComboBox Grid.Row="1" Grid.Column="1" ItemsSource="{x:Static vm:TrendsViewModel.ColumnChoices}" DisplayMemberBinding="{Binding Text}" SelectedItem="{Binding PanelColumns}" MinWidth="160" />
+                  <CheckBox Grid.Row="2" Grid.Column="1" Content="{loc:T 'Sincronizar el zoom de las gráficas de tiempo'}" IsChecked="{Binding PanelSyncZoom}"
+                            ToolTip.Tip="{loc:T 'Al ampliar un tramo en una tendencia o un cronograma se amplía el mismo en las demás'}" />
                 </Grid>
               </StackPanel>
             </Border>
@@ -343,8 +344,8 @@
             <Border Classes="card" Padding="20">
               <Grid ColumnDefinitions="*,*" ColumnSpacing="20">
                 <StackPanel Spacing="10">
-                  <TextBlock Text="VISTAS DEL PANEL" Classes="caption" />
-                  <TextBlock Classes="muted" Text="Ninguna todavía: añádelas de la lista de la derecha. Se colocan por filas, en este orden."
+                  <TextBlock Text="{loc:T 'VISTAS DEL PANEL'}" Classes="caption" />
+                  <TextBlock Classes="muted" Text="{loc:T 'Ninguna todavía: añádelas de la lista de la derecha. Se colocan por filas, en este orden.'}"
                              IsVisible="{Binding !PanelViews.Count}" TextWrapping="Wrap" />
                   <ItemsControl ItemsSource="{Binding PanelViews}">
                     <ItemsControl.ItemTemplate>
@@ -354,15 +355,15 @@
                             <TextBlock Text="{Binding Name}" TextTrimming="CharacterEllipsis" />
                             <TextBlock Text="{Binding Description}" Classes="muted" FontSize="11" TextTrimming="CharacterEllipsis" />
                           </StackPanel>
-                          <Button Grid.Column="1" Classes="ghost" ToolTip.Tip="Subir"
+                          <Button Grid.Column="1" Classes="ghost" ToolTip.Tip="{loc:T 'Subir'}"
                                   Command="{Binding $parent[UserControl].((vm:TrendsViewModel)DataContext).MovePanelViewUpCommand}" CommandParameter="{Binding}">
                             <c:Icon Kind="chevron-up" Width="14" Height="14" />
                           </Button>
-                          <Button Grid.Column="2" Classes="ghost" ToolTip.Tip="Bajar"
+                          <Button Grid.Column="2" Classes="ghost" ToolTip.Tip="{loc:T 'Bajar'}"
                                   Command="{Binding $parent[UserControl].((vm:TrendsViewModel)DataContext).MovePanelViewDownCommand}" CommandParameter="{Binding}">
                             <c:Icon Kind="chevron-down" Width="14" Height="14" />
                           </Button>
-                          <Button Grid.Column="3" Classes="ghost danger" ToolTip.Tip="Quitar del panel (la vista no se borra)"
+                          <Button Grid.Column="3" Classes="ghost danger" ToolTip.Tip="{loc:T 'Quitar del panel (la vista no se borra)'}"
                                   Command="{Binding $parent[UserControl].((vm:TrendsViewModel)DataContext).RemovePanelViewCommand}" CommandParameter="{Binding}">
                             <c:Icon Kind="x" Width="14" Height="14" />
                           </Button>
@@ -372,8 +373,8 @@
                   </ItemsControl>
                 </StackPanel>
                 <StackPanel Grid.Column="1" Spacing="10">
-                  <TextBlock Text="VISTAS GUARDADAS" Classes="caption" />
-                  <TextBlock Classes="muted" Text="No hay más vistas: créalas arriba, en «Tendencias»." TextWrapping="Wrap"
+                  <TextBlock Text="{loc:T 'VISTAS GUARDADAS'}" Classes="caption" />
+                  <TextBlock Classes="muted" Text="{loc:T 'No hay más vistas: créalas arriba, en «Tendencias».'}" TextWrapping="Wrap"
                              IsVisible="{Binding !PanelAvailable.Count}" />
                   <ScrollViewer MaxHeight="360">
                     <ItemsControl ItemsSource="{Binding PanelAvailable}">
@@ -384,7 +385,7 @@
                               <TextBlock Text="{Binding Name}" TextTrimming="CharacterEllipsis" />
                               <TextBlock Text="{Binding Description}" Classes="muted" FontSize="11" TextTrimming="CharacterEllipsis" />
                             </StackPanel>
-                            <Button Grid.Column="1" Classes="ghost" ToolTip.Tip="Añadir al panel"
+                            <Button Grid.Column="1" Classes="ghost" ToolTip.Tip="{loc:T 'Añadir al panel'}"
                                     Command="{Binding $parent[UserControl].((vm:TrendsViewModel)DataContext).AddPanelViewCommand}" CommandParameter="{Binding}">
                               <c:Icon Kind="plus" Width="14" Height="14" />
                             </Button>
@@ -406,20 +407,20 @@
               <Button Classes="accent" Command="{Binding OpenPanelCommand}">
                 <StackPanel Orientation="Horizontal" Spacing="6">
                   <c:Icon Kind="play" />
-                  <TextBlock Text="Abrir" />
+                  <TextBlock Text="{loc:T 'Abrir'}" />
                 </StackPanel>
               </Button>
-              <TextBlock Text="Leyendo el histórico…" Classes="muted" VerticalAlignment="Center" IsVisible="{Binding IsLoading}" />
+              <TextBlock Text="{loc:T 'Leyendo el histórico…'}" Classes="muted" VerticalAlignment="Center" IsVisible="{Binding IsLoading}" />
               <Button Classes="secondary" Command="{Binding SavePanelCommand}">
                 <StackPanel Orientation="Horizontal" Spacing="6">
                   <c:Icon Kind="save" />
-                  <TextBlock Text="Guardar" />
+                  <TextBlock Text="{loc:T 'Guardar'}" />
                 </StackPanel>
               </Button>
               <Button Classes="ghost danger" Command="{Binding DeletePanelCommand}">
                 <StackPanel Orientation="Horizontal" Spacing="6">
                   <c:Icon Kind="trash" />
-                  <TextBlock Text="Borrar" />
+                  <TextBlock Text="{loc:T 'Borrar'}" />
                 </StackPanel>
               </Button>
             </StackPanel>
@@ -432,27 +433,27 @@
             <Button Classes="secondary" Command="{Binding EditPanelCommand}">
               <StackPanel Orientation="Horizontal" Spacing="6">
                 <c:Icon Kind="pencil" />
-                <TextBlock Text="Editar panel" />
+                <TextBlock Text="{loc:T 'Editar panel'}" />
               </StackPanel>
             </Button>
-            <Button Classes="secondary" Command="{Binding OpenPanelCommand}" ToolTip.Tip="Volver a abrir las gráficas (y a leer el histórico)">
+            <Button Classes="secondary" Command="{Binding OpenPanelCommand}" ToolTip.Tip="{loc:T 'Volver a abrir las gráficas (y a leer el histórico)'}">
               <StackPanel Orientation="Horizontal" Spacing="6">
                 <c:Icon Kind="refresh" />
-                <TextBlock Text="Actualizar" />
+                <TextBlock Text="{loc:T 'Actualizar'}" />
               </StackPanel>
             </Button>
-            <CheckBox Content="Sincronizar zoom" IsChecked="{Binding OpenPanel.SyncZoom, FallbackValue=False}" VerticalAlignment="Center"
-                      ToolTip.Tip="Al ampliar un tramo en una tendencia o un cronograma se amplía el mismo en las demás" />
-            <Button x:Name="SavePanelPng" Classes="secondary" ToolTip.Tip="Exportar el panel entero a PNG (fondo blanco)">
+            <CheckBox Content="{loc:T 'Sincronizar zoom'}" IsChecked="{Binding OpenPanel.SyncZoom, FallbackValue=False}" VerticalAlignment="Center"
+                      ToolTip.Tip="{loc:T 'Al ampliar un tramo en una tendencia o un cronograma se amplía el mismo en las demás'}" />
+            <Button x:Name="SavePanelPng" Classes="secondary" ToolTip.Tip="{loc:T 'Exportar el panel entero a PNG (fondo blanco)'}">
               <StackPanel Orientation="Horizontal" Spacing="6">
                 <c:Icon Kind="image" />
                 <TextBlock Text="PNG" />
               </StackPanel>
             </Button>
-            <Button x:Name="CopyPanelPng" Classes="ghost" ToolTip.Tip="Copiar la imagen del panel al portapapeles">
+            <Button x:Name="CopyPanelPng" Classes="ghost" ToolTip.Tip="{loc:T 'Copiar la imagen del panel al portapapeles'}">
               <c:Icon Kind="copy" />
             </Button>
-            <TextBlock Text="Leyendo el histórico…" Classes="muted" VerticalAlignment="Center" IsVisible="{Binding IsLoading}" />
+            <TextBlock Text="{loc:T 'Leyendo el histórico…'}" Classes="muted" VerticalAlignment="Center" IsVisible="{Binding IsLoading}" />
           </StackPanel>
           <ScrollViewer>
             <ItemsControl x:Name="PanelCells" ItemsSource="{Binding OpenPanel.Cells, FallbackValue={x:Null}}">
@@ -486,13 +487,13 @@
               <Button Classes="secondary" Command="{Binding $parent[UserControl].((vm:TrendsViewModel)DataContext).EditCommand}">
                 <StackPanel Orientation="Horizontal" Spacing="6">
                   <c:Icon Kind="pencil" />
-                  <TextBlock Text="Editar vista" />
+                  <TextBlock Text="{loc:T 'Editar vista'}" />
                 </StackPanel>
               </Button>
               <Button Classes="secondary" Command="{Binding RefreshCommand}">
                 <StackPanel Orientation="Horizontal" Spacing="6">
                   <c:Icon Kind="refresh" />
-                  <TextBlock Text="Actualizar" />
+                  <TextBlock Text="{loc:T 'Actualizar'}" />
                 </StackPanel>
               </Button>
               <TextBlock Text="{Binding Description}" FontWeight="Medium" VerticalAlignment="Center" Margin="8,0,0,0" />
@@ -513,16 +514,16 @@
               <Button Classes="secondary" Command="{Binding $parent[UserControl].((vm:TrendsViewModel)DataContext).EditCommand}">
                 <StackPanel Orientation="Horizontal" Spacing="6">
                   <c:Icon Kind="pencil" />
-                  <TextBlock Text="Editar vista" />
+                  <TextBlock Text="{loc:T 'Editar vista'}" />
                 </StackPanel>
               </Button>
-              <TextBlock Text="Ventana" Classes="muted" VerticalAlignment="Center" Margin="8,0,0,0" IsVisible="{Binding UsesWindow}" />
-              <ComboBox ItemsSource="{x:Static vm:LiveTrendViewModel.Windows}" SelectedItem="{Binding Window}" MinWidth="110" IsVisible="{Binding UsesWindow}" />
+              <TextBlock Text="{loc:T 'Ventana'}" Classes="muted" VerticalAlignment="Center" Margin="8,0,0,0" IsVisible="{Binding UsesWindow}" />
+              <ComboBox ItemsSource="{x:Static vm:LiveTrendViewModel.Windows}" DisplayMemberBinding="{Binding Text}" SelectedItem="{Binding Window}" MinWidth="110" IsVisible="{Binding UsesWindow}" />
               <Button Classes="secondary" Command="{Binding $parent[UserControl].((vm:TrendsViewModel)DataContext).OpenCommand}" IsVisible="{Binding !IsLive}"
-                      ToolTip.Tip="Volver a leer el histórico">
+                      ToolTip.Tip="{loc:T 'Volver a leer el histórico'}">
                 <StackPanel Orientation="Horizontal" Spacing="6">
                   <c:Icon Kind="refresh" />
-                  <TextBlock Text="Actualizar" />
+                  <TextBlock Text="{loc:T 'Actualizar'}" />
                 </StackPanel>
               </Button>
               <TextBlock Text="{Binding HistoryText}" Classes="muted" VerticalAlignment="Center" IsVisible="{Binding !IsLive}" TextTrimming="CharacterEllipsis" />
@@ -534,7 +535,7 @@
                 </StackPanel>
               </Button>
               <Border Classes="pill warn" IsVisible="{Binding Paused}" VerticalAlignment="Center">
-                <TextBlock Text="En pausa" />
+                <TextBlock Text="{loc:T 'En pausa'}" />
               </Border>
               <Border Classes="pill" Classes.good="{Binding TriggerActive}" IsVisible="{Binding ShowTriggerState}" VerticalAlignment="Center"
                       ToolTip.Tip="{Binding TriggerText}">
@@ -548,21 +549,21 @@
             <!-- Ciclo de referencia con banda de tolerancia (ciclos superpuestos) -->
             <WrapPanel DockPanel.Dock="Top" Margin="0,0,0,10" IsVisible="{Binding CanUseReference}">
               <Button Classes="secondary" Command="{Binding SetReferenceCommand}" Margin="0,0,8,4"
-                      ToolTip.Tip="El último ciclo de cada tag pasa a ser el patrón; los ciclos que se salgan de la banda se ven en rojo">
+                      ToolTip.Tip="{loc:T 'El último ciclo de cada tag pasa a ser el patrón; los ciclos que se salgan de la banda se ven en rojo'}">
                 <StackPanel Orientation="Horizontal" Spacing="6">
                   <c:Icon Kind="check" />
-                  <TextBlock Text="Fijar último ciclo como referencia" />
+                  <TextBlock Text="{loc:T 'Fijar último ciclo como referencia'}" />
                 </StackPanel>
               </Button>
               <StackPanel Orientation="Horizontal" Spacing="8" IsVisible="{Binding HasReference}" Margin="0,0,0,4">
-                <TextBlock Text="Tolerancia ±" Classes="muted" VerticalAlignment="Center" Margin="6,0,0,0" />
+                <TextBlock Text="{loc:T 'Tolerancia ±'}" Classes="muted" VerticalAlignment="Center" Margin="6,0,0,0" />
                 <NumericUpDown Value="{Binding Tolerance}" Minimum="0" Increment="1" FormatString="0.###" Width="120" />
-                <CheckBox Content="% del rango" IsChecked="{Binding TolerancePercent}"
-                          ToolTip.Tip="Marcado: porcentaje del rango (máx − mín) de la referencia; sin marcar: en unidades del tag" />
-                <Button Classes="ghost danger" Command="{Binding ClearReferenceCommand}" ToolTip.Tip="Quitar la referencia">
+                <CheckBox Content="{loc:T '% del rango'}" IsChecked="{Binding TolerancePercent}"
+                          ToolTip.Tip="{loc:T 'Marcado: porcentaje del rango (máx − mín) de la referencia; sin marcar: en unidades del tag'}" />
+                <Button Classes="ghost danger" Command="{Binding ClearReferenceCommand}" ToolTip.Tip="{loc:T 'Quitar la referencia'}">
                   <StackPanel Orientation="Horizontal" Spacing="6">
                     <c:Icon Kind="x" Width="14" Height="14" />
-                    <TextBlock Text="Quitar" />
+                    <TextBlock Text="{loc:T 'Quitar'}" />
                   </StackPanel>
                 </Button>
               </StackPanel>

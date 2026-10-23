@@ -2,6 +2,7 @@ using System.Collections.ObjectModel;
 using System.ComponentModel;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
+using PlcMonitor.App.Localization;
 
 namespace PlcMonitor.App.Charts;
 
@@ -37,7 +38,7 @@ public sealed record ChartSeriesData(string Name, IReadOnlyList<ChartPoint> Poin
 /// Estado de una gráfica (la misma para la tendencia en vivo, el histórico y el visor de CSV): qué tags se ven, la
 /// ventana de tiempo (con zoom) y los límites del eje Y (automáticos o fijados a mano).
 /// </summary>
-public sealed partial class ChartViewModel : ObservableObject
+public sealed partial class ChartViewModel : LocalizedObservableObject
 {
     // Cada nombre conserva su color aunque cambie la lista.
     private readonly Dictionary<string, int> _colors = new(StringComparer.Ordinal);
@@ -85,7 +86,7 @@ public sealed partial class ChartViewModel : ObservableObject
     public partial bool IsZoomed { get; private set; }
 
     [ObservableProperty]
-    public partial string EmptyText { get; set; } = "Marca uno o más tags";
+    public partial string EmptyText { get; set; } = Loc.N("Marca uno o más tags");
 
     public bool HasOptions => Options.Count > 0;
 
@@ -109,9 +110,9 @@ public sealed partial class ChartViewModel : ObservableObject
     /// <summary>Texto de la casilla de los límites automáticos según qué eje son.</summary>
     public string AxisText => Kind switch
     {
-        ChartKind.Histogram => "Eje de valores automático",
-        ChartKind.Gauges => "Escala automática",
-        _ => "Eje Y automático",
+        ChartKind.Histogram => Loc.T("Eje de valores automático"),
+        ChartKind.Gauges => Loc.T("Escala automática"),
+        _ => Loc.T("Eje Y automático"),
     };
 
     /// <summary>Cursores de medida A y B en la tendencia (al quitarlos se borran).</summary>
@@ -227,14 +228,14 @@ public sealed partial class ChartViewModel : ObservableObject
 
     public string Hint => Kind switch
     {
-        ChartKind.Cycles => "Cada ciclo empieza en 0 (el disparo); el último va resaltado y los anteriores, tenues.",
-        ChartKind.XY => "Pasa el ratón para ver las coordenadas; el punto marca el valor más reciente.",
-        ChartKind.States => "Arrastra para ampliar un tramo; pasa el ratón por una franja para ver el estado y cuánto duró.",
-        ChartKind.Histogram => "Valores de la ventana. Líneas: media (negra), ±3σ (discontinuas) y tolerancias (rojas). Pasa el ratón por una barra.",
-        ChartKind.Gauges => "Valor actual de cada tag; en rojo si está fuera de los límites.",
-        ChartKind.Bars => "Un grupo de barras por periodo. Pasa el ratón para ver los valores.",
-        _ when ShowCursors => "Clic para poner los cursores A y B; arrástralos para moverlos. Quita «Cursores» para volver al zoom.",
-        _ => "Arrastra sobre la gráfica para ampliar un tramo; pasa el ratón para ver los valores.",
+        ChartKind.Cycles => Loc.T("Cada ciclo empieza en 0 (el disparo); el último va resaltado y los anteriores, tenues."),
+        ChartKind.XY => Loc.T("Pasa el ratón para ver las coordenadas; el punto marca el valor más reciente."),
+        ChartKind.States => Loc.T("Arrastra para ampliar un tramo; pasa el ratón por una franja para ver el estado y cuánto duró."),
+        ChartKind.Histogram => Loc.T("Valores de la ventana. Líneas: media (negra), ±3σ (discontinuas) y tolerancias (rojas). Pasa el ratón por una barra."),
+        ChartKind.Gauges => Loc.T("Valor actual de cada tag; en rojo si está fuera de los límites."),
+        ChartKind.Bars => Loc.T("Un grupo de barras por periodo. Pasa el ratón para ver los valores."),
+        _ when ShowCursors => Loc.T("Clic para poner los cursores A y B; arrástralos para moverlos. Quita «Cursores» para volver al zoom."),
+        _ => Loc.T("Arrastra sobre la gráfica para ampliar un tramo; pasa el ratón para ver los valores."),
     };
 
     /// <summary>Tags marcados, con sus puntos.</summary>

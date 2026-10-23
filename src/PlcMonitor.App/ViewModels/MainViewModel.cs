@@ -4,6 +4,7 @@ using CommunityToolkit.Mvvm.Input;
 using Google.Protobuf.WellKnownTypes;
 using Grpc.Core;
 using PlcMonitor.Agent.Contracts;
+using PlcMonitor.App.Localization;
 using PlcMonitor.App.Services;
 using PlcMonitor.Deploy;
 using PlcMonitor.Agent.Contracts.Client;
@@ -24,7 +25,7 @@ public enum AppPage
 /// Ventana principal: conexión con un agente, dispositivos con sus tags en vivo (por suscripción), explorador de
 /// símbolos y editor de dispositivos.
 /// </summary>
-public sealed partial class MainViewModel : ObservableObject, IAgentContext, IAsyncDisposable
+public sealed partial class MainViewModel : LocalizedObservableObject, IAgentContext, IAsyncDisposable
 {
     /// <summary>Espera antes de volver a suscribirse si se pierde la conexión con el agente.</summary>
     internal static TimeSpan ResubscribeDelay { get; set; } = TimeSpan.FromSeconds(2);
@@ -216,11 +217,11 @@ public sealed partial class MainViewModel : ObservableObject, IAgentContext, IAs
     public bool SelectedDeviceCanBrowse => DriverOf(SelectedDevice?.Driver)?.CanBrowse == true;
 
     /// <summary>Qué hacer cuando el dispositivo aún no tiene tags.</summary>
-    public string EmptyTagsHint => SelectedDeviceCanBrowse
+    public string EmptyTagsHint => Loc.T(SelectedDeviceCanBrowse
         ? "Añádelos con «Añadir tag» o búscalos en «Explorar» con el PLC conectado."
         : string.Equals(SelectedDevice?.Driver, AddTagViewModel.ModbusDriver, StringComparison.OrdinalIgnoreCase)
             ? "Añádelos con «Añadir tag» eligiendo la tabla y el número (p.ej. HR0), uno a uno o un rango de golpe."
-            : "Añádelos con «Añadir tag» indicando su dirección (p.ej. DB1.DBW10).";
+            : "Añádelos con «Añadir tag» indicando su dirección (p.ej. DB1.DBW10).");
 
     /// <summary>Consulta del histórico del dispositivo seleccionado.</summary>
     public HistoryViewModel History { get; }
@@ -232,7 +233,7 @@ public sealed partial class MainViewModel : ObservableObject, IAgentContext, IAs
     /// <summary>Agente al que pertenecen las vistas de tendencia: el id de su perfil o, sin perfil, su URL.</summary>
     public string AgentKey => SelectedProfile?.Id ?? AgentUrl.Trim();
 
-    public string AgentTitle => $"Agente {(SelectedProfile is { Name.Length: > 0 } profile ? profile.Name : AgentUrl.Trim())}";
+    public string AgentTitle => Loc.F("Agente {0}", SelectedProfile is { Name.Length: > 0 } profile ? profile.Name : AgentUrl.Trim());
 
     /// <summary>Han cambiado los tags del agente (foto nueva, dispositivo reconfigurado o quitado).</summary>
     public event EventHandler? TagsChanged;
@@ -291,12 +292,19 @@ public sealed partial class MainViewModel : ObservableObject, IAgentContext, IAs
 
     /// <summary>Tema elegido: "system", "light" o "dark". La vista lo aplica.</summary>
     [ObservableProperty]
-    [NotifyPropertyChangedFor(nameof(ThemeText), nameof(ThemeIcon))]
+    [NotifyPropertyChangedFor(nameof(ThemeText), nameof(ThemeTooltip), nameof(ThemeIcon))]
     public partial string Theme { get; set; }
 
-    public string ThemeText => Theme switch { "light" => "Claro", "dark" => "Oscuro", _ => "Sistema" };
+    public string ThemeText => Loc.T(Theme switch { "light" => "Claro", "dark" => "Oscuro", _ => "Sistema" });
+
+    public string ThemeTooltip => Loc.F("Tema: {0}", ThemeText);
 
     public string ThemeIcon => Theme switch { "light" => "sun", "dark" => "moon", _ => "monitor" };
+
+    /// <summary>Idioma que se está viendo (ES/EN) y acción para cambiarlo.</summary>
+    public string LanguageText => Loc.IsEnglish ? "EN" : "ES";
+
+    public string LanguageTooltip => Loc.T(Loc.IsEnglish ? "Cambiar a español" : "Cambiar a inglés");
 
     /// <summary>Anchos de serie de las columnas de la tabla de tags (formato de <see cref="Controls.TableRow.Columns"/>).</summary>
     public const string DefaultTagColumns = "2*,2.2*,1.6*,90,130,100,250";
@@ -415,7 +423,7 @@ public sealed partial class MainViewModel : ObservableObject, IAgentContext, IAs
     [ObservableProperty]
     public partial bool IsMessageError { get; set; }
 
-    public string ConnectionText => !IsConnected ? "Sin conexión" : IsLive ? "En vivo" : "Reconectando…";
+    public string ConnectionText => Loc.T(!IsConnected ? "Sin conexión" : IsLive ? "En vivo" : "Reconectando…");
 
     partial void OnSelectedDeviceChanged(DeviceViewModel? value)
     {
@@ -435,7 +443,28 @@ public sealed partial class MainViewModel : ObservableObject, IAgentContext, IAs
         IsMessageError = isError;
     });
 
-    public string Describe(Exception exception) => AgentErrors.Describe(exception, AgentUrl);
+    public string Describe(Exception exception) => Describe(exception, null);
+
+    public string Describe(Exception exception, string? url)
+    {
+        var target = url ?? AgentUrl;
+        return exception switch
+        {
+            _ when AgentErrors.IsCertificateMismatch(exception) =>
+                Loc.F("El certificado del agente en {0} no es el esperado (¿otro equipo o agente reinstalado?). Revisa el perfil del agente.", target),
+            RpcException { StatusCode: StatusCode.Unauthenticated } =>
+                Loc.F("El agente en {0} rechaza el token de acceso. Revisa el perfil del agente.", target),
+            RpcException { StatusCode: StatusCode.Unavailable } =>
+                Loc.F("No se puede conectar con el agente en {0}. ¿Está arrancado?", target),
+            RpcException { StatusCode: StatusCode.DeadlineExceeded } =>
+                Loc.F("El agente en {0} no responde a tiempo.", target),
+            RpcException { StatusCode: StatusCode.Unimplemented } =>
+                Loc.F("{0} no es un agente de PLC-Monitor (o es de otra versión).", target),
+            UriFormatException or InvalidOperationException =>
+                Loc.F("URL no válida: {0}", target),
+            _ => AgentErrors.Describe(exception, target),
+        };
+    }
 
     /// <summary>Transformaciones de valores del agente conectado.</summary>
     public IReadOnlyList<ValueTransform> Transforms { get; private set; } = [];
@@ -479,6 +508,15 @@ public sealed partial class MainViewModel : ObservableObject, IAgentContext, IAs
         _settings.Save(_settingsPath);
     }
 
+    /// <summary>Cambia la interfaz entre castellano e inglés y lo recuerda.</summary>
+    [RelayCommand]
+    private void ToggleLanguage()
+    {
+        Loc.SetLanguage(Loc.IsEnglish ? Loc.Spanish : Loc.English);
+        _settings.Language = Loc.Language;
+        _settings.Save(_settingsPath);
+    }
+
     /// <summary>Guarda los anchos de columna al terminar de arrastrar un borde.</summary>
     [RelayCommand]
     private void SaveTagColumns()
@@ -511,7 +549,7 @@ public sealed partial class MainViewModel : ObservableObject, IAgentContext, IAs
             ? profile.Endpoint
             : new AgentEndpoint(url);
         IsConnecting = true;
-        Report($"Conectando con {url}…");
+        Report(Loc.F("Conectando con {0}…", url));
         try
         {
             var (client, channel) = _connector.Connect(endpoint);
@@ -546,11 +584,11 @@ public sealed partial class MainViewModel : ObservableObject, IAgentContext, IAs
             // Las tendencias abiertas eran de otro agente: se cargan las de este.
             if (Trends is not null)
                 EnsureTrends();
-            Report($"Conectado a {url}");
+            Report(Loc.F("Conectado a {0}", url));
         }
         catch (Exception ex) when (ex is RpcException or UriFormatException or InvalidOperationException)
         {
-            Report(AgentErrors.Describe(ex, url), isError: true);
+            Report(Describe(ex, url), isError: true);
         }
         finally
         {
@@ -581,7 +619,7 @@ public sealed partial class MainViewModel : ObservableObject, IAgentContext, IAs
         AgentDescription = "";
         ReadOnlyAccess = false;
         TagsChanged?.Invoke(this, EventArgs.Empty);
-        Report("Desconectado");
+        Report(Loc.T("Desconectado"));
     }
 
     [RelayCommand(CanExecute = nameof(IsConnected))]
@@ -648,7 +686,7 @@ public sealed partial class MainViewModel : ObservableObject, IAgentContext, IAs
             return;
         if (!tag.Historized)
         {
-            Report($"{tag.Name} no se guarda en el histórico: actívalo en su detalle (doble clic → Histórico).");
+            Report(Loc.F("{0} no se guarda en el histórico: actívalo en su detalle (doble clic → Histórico).", tag.Name));
             return;
         }
         if (SelectedDevice?.Name != tag.Device)
@@ -666,12 +704,12 @@ public sealed partial class MainViewModel : ObservableObject, IAgentContext, IAs
     {
         if (Client is not { } client || SelectedDevice is not { } device)
             return;
-        if (!await Dialogs.ConfirmAsync("Eliminar dispositivo", $"¿Dar de baja {device.Name} y sus {device.Tags.Count} tags?\nSe guarda en la configuración del agente."))
+        if (!await Dialogs.ConfirmAsync(Loc.T("Eliminar dispositivo"), Loc.F("¿Dar de baja {0} y sus {1} tags?\nSe guarda en la configuración del agente.", device.Name, device.Tags.Count)))
             return;
         try
         {
             await client.DeleteDeviceAsync(new DeleteDeviceRequest { Device = device.Name, Persist = true });
-            Report($"{device.Name} eliminado");
+            Report(Loc.F("{0} eliminado", device.Name));
         }
         catch (RpcException ex)
         {
@@ -714,13 +752,13 @@ public sealed partial class MainViewModel : ObservableObject, IAgentContext, IAs
             catch (RpcException ex) when (ex.StatusCode == StatusCode.ResourceExhausted)
             {
                 // Esta app no consumió a tiempo: nueva suscripción y nueva foto.
-                Report("Suscripción reiniciada (demasiados cambios a la vez)");
+                Report(Loc.T("Suscripción reiniciada (demasiados cambios a la vez)"));
                 continue;
             }
             catch (RpcException ex)
             {
                 _ui.Post(() => IsLive = false);
-                Report($"Conexión con el agente perdida: {Describe(ex)}. Reintentando…", isError: true);
+                Report(Loc.F("Conexión con el agente perdida: {0}. Reintentando…", Describe(ex)), isError: true);
             }
             try
             {
@@ -779,7 +817,7 @@ public sealed partial class MainViewModel : ObservableObject, IAgentContext, IAs
         HistorianEnabled = info.Historian?.Enabled ?? false;
         // Un agente anterior a los roles no dice nada (UNSPECIFIED): su único token es de acceso completo.
         ReadOnlyAccess = info.Access == AccessLevel.Read;
-        AgentDescription = $"{info.Machine} · {info.Os} · v{info.Version.Split('+')[0]}{(ReadOnlyAccess ? " · solo lectura" : "")}";
+        AgentDescription = $"{info.Machine} · {info.Os} · v{info.Version.Split('+')[0]}" + (ReadOnlyAccess ? " · " + Loc.T("solo lectura") : "");
     }
 
     // La información del agente se acaba de leer al conectar: la primera foto no hace falta que la vuelva a pedir.
@@ -925,7 +963,7 @@ public sealed partial class MainViewModel : ObservableObject, IAgentContext, IAs
         }
         catch (RpcException ex) when (ex.StatusCode == StatusCode.Unimplemented)
         {
-            Report("Este agente no permite reordenar dispositivos: actualízalo.", isError: true);
+            Report(Loc.T("Este agente no permite reordenar dispositivos: actualízalo."), isError: true);
         }
         catch (RpcException ex)
         {

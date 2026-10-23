@@ -3,6 +3,7 @@
         xmlns:vm="using:PlcMonitor.App.ViewModels"
         xmlns:c="using:PlcMonitor.App.Controls"
         xmlns:svc="using:PlcMonitor.App.Services"
+        xmlns:loc="using:PlcMonitor.App.Localization"
         xmlns:v="using:PlcMonitor.App.Views"
         x:Class="PlcMonitor.App.Views.MainWindow"
         Icon="/Assets/plc-monitor.png"
@@ -20,13 +21,13 @@
           <StackPanel VerticalAlignment="Center">
             <TextBlock Text="PLC-Monitor" FontWeight="Bold" FontSize="14" />
             <TextBlock Text="{Binding AgentDescription}" Classes="muted" FontSize="11" IsVisible="{Binding IsConnected}" />
-            <TextBlock Text="Diagnóstico de PLCs" Classes="muted" FontSize="11" IsVisible="{Binding !IsConnected}" />
+            <TextBlock Text="{loc:T 'Diagnóstico de PLCs'}" Classes="muted" FontSize="11" IsVisible="{Binding !IsConnected}" />
           </StackPanel>
         </StackPanel>
 
         <Grid Grid.Column="1" ColumnDefinitions="*,Auto" ColumnSpacing="8" HorizontalAlignment="Center" VerticalAlignment="Center">
           <ComboBox ItemsSource="{Binding Profiles}" SelectedItem="{Binding SelectedProfile}" MaxWidth="320" MinWidth="120" HorizontalAlignment="Stretch"
-                    IsEnabled="{Binding !IsConnected}" PlaceholderText="Elige un agente">
+                    IsEnabled="{Binding !IsConnected}" PlaceholderText="{loc:T 'Elige un agente'}">
             <ComboBox.ItemTemplate>
               <DataTemplate x:DataType="svc:AgentProfile">
                 <DockPanel>
@@ -40,13 +41,13 @@
           <Button Grid.Column="1" Classes="accent" Command="{Binding ConnectCommand}" IsVisible="{Binding !IsConnected}">
             <StackPanel Orientation="Horizontal" Spacing="6">
               <c:Icon Kind="link" />
-              <TextBlock Text="Conectar" />
+              <TextBlock Text="{loc:T 'Conectar'}" />
             </StackPanel>
           </Button>
           <Button Grid.Column="1" Classes="secondary" Command="{Binding DisconnectCommand}" IsVisible="{Binding IsConnected}">
             <StackPanel Orientation="Horizontal" Spacing="6">
               <c:Icon Kind="unlink" />
-              <TextBlock Text="Desconectar" />
+              <TextBlock Text="{loc:T 'Desconectar'}" />
             </StackPanel>
           </Button>
         </Grid>
@@ -61,37 +62,43 @@
 
         <!-- Pestañas: cambian de página sin cerrar nada (cada una sigue como se dejó) -->
         <StackPanel Grid.Column="3" Orientation="Horizontal" Spacing="2">
-        <Button Classes="ghost tab" Classes.on="{Binding IsTagsPage}" Command="{Binding ShowTagsCommand}" ToolTip.Tip="Dispositivos y sus tags en vivo, histórico y explorador">
+        <Button Classes="ghost tab" Classes.on="{Binding IsTagsPage}" Command="{Binding ShowTagsCommand}" ToolTip.Tip="{loc:T 'Dispositivos y sus tags en vivo, histórico y explorador'}">
           <StackPanel Orientation="Horizontal" Spacing="6">
             <c:Icon Kind="list" Width="16" Height="16" />
-            <TextBlock Text="Dispositivos" Classes="barlabel" />
+            <TextBlock Text="{loc:T 'Dispositivos'}" Classes="barlabel" />
           </StackPanel>
         </Button>
-        <Button Classes="ghost tab" Classes.on="{Binding IsTrendsPage}" Command="{Binding OpenTrendsCommand}" ToolTip.Tip="Gráficas de tags de cualquier dispositivo o de un CSV: en vivo, del histórico o del fichero">
+        <Button Classes="ghost tab" Classes.on="{Binding IsTrendsPage}" Command="{Binding OpenTrendsCommand}" ToolTip.Tip="{loc:T 'Gráficas de tags de cualquier dispositivo o de un CSV: en vivo, del histórico o del fichero'}">
           <StackPanel Orientation="Horizontal" Spacing="6">
             <c:Icon Kind="pulse" Width="16" Height="16" />
-            <TextBlock Text="Tendencias" Classes="barlabel" />
+            <TextBlock Text="{loc:T 'Tendencias'}" Classes="barlabel" />
           </StackPanel>
         </Button>
-        <Button Classes="ghost tab" Classes.on="{Binding IsTransformsPage}" Command="{Binding OpenTransformsCommand}" ToolTip.Tip="Transformaciones: mostrar valores enteros como texto (0 = Parado, 1 = Marcha…)">
+        <Button Classes="ghost tab" Classes.on="{Binding IsTransformsPage}" Command="{Binding OpenTransformsCommand}" ToolTip.Tip="{loc:T 'Transformaciones: mostrar valores enteros como texto (0 = Parado, 1 = Marcha…)'}">
           <StackPanel Orientation="Horizontal" Spacing="6">
             <c:Icon Kind="replace" Width="16" Height="16" />
-            <TextBlock Text="Transformaciones" Classes="barlabel" />
+            <TextBlock Text="{loc:T 'Transformaciones'}" Classes="barlabel" />
           </StackPanel>
         </Button>
-        <Button Classes="ghost tab" Classes.on="{Binding IsOpcUaPage}" Command="{Binding OpenOpcUaCommand}" ToolTip.Tip="Servidor OPC UA del agente: publicar los tags para Ignition, UaExpert…">
+        <Button Classes="ghost tab" Classes.on="{Binding IsOpcUaPage}" Command="{Binding OpenOpcUaCommand}" ToolTip.Tip="{loc:T 'Servidor OPC UA del agente: publicar los tags para Ignition, UaExpert…'}">
           <StackPanel Orientation="Horizontal" Spacing="6">
             <c:Icon Kind="link" Width="16" Height="16" />
             <TextBlock Text="OPC UA" Classes="barlabel" />
           </StackPanel>
         </Button>
-        <Button Classes="ghost tab" Classes.on="{Binding IsAgentsPage}" Command="{Binding OpenAgentsCommand}" ToolTip.Tip="Gestionar agentes (instalar en equipos por SSH)">
+        <Button Classes="ghost tab" Classes.on="{Binding IsAgentsPage}" Command="{Binding OpenAgentsCommand}" ToolTip.Tip="{loc:T 'Gestionar agentes (instalar en equipos por SSH)'}">
           <StackPanel Orientation="Horizontal" Spacing="6">
             <c:Icon Kind="server" Width="16" Height="16" />
-            <TextBlock Text="Agentes" Classes="barlabel" />
+            <TextBlock Text="{loc:T 'Agentes'}" Classes="barlabel" />
           </StackPanel>
         </Button>
-        <Button Classes="ghost" Command="{Binding ToggleThemeCommand}" ToolTip.Tip="{Binding ThemeText, StringFormat='Tema: {0}'}" Margin="6,0,0,0">
+        <Button Classes="ghost" Command="{Binding ToggleLanguageCommand}" ToolTip.Tip="{Binding LanguageTooltip}" Margin="6,0,0,0">
+          <StackPanel Orientation="Horizontal" Spacing="4">
+            <c:Icon Kind="globe" Width="17" Height="17" />
+            <TextBlock Text="{Binding LanguageText}" FontSize="11.5" FontWeight="SemiBold" />
+          </StackPanel>
+        </Button>
+        <Button Classes="ghost" Command="{Binding ToggleThemeCommand}" ToolTip.Tip="{Binding ThemeTooltip}" Margin="2,0,0,0">
           <c:Icon Kind="{Binding ThemeIcon}" Width="18" Height="18" />
         </Button>
         </StackPanel>
@@ -114,15 +121,15 @@
       <Border Classes="bar" BorderThickness="0,0,1,0">
         <DockPanel Margin="12,14,12,12">
           <Grid DockPanel.Dock="Top" ColumnDefinitions="*,Auto" Margin="4,0,0,10">
-            <TextBlock Text="DISPOSITIVOS" Classes="caption" VerticalAlignment="Center" />
-            <Button Grid.Column="1" Classes="ghost" Command="{Binding NewDeviceCommand}" ToolTip.Tip="Nuevo dispositivo">
+            <TextBlock Text="{loc:T 'DISPOSITIVOS'}" Classes="caption" VerticalAlignment="Center" />
+            <Button Grid.Column="1" Classes="ghost" Command="{Binding NewDeviceCommand}" ToolTip.Tip="{loc:T 'Nuevo dispositivo'}">
               <c:Icon Kind="plus" />
             </Button>
           </Grid>
           <TextBlock DockPanel.Dock="Top" Classes="muted" TextWrapping="Wrap" Margin="4,8" FontSize="12"
-                     IsVisible="{Binding !IsConnected}" Text="Conecta con un agente para ver sus PLC." />
+                     IsVisible="{Binding !IsConnected}" Text="{loc:T 'Conecta con un agente para ver sus PLC.'}" />
           <ListBox x:Name="DevicesList" Classes="devices" ItemsSource="{Binding Devices}" SelectedItem="{Binding SelectedDevice}" DragDrop.AllowDrop="True"
-                   ToolTip.Tip="Arrastra un dispositivo para cambiar el orden">
+                   ToolTip.Tip="{loc:T 'Arrastra un dispositivo para cambiar el orden'}">
             <ListBox.ItemTemplate>
               <DataTemplate x:DataType="vm:DeviceViewModel">
                 <Grid ColumnDefinitions="Auto,*,Auto" RowDefinitions="Auto,Auto" ColumnSpacing="10" RowSpacing="2">
@@ -152,9 +159,9 @@
           <Border Width="56" Height="56" CornerRadius="16" Background="{DynamicResource App.AccentSoft}" HorizontalAlignment="Center">
             <c:Icon Kind="server" Width="26" Height="26" Foreground="{DynamicResource App.Accent}" />
           </Border>
-          <TextBlock Text="Ningún dispositivo seleccionado" FontSize="15" FontWeight="SemiBold" HorizontalAlignment="Center" />
+          <TextBlock Text="{loc:T 'Ningún dispositivo seleccionado'}" FontSize="15" FontWeight="SemiBold" HorizontalAlignment="Center" />
           <TextBlock Classes="muted" HorizontalAlignment="Center" TextAlignment="Center" TextWrapping="Wrap" MaxWidth="360"
-                     Text="Conecta con un agente y elige un PLC, o da de alta uno nuevo con el botón +." />
+                     Text="{loc:T 'Conecta con un agente y elige un PLC, o da de alta uno nuevo con el botón +.'}" />
         </StackPanel>
 
         <!-- Dispositivo seleccionado -->
@@ -170,14 +177,14 @@
                   </StackPanel>
                 </Border>
                 <Border Classes="pill accent" IsVisible="{Binding WritesEnabled}">
-                  <TextBlock Text="Escritura habilitada" />
+                  <TextBlock Text="{loc:T 'Escritura habilitada'}" />
                 </Border>
-                <Border Classes="pill accent" IsVisible="{Binding OpcUaPublished}" ToolTip.Tip="Publicado en el servidor OPC UA del agente">
+                <Border Classes="pill accent" IsVisible="{Binding OpcUaPublished}" ToolTip.Tip="{loc:T 'Publicado en el servidor OPC UA del agente'}">
                   <TextBlock Text="OPC UA" />
                 </Border>
               </StackPanel>
               <TextBlock Classes="muted" TextWrapping="Wrap" FontSize="12">
-                <Run Text="{Binding Driver}" /><Run Text="  ·  desde " /><Run Text="{Binding Since}" /><Run Text="  " /><Run Text="{Binding Detail}" />
+                <Run Text="{Binding Driver}" /><Run Text="{loc:T '  ·  desde '}" /><Run Text="{Binding Since}" /><Run Text="{loc:T '  '}" /><Run Text="{Binding Detail}" />
               </TextBlock>
             </StackPanel>
             <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="6" VerticalAlignment="Top">
@@ -190,10 +197,10 @@
               <Button Classes="secondary" Command="{Binding $parent[Window].((vm:MainViewModel)DataContext).EditDeviceCommand}">
                 <StackPanel Orientation="Horizontal" Spacing="6">
                   <c:Icon Kind="pencil" />
-                  <TextBlock Text="Editar" />
+                  <TextBlock Text="{loc:T 'Editar'}" />
                 </StackPanel>
               </Button>
-              <Button Classes="ghost danger" Command="{Binding $parent[Window].((vm:MainViewModel)DataContext).DeleteDeviceCommand}" ToolTip.Tip="Eliminar dispositivo">
+              <Button Classes="ghost danger" Command="{Binding $parent[Window].((vm:MainViewModel)DataContext).DeleteDeviceCommand}" ToolTip.Tip="{loc:T 'Eliminar dispositivo'}">
                 <c:Icon Kind="trash" />
               </Button>
             </StackPanel>
@@ -204,7 +211,7 @@
             <TabItem>
               <TabItem.Header>
                 <StackPanel Orientation="Horizontal" Spacing="8">
-                  <TextBlock Text="Tags" />
+                  <TextBlock Text="{loc:T 'Tags'}" />
                   <Border Classes="pill" Padding="7,0">
                     <TextBlock Text="{Binding SelectedDevice.Tags.Count, FallbackValue=0}" />
                   </Border>
@@ -216,32 +223,32 @@
                         IsVisible="{Binding IsOpen}">
                   <StackPanel Spacing="10">
                     <Grid ColumnDefinitions="*,Auto">
-                      <TextBlock Text="AÑADIR TAG POR DIRECCIÓN" Classes="caption" VerticalAlignment="Center" />
-                      <Button Grid.Column="1" Classes="ghost" Command="{Binding CloseCommand}" ToolTip.Tip="Cerrar">
+                      <TextBlock Text="{loc:T 'AÑADIR TAG POR DIRECCIÓN'}" Classes="caption" VerticalAlignment="Center" />
+                      <Button Grid.Column="1" Classes="ghost" Command="{Binding CloseCommand}" ToolTip.Tip="{loc:T 'Cerrar'}">
                         <c:Icon Kind="x" Width="14" Height="14" />
                       </Button>
                     </Grid>
                     <!-- Modbus: la dirección se compone con desplegables (y se puede escribir a mano) -->
                     <StackPanel Spacing="4" IsVisible="{Binding IsModbus}">
                       <WrapPanel Orientation="Horizontal">
-                        <ComboBox ItemsSource="{x:Static vm:AddTagViewModel.ModbusTables}" SelectedItem="{Binding ModbusTable}" Width="250" Margin="0,0,8,6" />
+                        <ComboBox ItemsSource="{x:Static vm:AddTagViewModel.ModbusTables}" DisplayMemberBinding="{Binding Label}" SelectedItem="{Binding ModbusTable}" Width="250" Margin="0,0,8,6" />
                         <NumericUpDown Value="{Binding ModbusNumber}" Minimum="0" Maximum="65536" FormatString="0" Width="130" Margin="0,0,8,6"
-                                       ToolTip.Tip="Número del registro o del bit, como lo numera el dispositivo (desde 0 o desde 1)" />
-                        <ComboBox ItemsSource="{x:Static vm:AddTagViewModel.ModbusTypes}" SelectedItem="{Binding ModbusType}" Width="250" Margin="0,0,8,6"
+                                       ToolTip.Tip="{loc:T 'Número del registro o del bit, como lo numera el dispositivo (desde 0 o desde 1)'}" />
+                        <ComboBox ItemsSource="{x:Static vm:AddTagViewModel.ModbusTypes}" DisplayMemberBinding="{Binding Label}" SelectedItem="{Binding ModbusType}" Width="250" Margin="0,0,8,6"
                                   IsVisible="{Binding IsRegisterTable}" />
                         <StackPanel Orientation="Horizontal" Spacing="6" Margin="0,0,8,6" IsVisible="{Binding IsBitType}">
                           <TextBlock Text="bit" Classes="muted" VerticalAlignment="Center" />
                           <NumericUpDown Value="{Binding ModbusBit}" Minimum="0" Maximum="15" FormatString="0" Width="100" />
                         </StackPanel>
                         <StackPanel Orientation="Horizontal" Spacing="6" Margin="0,0,8,6" IsVisible="{Binding IsStringType}">
-                          <TextBlock Text="caracteres" Classes="muted" VerticalAlignment="Center" />
+                          <TextBlock Text="{loc:T 'caracteres'}" Classes="muted" VerticalAlignment="Center" />
                           <NumericUpDown Value="{Binding ModbusStringLength}" Minimum="1" Maximum="250" FormatString="0" Width="100" />
                         </StackPanel>
-                        <ComboBox ItemsSource="{x:Static vm:AddTagViewModel.ModbusOrders}" SelectedItem="{Binding ModbusOrder}" Width="190" Margin="0,0,8,6"
-                                  IsVisible="{Binding HasByteOrder}" ToolTip.Tip="Orden de bytes de este tag (si no, el del dispositivo)" />
+                        <ComboBox ItemsSource="{x:Static vm:AddTagViewModel.ModbusOrders}" DisplayMemberBinding="{Binding Label}" SelectedItem="{Binding ModbusOrder}" Width="190" Margin="0,0,8,6"
+                                  IsVisible="{Binding HasByteOrder}" ToolTip.Tip="{loc:T 'Orden de bytes de este tag (si no, el del dispositivo)'}" />
                         <StackPanel Orientation="Horizontal" Spacing="6" Margin="0,0,0,6"
-                                    ToolTip.Tip="Dar de alta varios tags seguidos a partir de esta dirección (p.ej. 20 registros)">
-                          <TextBlock Text="cantidad" Classes="muted" VerticalAlignment="Center" />
+                                    ToolTip.Tip="{loc:T 'Dar de alta varios tags seguidos a partir de esta dirección (p.ej. 20 registros)'}">
+                          <TextBlock Text="{loc:T 'cantidad'}" Classes="muted" VerticalAlignment="Center" />
                           <NumericUpDown Value="{Binding RangeCount}" Minimum="1" Maximum="500" FormatString="0" Width="110" />
                         </StackPanel>
                       </WrapPanel>
@@ -249,54 +256,54 @@
                                  IsVisible="{Binding RangePreview, Converter={x:Static StringConverters.IsNotNullOrEmpty}}" />
                     </StackPanel>
                     <Grid ColumnDefinitions="2*,*,Auto,Auto" ColumnSpacing="8">
-                      <TextBox Text="{Binding Address}" Classes="mono" PlaceholderText="Dirección (p.ej. DB1.DBW10)">
+                      <TextBox Text="{Binding Address}" Classes="mono" PlaceholderText="{loc:T 'Dirección (p.ej. DB1.DBW10)'}">
                         <TextBox.KeyBindings>
                           <KeyBinding Gesture="Enter" Command="{Binding TestCommand}" />
                         </TextBox.KeyBindings>
                       </TextBox>
-                      <TextBox Grid.Column="1" Text="{Binding Name}" PlaceholderText="Nombre (vacío = la dirección)" />
-                      <Button Grid.Column="2" Classes="secondary" Command="{Binding TestCommand}" ToolTip.Tip="Leer la dirección del PLC sin añadirla">
+                      <TextBox Grid.Column="1" Text="{Binding Name}" PlaceholderText="{loc:T 'Nombre (vacío = la dirección)'}" />
+                      <Button Grid.Column="2" Classes="secondary" Command="{Binding TestCommand}" ToolTip.Tip="{loc:T 'Leer la dirección del PLC sin añadirla'}">
                         <StackPanel Orientation="Horizontal" Spacing="6">
                           <c:Icon Kind="search" />
-                          <TextBlock Text="Probar" />
+                          <TextBlock Text="{loc:T 'Probar'}" />
                         </StackPanel>
                       </Button>
                       <Button Grid.Column="3" Classes="accent" Command="{Binding AddCommand}">
                         <StackPanel Orientation="Horizontal" Spacing="6">
                           <c:Icon Kind="plus" />
-                          <TextBlock Text="Añadir" />
+                          <TextBlock Text="{loc:T 'Añadir'}" />
                         </StackPanel>
                       </Button>
                     </Grid>
                     <TextBlock Text="{Binding TestResult}" Classes="mono" FontSize="12.5" Classes.error="{Binding TestIsError}" TextWrapping="Wrap"
                                IsVisible="{Binding TestResult, Converter={x:Static StringConverters.IsNotNullOrEmpty}}" />
                     <WrapPanel Orientation="Horizontal">
-                      <TextBlock Text="Grupo" Classes="muted" VerticalAlignment="Center" Margin="0,0,8,6" />
+                      <TextBlock Text="{loc:T 'Grupo'}" Classes="muted" VerticalAlignment="Center" Margin="0,0,8,6" />
                       <TextBox Text="{Binding GroupName}" Width="140" Margin="0,0,10,6" />
-                      <TextBlock Text="cada" Classes="muted" VerticalAlignment="Center" Margin="0,0,8,6" />
+                      <TextBlock Text="{loc:T 'cada'}" Classes="muted" VerticalAlignment="Center" Margin="0,0,8,6" />
                       <NumericUpDown Value="{Binding IntervalMs}" Minimum="50" Increment="250" FormatString="0" Width="130" Margin="0,0,8,6" />
-                      <TextBlock Text="ms (si el grupo es nuevo)" Classes="muted" VerticalAlignment="Center" Margin="0,0,16,6" />
-                      <CheckBox Content="Escribible" IsChecked="{Binding Writable}" IsEnabled="{Binding CanBeWritable}" Margin="0,0,0,6" />
+                      <TextBlock Text="{loc:T 'ms (si el grupo es nuevo)'}" Classes="muted" VerticalAlignment="Center" Margin="0,0,16,6" />
+                      <CheckBox Content="{loc:T 'Escribible'}" IsChecked="{Binding Writable}" IsEnabled="{Binding CanBeWritable}" Margin="0,0,0,6" />
                     </WrapPanel>
                     <TextBlock Text="{Binding Hint}" Classes="muted" FontSize="12" TextWrapping="Wrap" />
                   </StackPanel>
                 </Border>
                 <Button DockPanel.Dock="Top" Classes="secondary" HorizontalAlignment="Right" Margin="0,0,0,10"
-                        Command="{Binding AddTag.OpenCommand}" IsVisible="{Binding !AddTag.IsOpen}" ToolTip.Tip="Añadir un tag escribiendo su dirección">
+                        Command="{Binding AddTag.OpenCommand}" IsVisible="{Binding !AddTag.IsOpen}" ToolTip.Tip="{loc:T 'Añadir un tag escribiendo su dirección'}">
                   <StackPanel Orientation="Horizontal" Spacing="6">
                     <c:Icon Kind="plus" Width="14" Height="14" />
-                    <TextBlock Text="Añadir tag" />
+                    <TextBlock Text="{loc:T 'Añadir tag'}" />
                   </StackPanel>
                 </Button>
                 <StackPanel DockPanel.Dock="Top" Orientation="Horizontal" Spacing="8" Margin="0,0,0,10"
                             DataContext="{Binding SelectedDevice}" x:DataType="vm:DeviceViewModel" IsVisible="{Binding HasTags, FallbackValue=False}">
                   <Border Classes="pill good">
-                    <TextBlock><Run Text="{Binding GoodCount}" /><Run Text=" en buen estado" /></TextBlock>
+                    <TextBlock><Run Text="{Binding GoodCount}" /><Run Text="{loc:T ' en buen estado'}" /></TextBlock>
                   </Border>
                   <Border Classes="pill bad" IsVisible="{Binding HasBadTags}">
-                    <TextBlock><Run Text="{Binding BadCount}" /><Run Text=" con error" /></TextBlock>
+                    <TextBlock><Run Text="{Binding BadCount}" /><Run Text="{loc:T ' con error'}" /></TextBlock>
                   </Border>
-                  <Border Classes="pill" IsVisible="{Binding HasDisabledTags}" ToolTip.Tip="No se leen, ni se historizan, ni se publican en OPC UA. Clic derecho en el tag → Activar">
+                  <Border Classes="pill" IsVisible="{Binding HasDisabledTags}" ToolTip.Tip="{loc:T 'No se leen, ni se historizan, ni se publican en OPC UA. Clic derecho en el tag → Activar'}">
                     <TextBlock Text="{Binding DisabledText}" />
                   </Border>
                 </StackPanel>
@@ -310,25 +317,25 @@
                                 CanReorder="True" ReorderCompletedCommand="{Binding $parent[Window].((vm:MainViewModel)DataContext).SaveTagColumnOrderCommand}"
                                 HiddenColumns="{Binding $parent[Window].((vm:MainViewModel)DataContext).TagHiddenColumns, FallbackValue=''}"
                                 ResizeCompletedCommand="{Binding $parent[Window].((vm:MainViewModel)DataContext).SaveTagColumnsCommand}"
-                                ToolTip.Tip="Arrastra una columna para cambiar su sitio, o el borde entre dos para cambiar su ancho. Clic derecho para ocultar o mostrar columnas">
+                                ToolTip.Tip="{loc:T 'Arrastra una columna para cambiar su sitio, o el borde entre dos para cambiar su ancho. Clic derecho para ocultar o mostrar columnas'}">
                       <c:TableRow.ContextMenu>
                         <ContextMenu x:Name="ColumnsMenu" />
                       </c:TableRow.ContextMenu>
-                      <TextBlock Text="TAG" />
-                      <TextBlock Grid.Column="1" Text="DIRECCIÓN" />
-                      <TextBlock Grid.Column="2" Text="VALOR" />
-                      <TextBlock Grid.Column="3" Text="TIPO" />
-                      <TextBlock Grid.Column="4" Text="CALIDAD" />
-                      <TextBlock Grid.Column="5" Text="ACTUALIZADO" />
-                      <TextBlock Grid.Column="6" Text="ESCRIBIR" />
+                      <TextBlock Text="{loc:T 'TAG'}" />
+                      <TextBlock Grid.Column="1" Text="{loc:T 'DIRECCIÓN'}" />
+                      <TextBlock Grid.Column="2" Text="{loc:T 'VALOR'}" />
+                      <TextBlock Grid.Column="3" Text="{loc:T 'TIPO'}" />
+                      <TextBlock Grid.Column="4" Text="{loc:T 'CALIDAD'}" />
+                      <TextBlock Grid.Column="5" Text="{loc:T 'ACTUALIZADO'}" />
+                      <TextBlock Grid.Column="6" Text="{loc:T 'ESCRIBIR'}" />
                     </c:TableRow>
                     <StackPanel DockPanel.Dock="Top" Margin="16,24" Spacing="6" HorizontalAlignment="Center"
                                 IsVisible="{Binding !SelectedDevice.HasTags, FallbackValue=False}">
-                      <TextBlock Text="Sin tags" FontWeight="SemiBold" HorizontalAlignment="Center" />
+                      <TextBlock Text="{loc:T 'Sin tags'}" FontWeight="SemiBold" HorizontalAlignment="Center" />
                       <TextBlock Classes="muted" Text="{Binding EmptyTagsHint}" HorizontalAlignment="Center" />
                     </StackPanel>
                     <ListBox x:Name="TagsList" Classes="table" ItemsSource="{Binding SelectedDevice.Rows}" SelectionMode="Multiple" DragDrop.AllowDrop="True"
-                             ToolTip.Tip="Doble clic para ver el detalle del tag. Clic derecho para editar, ver su histórico, agrupar, activar o desactivar, o quitar (Ctrl o Mayús para elegir varios). Arrastra tags para cambiar el orden o a la cabecera de un grupo para moverlos a él">
+                             ToolTip.Tip="{loc:T 'Doble clic para ver el detalle del tag. Clic derecho para editar, ver su histórico, agrupar, activar o desactivar, o quitar (Ctrl o Mayús para elegir varios). Arrastra tags para cambiar el orden o a la cabecera de un grupo para moverlos a él'}">
                       <ListBox.ContextMenu>
                         <ContextMenu x:Name="TagsMenu" />
                       </ListBox.ContextMenu>
@@ -343,7 +350,7 @@
                               <TextBlock Text="{Binding Title}" FontWeight="SemiBold" VerticalAlignment="Center" />
                               <TextBlock Text="{Binding CountText}" Classes="muted" FontSize="12" VerticalAlignment="Center" />
                               <Border Classes="pill bad" IsVisible="{Binding HasBadTags}" Padding="7,0">
-                                <TextBlock><Run Text="{Binding BadCount}" /><Run Text=" con error" /></TextBlock>
+                                <TextBlock><Run Text="{Binding BadCount}" /><Run Text="{loc:T ' con error'}" /></TextBlock>
                               </Border>
                             </StackPanel>
                           </Button>
@@ -355,7 +362,7 @@
                             <StackPanel VerticalAlignment="Center" Classes="tagname" Classes.infolder="{Binding IsInFolder}">
                               <DockPanel>
                                 <c:Icon DockPanel.Dock="Left" Kind="history" Width="13" Height="13" Margin="0,0,6,0" Foreground="{DynamicResource App.Accent}"
-                                        IsVisible="{Binding Historized}" ToolTip.Tip="Se guarda en el histórico" />
+                                        IsVisible="{Binding Historized}" ToolTip.Tip="{loc:T 'Se guarda en el histórico'}" />
                                 <TextBlock Text="{Binding Name}" FontWeight="SemiBold" TextTrimming="CharacterEllipsis" ToolTip.Tip="{Binding Name}" />
                               </DockPanel>
                               <TextBlock Text="{Binding Group}" Classes="muted" FontSize="11" TextTrimming="CharacterEllipsis" />
@@ -370,16 +377,16 @@
                             </Border>
                             <TextBlock Grid.Column="5" Text="{Binding Time}" Classes="muted mono" FontSize="11.5" VerticalAlignment="Center" TextTrimming="CharacterEllipsis" />
                             <StackPanel Grid.Column="6" Orientation="Horizontal" Spacing="4" VerticalAlignment="Center">
-                              <TextBox Text="{Binding NewValue}" Width="120" IsVisible="{Binding ShowTextWrite}" PlaceholderText="nuevo valor" Classes="mono" />
-                              <Button Classes="accent" Padding="9,6" Command="{Binding WriteCommand}" IsVisible="{Binding ShowTextWrite}" ToolTip.Tip="Escribir">
+                              <TextBox Text="{Binding NewValue}" Width="120" IsVisible="{Binding ShowTextWrite}" PlaceholderText="{loc:T 'nuevo valor'}" Classes="mono" />
+                              <Button Classes="accent" Padding="9,6" Command="{Binding WriteCommand}" IsVisible="{Binding ShowTextWrite}" ToolTip.Tip="{loc:T 'Escribir'}">
                                 <c:Icon Kind="send" Width="14" Height="14" />
                               </Button>
                               <!-- Booleanos: el botón del valor actual va encendido; el otro escribe ese valor -->
                               <StackPanel Orientation="Horizontal" IsVisible="{Binding ShowBoolWrite}">
                                 <Button Classes="seg left" Classes.on="{Binding IsFalse}" IsHitTestVisible="{Binding !IsFalse}"
-                                        Command="{Binding WriteBoolCommand}" CommandParameter="false" Content="false" ToolTip.Tip="Escribir false" />
+                                        Command="{Binding WriteBoolCommand}" CommandParameter="false" Content="false" ToolTip.Tip="{loc:T 'Escribir false'}" />
                                 <Button Classes="seg right" Classes.on="{Binding IsTrue}" IsHitTestVisible="{Binding !IsTrue}"
-                                        Command="{Binding WriteBoolCommand}" CommandParameter="true" Content="true" ToolTip.Tip="Escribir true" />
+                                        Command="{Binding WriteBoolCommand}" CommandParameter="true" Content="true" ToolTip.Tip="{loc:T 'Escribir true'}" />
                               </StackPanel>
                             </StackPanel>
                           </c:TableRow>
@@ -392,12 +399,12 @@
             </TabItem>
 
             <!-- Histórico -->
-            <TabItem Header="Histórico">
+            <TabItem Header="{loc:T 'Histórico'}">
               <DockPanel Margin="0,12,0,0" DataContext="{Binding History}" x:DataType="vm:HistoryViewModel">
                 <Border DockPanel.Dock="Top" Classes="card" Padding="14" Margin="0,0,0,12">
                   <StackPanel Spacing="12">
                     <TextBlock Classes="muted" TextWrapping="Wrap" IsVisible="{Binding !HasHistorizedTags}"
-                               Text="Este dispositivo no tiene tags historizados. Actívalo en un tag con doble clic → Histórico." />
+                               Text="{loc:T 'Este dispositivo no tiene tags historizados. Actívalo en un tag con doble clic → Histórico.'}" />
                     <ItemsControl ItemsSource="{Binding Tags}" IsVisible="{Binding HasHistorizedTags}">
                       <ItemsControl.ItemsPanel>
                         <ItemsPanelTemplate><WrapPanel /></ItemsPanelTemplate>
@@ -409,52 +416,52 @@
                       </ItemsControl.ItemTemplate>
                     </ItemsControl>
                     <StackPanel Orientation="Horizontal" Spacing="10">
-                      <ComboBox ItemsSource="{x:Static vm:HistoryViewModel.Ranges}" SelectedItem="{Binding Range}" MinWidth="160" />
-                      <ComboBox ItemsSource="{x:Static vm:HistoryViewModel.Aggregates}" SelectedItem="{Binding Aggregate}" MinWidth="130" />
-                      <TextBlock Text="cada" Classes="muted" VerticalAlignment="Center" IsVisible="{Binding IsAggregated}" />
-                      <ComboBox ItemsSource="{x:Static vm:HistoryViewModel.Intervals}" SelectedItem="{Binding Interval}" MinWidth="100" IsVisible="{Binding IsAggregated}" />
+                      <ComboBox ItemsSource="{x:Static vm:HistoryViewModel.Ranges}" DisplayMemberBinding="{Binding Text}" SelectedItem="{Binding Range}" MinWidth="160" />
+                      <ComboBox ItemsSource="{x:Static vm:HistoryViewModel.Aggregates}" DisplayMemberBinding="{Binding Text}" SelectedItem="{Binding Aggregate}" MinWidth="130" />
+                      <TextBlock Text="{loc:T 'cada'}" Classes="muted" VerticalAlignment="Center" IsVisible="{Binding IsAggregated}" />
+                      <ComboBox ItemsSource="{x:Static vm:HistoryViewModel.Intervals}" DisplayMemberBinding="{Binding Text}" SelectedItem="{Binding Interval}" MinWidth="100" IsVisible="{Binding IsAggregated}" />
                       <Button Classes="accent" Command="{Binding QueryCommand}">
                         <StackPanel Orientation="Horizontal" Spacing="6">
                           <c:Icon Kind="search" />
-                          <TextBlock Text="Consultar" />
+                          <TextBlock Text="{loc:T 'Consultar'}" />
                         </StackPanel>
                       </Button>
-                      <Button Classes="secondary" Command="{Binding ExportCommand}" ToolTip.Tip="Exportar a CSV">
+                      <Button Classes="secondary" Command="{Binding ExportCommand}" ToolTip.Tip="{loc:T 'Exportar a CSV'}">
                         <StackPanel Orientation="Horizontal" Spacing="6">
                           <c:Icon Kind="download" />
                           <TextBlock Text="CSV" />
                         </StackPanel>
                       </Button>
                       <Button Classes="secondary" Command="{Binding OpenInTrendsCommand}"
-                              ToolTip.Tip="Crear una vista de Tendencias con estos tags y este periodo (histograma, ciclos, X-Y, cronograma…)">
+                              ToolTip.Tip="{loc:T 'Crear una vista de Tendencias con estos tags y este periodo (histograma, ciclos, X-Y, cronograma…)'}">
                         <StackPanel Orientation="Horizontal" Spacing="6">
                           <c:Icon Kind="pulse" />
-                          <TextBlock Text="Abrir en Tendencias" />
+                          <TextBlock Text="{loc:T 'Abrir en Tendencias'}" />
                         </StackPanel>
                       </Button>
-                      <Button Classes="ghost danger" Command="{Binding ToggleDeleteCommand}" ToolTip.Tip="Borrar los datos guardados de los tags marcados entre dos fechas">
+                      <Button Classes="ghost danger" Command="{Binding ToggleDeleteCommand}" ToolTip.Tip="{loc:T 'Borrar los datos guardados de los tags marcados entre dos fechas'}">
                         <StackPanel Orientation="Horizontal" Spacing="6">
                           <c:Icon Kind="trash" />
-                          <TextBlock Text="Borrar datos…" />
+                          <TextBlock Text="{loc:T 'Borrar datos…'}" />
                         </StackPanel>
                       </Button>
                     </StackPanel>
                     <!-- Borrar datos de los tags marcados entre dos instantes -->
                     <Border Classes="danger" Padding="12,10" IsVisible="{Binding ShowDelete}">
                       <WrapPanel Orientation="Horizontal" ItemSpacing="8" LineSpacing="8">
-                        <TextBlock Text="Borrar los tags marcados desde" VerticalAlignment="Center" Foreground="{DynamicResource App.Bad}" FontWeight="SemiBold" />
+                        <TextBlock Text="{loc:T 'Borrar los tags marcados desde'}" VerticalAlignment="Center" Foreground="{DynamicResource App.Bad}" FontWeight="SemiBold" />
                         <CalendarDatePicker SelectedDate="{Binding DeleteFromDate}" Width="140" />
                         <TimePicker SelectedTime="{Binding DeleteFromTime}" ClockIdentifier="24HourClock" />
-                        <TextBlock Text="hasta" VerticalAlignment="Center" />
+                        <TextBlock Text="{loc:T 'hasta'}" VerticalAlignment="Center" />
                         <CalendarDatePicker SelectedDate="{Binding DeleteToDate}" Width="140" />
                         <TimePicker SelectedTime="{Binding DeleteToTime}" ClockIdentifier="24HourClock" />
                         <Button Classes="accent" Command="{Binding DeleteCommand}">
                           <StackPanel Orientation="Horizontal" Spacing="6">
                             <c:Icon Kind="trash" />
-                            <TextBlock Text="Borrar" />
+                            <TextBlock Text="{loc:T 'Borrar'}" />
                           </StackPanel>
                         </Button>
-                        <Button Classes="secondary" Content="Cancelar" Command="{Binding ToggleDeleteCommand}" />
+                        <Button Classes="secondary" Content="{loc:T 'Cancelar'}" Command="{Binding ToggleDeleteCommand}" />
                       </WrapPanel>
                     </Border>
                   </StackPanel>
@@ -462,7 +469,7 @@
 
                 <Grid DockPanel.Dock="Top" ColumnDefinitions="*,Auto" Margin="2,0,0,8">
                   <TextBlock Text="{Binding Summary}" Classes="muted" FontSize="12" VerticalAlignment="Center" />
-                  <CheckBox Grid.Column="1" Content="Ver tabla" IsChecked="{Binding ShowTable}" />
+                  <CheckBox Grid.Column="1" Content="{loc:T 'Ver tabla'}" IsChecked="{Binding ShowTable}" />
                 </Grid>
 
                 <Panel>
@@ -473,10 +480,10 @@
                 <Border Classes="card" ClipToBounds="True" IsVisible="{Binding ShowTable}">
                   <DockPanel>
                     <Grid DockPanel.Dock="Top" Classes="tablehead" ColumnDefinitions="200,2*,2*,150" ColumnSpacing="12" Margin="16,12,16,10">
-                      <TextBlock Text="HORA" />
-                      <TextBlock Grid.Column="1" Text="TAG" />
-                      <TextBlock Grid.Column="2" Text="VALOR" />
-                      <TextBlock Grid.Column="3" Text="CALIDAD" />
+                      <TextBlock Text="{loc:T 'HORA'}" />
+                      <TextBlock Grid.Column="1" Text="{loc:T 'TAG'}" />
+                      <TextBlock Grid.Column="2" Text="{loc:T 'VALOR'}" />
+                      <TextBlock Grid.Column="3" Text="{loc:T 'CALIDAD'}" />
                     </Grid>
                     <ListBox Classes="table" ItemsSource="{Binding Rows}">
                       <ListBox.ItemTemplate>
@@ -499,12 +506,12 @@
             </TabItem>
 
             <!-- Explorador de símbolos -->
-            <TabItem Header="Explorar" IsVisible="{Binding SelectedDeviceCanBrowse}">
+            <TabItem Header="{loc:T 'Explorar'}" IsVisible="{Binding SelectedDeviceCanBrowse}">
               <DockPanel Margin="0,12,0,0" DataContext="{Binding Browse}" x:DataType="vm:BrowseViewModel">
                 <Border DockPanel.Dock="Top" Classes="card" Padding="14" Margin="0,0,0,12">
                   <StackPanel Spacing="12">
                     <Grid ColumnDefinitions="*,Auto,Auto,Auto" ColumnSpacing="8">
-                      <TextBox Text="{Binding Filter}" PlaceholderText="Buscar símbolos por nombre (vacío = todos)">
+                      <TextBox Text="{Binding Filter}" PlaceholderText="{loc:T 'Buscar símbolos por nombre (vacío = todos)'}">
                         <TextBox.InnerLeftContent>
                           <c:Icon Kind="search" Margin="10,0,2,0" Foreground="{DynamicResource App.TextMuted}" />
                         </TextBox.InnerLeftContent>
@@ -513,24 +520,24 @@
                         </TextBox.KeyBindings>
                       </TextBox>
                       <NumericUpDown Grid.Column="1" Value="{Binding MaxResults}" Minimum="10" Maximum="100000" Increment="100" FormatString="0" Width="130"
-                                     ToolTip.Tip="Máximo de resultados" />
+                                     ToolTip.Tip="{loc:T 'Máximo de resultados'}" />
                       <Button Grid.Column="2" Classes="accent" Command="{Binding SearchCommand}">
                         <StackPanel Orientation="Horizontal" Spacing="6">
                           <c:Icon Kind="search" />
-                          <TextBlock Text="Buscar" />
+                          <TextBlock Text="{loc:T 'Buscar'}" />
                         </StackPanel>
                       </Button>
-                      <Button Grid.Column="3" Classes="secondary" Command="{Binding RefreshCommand}" ToolTip.Tip="Volver a explorar la CPU (tras cargar un programa nuevo)">
+                      <Button Grid.Column="3" Classes="secondary" Command="{Binding RefreshCommand}" ToolTip.Tip="{loc:T 'Volver a explorar la CPU (tras cargar un programa nuevo)'}">
                         <c:Icon Kind="refresh" />
                       </Button>
                     </Grid>
                     <StackPanel Orientation="Horizontal" Spacing="10">
-                      <TextBlock Text="Añadir al grupo" Classes="muted" VerticalAlignment="Center" />
+                      <TextBlock Text="{loc:T 'Añadir al grupo'}" Classes="muted" VerticalAlignment="Center" />
                       <TextBox Text="{Binding GroupName}" Width="140" />
-                      <TextBlock Text="cada" Classes="muted" VerticalAlignment="Center" />
+                      <TextBlock Text="{loc:T 'cada'}" Classes="muted" VerticalAlignment="Center" />
                       <NumericUpDown Value="{Binding IntervalMs}" Minimum="50" Increment="250" FormatString="0" Width="130" />
-                      <TextBlock Text="ms (si el grupo es nuevo)" Classes="muted" VerticalAlignment="Center" />
-                      <CheckBox Content="Escribible" IsChecked="{Binding AddWritable}" Margin="8,0,0,0" />
+                      <TextBlock Text="{loc:T 'ms (si el grupo es nuevo)'}" Classes="muted" VerticalAlignment="Center" />
+                      <CheckBox Content="{loc:T 'Escribible'}" IsChecked="{Binding AddWritable}" Margin="8,0,0,0" />
                     </StackPanel>
                   </StackPanel>
                 </Border>
@@ -540,9 +547,9 @@
                 <Border Classes="card" ClipToBounds="True">
                   <DockPanel>
                     <Grid DockPanel.Dock="Top" Classes="tablehead" ColumnDefinitions="*,140,110,Auto" ColumnSpacing="12" Margin="16,12,16,10">
-                      <TextBlock Text="SÍMBOLO" />
-                      <TextBlock Grid.Column="1" Text="TIPO PLC" />
-                      <TextBlock Grid.Column="2" Text="TIPO" />
+                      <TextBlock Text="{loc:T 'SÍMBOLO'}" />
+                      <TextBlock Grid.Column="1" Text="{loc:T 'TIPO PLC'}" />
+                      <TextBlock Grid.Column="2" Text="{loc:T 'TIPO'}" />
                       <TextBlock Grid.Column="3" Text="" Width="96" />
                     </Grid>
                     <ListBox Classes="table" ItemsSource="{Binding Results}" SelectedItem="{Binding SelectedItem}">
@@ -556,13 +563,13 @@
                                     Command="{Binding $parent[ListBox].((vm:BrowseViewModel)DataContext).AddCommand}" CommandParameter="{Binding}">
                               <StackPanel Orientation="Horizontal" Spacing="5">
                                 <c:Icon Kind="plus" Width="14" Height="14" />
-                                <TextBlock Text="Añadir" />
+                                <TextBlock Text="{loc:T 'Añadir'}" />
                               </StackPanel>
                             </Button>
-                            <Border Grid.Column="3" Classes="pill good" Width="96" IsVisible="{Binding IsAdded}" ToolTip.Tip="Ya es un tag de este dispositivo">
+                            <Border Grid.Column="3" Classes="pill good" Width="96" IsVisible="{Binding IsAdded}" ToolTip.Tip="{loc:T 'Ya es un tag de este dispositivo'}">
                               <StackPanel Orientation="Horizontal" Spacing="5" HorizontalAlignment="Center">
                                 <c:Icon Kind="check" Width="12" Height="12" Foreground="{DynamicResource App.Good}" />
-                                <TextBlock Text="Añadido" />
+                                <TextBlock Text="{loc:T 'Añadido'}" />
                               </StackPanel>
                             </Border>
                           </Grid>
@@ -583,16 +590,16 @@
               <StackPanel Spacing="16" DataContext="{Binding Editor}" x:DataType="vm:DeviceEditorViewModel">
                 <StackPanel Spacing="2">
                   <TextBlock Text="{Binding Title}" Classes="title" />
-                  <TextBlock Text="Los cambios se guardan en la configuración del agente." Classes="muted" />
+                  <TextBlock Text="{loc:T 'Los cambios se guardan en la configuración del agente.'}" Classes="muted" />
                 </StackPanel>
                 <Grid ColumnDefinitions="170,*" RowDefinitions="Auto,Auto,Auto,Auto,Auto" RowSpacing="14" ColumnSpacing="16">
-                  <TextBlock Text="Nombre" VerticalAlignment="Center" FontWeight="Medium" />
+                  <TextBlock Text="{loc:T 'Nombre'}" VerticalAlignment="Center" FontWeight="Medium" />
                   <TextBox Grid.Column="1" Text="{Binding Name}" PlaceholderText="prensa1" />
                   <TextBlock Grid.Row="1" Text="Driver" VerticalAlignment="Center" FontWeight="Medium" />
                   <StackPanel Grid.Row="1" Grid.Column="1" Orientation="Horizontal" Spacing="20">
-                    <ComboBox ItemsSource="{Binding DriverOptions}" SelectedItem="{Binding SelectedDriver}" MinWidth="300" />
-                    <CheckBox Content="Editar como JSON" IsChecked="{Binding ShowJson}" IsVisible="{Binding HasForm}"
-                              ToolTip.Tip="Los mismos ajustes en el formato de agent.json, para pegarlos o copiarlos" />
+                    <ComboBox ItemsSource="{Binding DriverOptions}" DisplayMemberBinding="{Binding Label}" SelectedItem="{Binding SelectedDriver}" MinWidth="300" />
+                    <CheckBox Content="{loc:T 'Editar como JSON'}" IsChecked="{Binding ShowJson}" IsVisible="{Binding HasForm}"
+                              ToolTip.Tip="{loc:T 'Los mismos ajustes en el formato de agent.json, para pegarlos o copiarlos'}" />
                   </StackPanel>
                   <!-- Ajustes: formulario del driver (Siemens simbólico, absoluto o Modbus) o JSON, en la misma fila -->
                   <Panel Grid.Row="2" Grid.ColumnSpan="2">
@@ -611,23 +618,23 @@
                     </ContentControl>
                     <Grid ColumnDefinitions="170,*" ColumnSpacing="16" IsVisible="{Binding IsJsonVisible}">
                       <StackPanel Spacing="2" Margin="0,6,0,0">
-                        <TextBlock Text="Ajustes" FontWeight="Medium" />
-                        <TextBlock Text="JSON del driver" Classes="muted" FontSize="11.5" />
-                        <TextBlock Text="La contraseña guardada se ve como ********; déjala así para conservarla" Classes="muted" FontSize="11.5" TextWrapping="Wrap" Margin="0,6,0,0" />
+                        <TextBlock Text="{loc:T 'Ajustes'}" FontWeight="Medium" />
+                        <TextBlock Text="{loc:T 'JSON del driver'}" Classes="muted" FontSize="11.5" />
+                        <TextBlock Text="{loc:T 'La contraseña guardada se ve como ********; déjala así para conservarla'}" Classes="muted" FontSize="11.5" TextWrapping="Wrap" Margin="0,6,0,0" />
                       </StackPanel>
                       <TextBox Grid.Column="1" Text="{Binding SettingsJson}" AcceptsReturn="True" Classes="mono" MinHeight="150" FontSize="12.5" />
                     </Grid>
                   </Panel>
-                  <TextBlock Grid.Row="3" Text="Opciones" VerticalAlignment="Center" FontWeight="Medium" />
+                  <TextBlock Grid.Row="3" Text="{loc:T 'Opciones'}" VerticalAlignment="Center" FontWeight="Medium" />
                   <StackPanel Grid.Row="3" Grid.Column="1" Orientation="Horizontal" Spacing="20">
-                    <CheckBox Content="Activo" IsChecked="{Binding Enabled}" />
-                    <CheckBox Content="Escrituras habilitadas (1.ª llave)" IsChecked="{Binding WritesEnabled}" />
-                    <CheckBox Content="Publicar en OPC UA (1.ª llave)" IsChecked="{Binding OpcUaPublished}"
-                              ToolTip.Tip="El dispositivo aparece en el servidor OPC UA del agente con los tags que tengan la 2.ª llave (activada por defecto)" />
+                    <CheckBox Content="{loc:T 'Activo'}" IsChecked="{Binding Enabled}" />
+                    <CheckBox Content="{loc:T 'Escrituras habilitadas (1.ª llave)'}" IsChecked="{Binding WritesEnabled}" />
+                    <CheckBox Content="{loc:T 'Publicar en OPC UA (1.ª llave)'}" IsChecked="{Binding OpcUaPublished}"
+                              ToolTip.Tip="{loc:T 'El dispositivo aparece en el servidor OPC UA del agente con los tags que tengan la 2.ª llave (activada por defecto)'}" />
                   </StackPanel>
                   <StackPanel Grid.Row="4" Spacing="2">
-                    <TextBlock Text="Reconexión" FontWeight="Medium" />
-                    <TextBlock Text="espera inicial, máxima y factor" Classes="muted" FontSize="11.5" />
+                    <TextBlock Text="{loc:T 'Reconexión'}" FontWeight="Medium" />
+                    <TextBlock Text="{loc:T 'espera inicial, máxima y factor'}" Classes="muted" FontSize="11.5" />
                   </StackPanel>
                   <StackPanel Grid.Row="4" Grid.Column="1" Orientation="Horizontal" Spacing="8">
                     <NumericUpDown Value="{Binding InitialDelayMs}" Minimum="100" Increment="500" FormatString="0" Width="130" />
@@ -647,10 +654,10 @@
                   <Button Classes="accent" Command="{Binding SaveCommand}">
                     <StackPanel Orientation="Horizontal" Spacing="6">
                       <c:Icon Kind="save" />
-                      <TextBlock Text="Guardar" />
+                      <TextBlock Text="{loc:T 'Guardar'}" />
                     </StackPanel>
                   </Button>
-                  <Button Classes="secondary" Content="Cancelar" Command="{Binding $parent[Window].((vm:MainViewModel)DataContext).CloseEditorCommand}" />
+                  <Button Classes="secondary" Content="{loc:T 'Cancelar'}" Command="{Binding $parent[Window].((vm:MainViewModel)DataContext).CloseEditorCommand}" />
                 </StackPanel>
               </StackPanel>
             </Border>

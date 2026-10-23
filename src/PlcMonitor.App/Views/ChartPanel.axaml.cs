@@ -4,6 +4,7 @@ using Avalonia.Input.Platform;
 using Avalonia.Markup.Xaml;
 using Avalonia.Media.Imaging;
 using PlcMonitor.App.Charts;
+using PlcMonitor.App.Localization;
 using PlcMonitor.App.ViewModels;
 
 namespace PlcMonitor.App.Views;
@@ -40,18 +41,18 @@ public sealed partial class ChartPanel : UserControl
     {
         if (Chart is not { } chart || Main is not { } main)
             return;
-        var path = await main.Dialogs.SaveFileAsync("Exportar gráfica", ChartExport.FileName(chart.Title, DateTime.Now, "png"), "png");
+        var path = await main.Dialogs.SaveFileAsync(Loc.T("Exportar gráfica"), ChartExport.FileName(chart.Title, DateTime.Now, "png"), "png");
         if (path is null)
             return;
         try
         {
             using var image = RenderImage();
             image?.Save(path, PngBitmapEncoderOptions.Default);
-            main.Report($"Gráfica guardada en {path}");
+            main.Report(Loc.F("Gráfica guardada en {0}", path));
         }
         catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
         {
-            main.Report($"No se ha podido guardar la imagen: {ex.Message}", isError: true);
+            main.Report(Loc.F("No se ha podido guardar la imagen: {0}", ex.Message), isError: true);
         }
     }
 
@@ -63,7 +64,7 @@ public sealed partial class ChartPanel : UserControl
         if (image is null)
             return;
         await clipboard.SetBitmapAsync(image);
-        Main?.Report("Imagen de la gráfica copiada al portapapeles");
+        Main?.Report(Loc.T("Imagen de la gráfica copiada al portapapeles"));
     }
 
     private async Task CopyStatsAsync()
@@ -71,24 +72,24 @@ public sealed partial class ChartPanel : UserControl
         if (Chart is not { } chart || TopLevel.GetTopLevel(this)?.Clipboard is not { } clipboard)
             return;
         await clipboard.SetTextAsync(SeriesStats.ToTable(chart.Stats));
-        Main?.Report("Estadísticas copiadas al portapapeles");
+        Main?.Report(Loc.T("Estadísticas copiadas al portapapeles"));
     }
 
     private async Task SaveStatsAsync()
     {
         if (Chart is not { From: { } from, To: { } to } chart || Main is not { } main)
             return;
-        var path = await main.Dialogs.SaveFileAsync("Exportar estadísticas", ChartExport.FileName($"{chart.Title} estadisticas".Trim(), DateTime.Now, "csv"), "csv");
+        var path = await main.Dialogs.SaveFileAsync(Loc.T("Exportar estadísticas"), ChartExport.FileName($"{chart.Title} estadisticas".Trim(), DateTime.Now, "csv"), "csv");
         if (path is null)
             return;
         try
         {
             await File.WriteAllTextAsync(path, SeriesStats.ToCsv(chart.Stats, from, to));
-            main.Report($"Estadísticas guardadas en {path}");
+            main.Report(Loc.F("Estadísticas guardadas en {0}", path));
         }
         catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
         {
-            main.Report($"No se han podido guardar las estadísticas: {ex.Message}", isError: true);
+            main.Report(Loc.F("No se han podido guardar las estadísticas: {0}", ex.Message), isError: true);
         }
     }
 }

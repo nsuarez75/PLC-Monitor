@@ -1,5 +1,6 @@
 <UserControl xmlns="https://github.com/avaloniaui"
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:loc="using:PlcMonitor.App.Localization"
              xmlns:vm="using:PlcMonitor.App.ViewModels"
              xmlns:c="using:PlcMonitor.App.Controls"
              x:Class="PlcMonitor.App.Views.TransformsView"
@@ -11,13 +12,13 @@
     <Border Classes="card" Padding="12">
       <DockPanel>
         <Grid DockPanel.Dock="Top" ColumnDefinitions="*,Auto" Margin="4,0,0,10">
-          <TextBlock Text="TRANSFORMACIONES" Classes="caption" VerticalAlignment="Center" />
-          <Button Grid.Column="1" Classes="ghost" Command="{Binding AddCommand}" ToolTip.Tip="Nueva transformación">
+          <TextBlock Text="{loc:T 'TRANSFORMACIONES'}" Classes="caption" VerticalAlignment="Center" />
+          <Button Grid.Column="1" Classes="ghost" Command="{Binding AddCommand}" ToolTip.Tip="{loc:T 'Nueva transformación'}">
             <c:Icon Kind="plus" />
           </Button>
         </Grid>
         <TextBlock DockPanel.Dock="Top" Classes="muted" FontSize="12" TextWrapping="Wrap" Margin="4,8" IsVisible="{Binding IsEmpty}"
-                   Text="Aún no hay transformaciones. Crea una con «+»." />
+                   Text="{loc:T 'Aún no hay transformaciones. Crea una con «+».'}" />
         <ListBox Classes="devices" ItemsSource="{Binding Items}" SelectedItem="{Binding Selected}">
           <ListBox.ItemTemplate>
             <DataTemplate x:DataType="vm:TransformItem">
@@ -34,9 +35,9 @@
     <!-- Detalle de la transformación seleccionada -->
     <DockPanel Grid.Column="1">
       <StackPanel DockPanel.Dock="Top" Spacing="2" Margin="0,0,0,14">
-        <TextBlock Text="Transformaciones" Classes="title" />
+        <TextBlock Text="{loc:T 'Transformaciones'}" Classes="title" />
         <TextBlock Classes="muted" TextWrapping="Wrap"
-                   Text="Muestran valores enteros como texto (0 = Parado, 1 = Marcha…). Se guardan en el agente y se asignan a cada tag en su detalle (doble clic → «Mostrar valor como»)." />
+                   Text="{loc:T 'Muestran valores enteros como texto (0 = Parado, 1 = Marcha…). Se guardan en el agente y se asignan a cada tag en su detalle (doble clic → «Mostrar valor como»).'}" />
       </StackPanel>
 
       <!-- Guardar / descartar -->
@@ -48,12 +49,12 @@
           </StackPanel>
         </Border>
         <StackPanel Orientation="Horizontal" Spacing="8" HorizontalAlignment="Right">
-          <TextBlock Text="Cambios sin guardar" Classes="muted" VerticalAlignment="Center" IsVisible="{Binding IsDirty}" Margin="0,0,8,0" />
-          <Button Classes="secondary" Command="{Binding DiscardCommand}" Content="Descartar" />
+          <TextBlock Text="{loc:T 'Cambios sin guardar'}" Classes="muted" VerticalAlignment="Center" IsVisible="{Binding IsDirty}" Margin="0,0,8,0" />
+          <Button Classes="secondary" Command="{Binding DiscardCommand}" Content="{loc:T 'Descartar'}" />
           <Button Classes="accent" Command="{Binding SaveCommand}">
             <StackPanel Orientation="Horizontal" Spacing="6">
               <c:Icon Kind="save" />
-              <TextBlock Text="Guardar en el agente" />
+              <TextBlock Text="{loc:T 'Guardar en el agente'}" />
             </StackPanel>
           </Button>
         </StackPanel>
@@ -64,21 +65,21 @@
                 IsVisible="{Binding $parent[UserControl].((vm:TransformsViewModel)DataContext).HasSelection}">
           <StackPanel Spacing="14">
             <Grid ColumnDefinitions="150,*,Auto" ColumnSpacing="16">
-              <TextBlock Text="Nombre" VerticalAlignment="Center" FontWeight="Medium" />
-              <TextBox Grid.Column="1" Text="{Binding Name}" PlaceholderText="Estado del motor" />
-              <Button Grid.Column="2" Classes="ghost danger" ToolTip.Tip="Borrar transformación"
+              <TextBlock Text="{loc:T 'Nombre'}" VerticalAlignment="Center" FontWeight="Medium" />
+              <TextBox Grid.Column="1" Text="{Binding Name}" PlaceholderText="{loc:T 'Estado del motor'}" />
+              <Button Grid.Column="2" Classes="ghost danger" ToolTip.Tip="{loc:T 'Borrar transformación'}"
                       Command="{Binding $parent[UserControl].((vm:TransformsViewModel)DataContext).RemoveCommand}">
                 <c:Icon Kind="trash" />
               </Button>
             </Grid>
             <TextBlock Classes="muted" FontSize="12" TextWrapping="Wrap">
-              <Run Text="La usa: " /><Run Text="{Binding UsageText}" />
+              <Run Text="{loc:T 'La usa: '}" /><Run Text="{Binding UsageText}" />
             </TextBlock>
 
             <StackPanel Spacing="6">
               <Grid ColumnDefinitions="140,24,*,Auto" ColumnSpacing="8" Classes="tablehead">
-                <TextBlock Text="VALOR" />
-                <TextBlock Grid.Column="2" Text="SE MUESTRA COMO" />
+                <TextBlock Text="{loc:T 'VALOR'}" />
+                <TextBlock Grid.Column="2" Text="{loc:T 'SE MUESTRA COMO'}" />
               </Grid>
               <ItemsControl ItemsSource="{Binding Entries}">
                 <ItemsControl.ItemTemplate>
@@ -86,8 +87,8 @@
                     <Grid ColumnDefinitions="140,24,*,Auto" ColumnSpacing="8" Margin="0,0,0,6">
                       <TextBox Text="{Binding Value}" Classes="mono" PlaceholderText="0" />
                       <TextBlock Grid.Column="1" Text="=" Classes="muted" HorizontalAlignment="Center" VerticalAlignment="Center" />
-                      <TextBox Grid.Column="2" Text="{Binding Text}" PlaceholderText="Parado" />
-                      <Button Grid.Column="3" Classes="ghost danger" ToolTip.Tip="Quitar valor"
+                      <TextBox Grid.Column="2" Text="{Binding Text}" PlaceholderText="{loc:T 'Parado'}" />
+                      <Button Grid.Column="3" Classes="ghost danger" ToolTip.Tip="{loc:T 'Quitar valor'}"
                               Command="{Binding $parent[ItemsControl].((vm:TransformItem)DataContext).RemoveEntryCommand}" CommandParameter="{Binding}">
                         <c:Icon Kind="x" Width="14" Height="14" />
                       </Button>
@@ -98,12 +99,12 @@
               <Button Classes="secondary" Command="{Binding AddEntryCommand}" HorizontalAlignment="Left">
                 <StackPanel Orientation="Horizontal" Spacing="6">
                   <c:Icon Kind="plus" Width="14" Height="14" />
-                  <TextBlock Text="Añadir valor" />
+                  <TextBlock Text="{loc:T 'Añadir valor'}" />
                 </StackPanel>
               </Button>
             </StackPanel>
             <TextBlock Classes="muted" FontSize="12" TextWrapping="Wrap"
-                       Text="Los booleanos cuentan como 0 (false) y 1 (true). Un valor que no está en la lista se muestra tal cual. Las filas sin texto no se guardan." />
+                       Text="{loc:T 'Los booleanos cuentan como 0 (false) y 1 (true). Un valor que no está en la lista se muestra tal cual. Las filas sin texto no se guardan.'}" />
           </StackPanel>
         </Border>
       </ScrollViewer>

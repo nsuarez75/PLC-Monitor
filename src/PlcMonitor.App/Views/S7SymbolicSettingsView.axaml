@@ -1,5 +1,6 @@
 <UserControl xmlns="https://github.com/avaloniaui"
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:loc="using:PlcMonitor.App.Localization"
              xmlns:vm="using:PlcMonitor.App.ViewModels"
              x:Class="PlcMonitor.App.Views.S7SymbolicSettingsView"
              x:DataType="vm:S7SymbolicSettingsForm">
@@ -9,27 +10,27 @@
     <TextBox Grid.Column="1" Text="{Binding Host}" PlaceholderText="192.168.0.1" Width="240" HorizontalAlignment="Left" />
 
     <StackPanel Grid.Row="1" Spacing="2" Margin="0,6,0,0">
-      <TextBlock Text="Contraseña" FontWeight="Medium" />
-      <TextBlock Text="nivel de acceso de la CPU" Classes="muted" FontSize="11.5" />
+      <TextBlock Text="{loc:T 'Contraseña'}" FontWeight="Medium" />
+      <TextBlock Text="{loc:T 'nivel de acceso de la CPU'}" Classes="muted" FontSize="11.5" />
     </StackPanel>
     <StackPanel Grid.Row="1" Grid.Column="1" Spacing="4">
-      <TextBox Text="{Binding Password}" PasswordChar="•" PlaceholderText="(CPU sin protección)" Width="240" HorizontalAlignment="Left" />
-      <TextBlock Text="La guardada se ve como ********; déjala así para conservarla. Se guarda cifrada en el agente."
+      <TextBox Text="{Binding Password}" PasswordChar="•" PlaceholderText="{loc:T '(CPU sin protección)'}" Width="240" HorizontalAlignment="Left" />
+      <TextBlock Text="{loc:T 'La guardada se ve como ********; déjala así para conservarla. Se guarda cifrada en el agente.'}"
                  Classes="muted" FontSize="11.5" TextWrapping="Wrap" />
     </StackPanel>
 
     <StackPanel Grid.Row="2" Spacing="2" Margin="0,6,0,0">
-      <TextBlock Text="Usuario" FontWeight="Medium" />
-      <TextBlock Text="opcional" Classes="muted" FontSize="11.5" />
+      <TextBlock Text="{loc:T 'Usuario'}" FontWeight="Medium" />
+      <TextBlock Text="{loc:T 'opcional'}" Classes="muted" FontSize="11.5" />
     </StackPanel>
     <StackPanel Grid.Row="2" Grid.Column="1" Spacing="4">
-      <TextBox Text="{Binding Username}" PlaceholderText="(sin usuario)" Width="240" HorizontalAlignment="Left" />
-      <TextBlock Text="Solo en CPUs con gestión de usuarios (firmware 3.1 o posterior); si no, basta la contraseña."
+      <TextBox Text="{Binding Username}" PlaceholderText="{loc:T '(sin usuario)'}" Width="240" HorizontalAlignment="Left" />
+      <TextBlock Text="{loc:T 'Solo en CPUs con gestión de usuarios (firmware 3.1 o posterior); si no, basta la contraseña.'}"
                  Classes="muted" FontSize="11.5" TextWrapping="Wrap" />
     </StackPanel>
 
-    <TextBlock Grid.Row="3" Text="Seguridad" VerticalAlignment="Center" FontWeight="Medium" />
-    <ComboBox Grid.Row="3" Grid.Column="1" ItemsSource="{x:Static vm:S7SymbolicSettingsForm.SecurityOptions}" SelectedItem="{Binding Security}" MinWidth="300" />
+    <TextBlock Grid.Row="3" Text="{loc:T 'Seguridad'}" VerticalAlignment="Center" FontWeight="Medium" />
+    <ComboBox Grid.Row="3" Grid.Column="1" ItemsSource="{x:Static vm:S7SymbolicSettingsForm.SecurityOptions}" DisplayMemberBinding="{Binding Label}" SelectedItem="{Binding Security}" MinWidth="300" />
 
     <TextBlock Grid.Row="4" Text="Timeout" VerticalAlignment="Center" FontWeight="Medium" />
     <StackPanel Grid.Row="4" Grid.Column="1" Orientation="Horizontal" Spacing="8">

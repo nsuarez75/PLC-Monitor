@@ -1,5 +1,6 @@
 <UserControl xmlns="https://github.com/avaloniaui"
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:loc="using:PlcMonitor.App.Localization"
              xmlns:vm="using:PlcMonitor.App.ViewModels"
              xmlns:svc="using:PlcMonitor.App.Services"
              xmlns:c="using:PlcMonitor.App.Controls"
@@ -12,8 +13,8 @@
     <Border Classes="card" Padding="12">
       <DockPanel>
         <Grid DockPanel.Dock="Top" ColumnDefinitions="*,Auto" Margin="4,0,0,10">
-          <TextBlock Text="AGENTES" Classes="caption" VerticalAlignment="Center" />
-          <Button Grid.Column="1" Classes="ghost" Command="{Binding NewCommand}" ToolTip.Tip="Nuevo agente">
+          <TextBlock Text="{loc:T 'AGENTES'}" Classes="caption" VerticalAlignment="Center" />
+          <Button Grid.Column="1" Classes="ghost" Command="{Binding NewCommand}" ToolTip.Tip="{loc:T 'Nuevo agente'}">
             <c:Icon Kind="plus" />
           </Button>
         </Grid>
@@ -42,16 +43,16 @@
         <!-- Conexión -->
         <Border Classes="card" Padding="20">
           <StackPanel Spacing="12">
-            <TextBlock Text="CONEXIÓN" Classes="caption" />
+            <TextBlock Text="{loc:T 'CONEXIÓN'}" Classes="caption" />
             <Grid ColumnDefinitions="170,*" RowDefinitions="Auto,Auto,Auto,Auto" RowSpacing="10" ColumnSpacing="16">
-              <TextBlock Text="Nombre" VerticalAlignment="Center" FontWeight="Medium" />
-              <TextBox Grid.Column="1" Text="{Binding Name}" PlaceholderText="Línea 3" />
+              <TextBlock Text="{loc:T 'Nombre'}" VerticalAlignment="Center" FontWeight="Medium" />
+              <TextBox Grid.Column="1" Text="{Binding Name}" PlaceholderText="{loc:T 'Línea 3'}" />
               <TextBlock Grid.Row="1" Text="URL" VerticalAlignment="Center" FontWeight="Medium" />
-              <TextBox Grid.Row="1" Grid.Column="1" Text="{Binding Url}" Classes="mono" PlaceholderText="https://equipo:5311 (se rellena al instalar)" />
+              <TextBox Grid.Row="1" Grid.Column="1" Text="{Binding Url}" Classes="mono" PlaceholderText="{loc:T 'https://equipo:5311 (se rellena al instalar)'}" />
               <TextBlock Grid.Row="2" Text="Token" VerticalAlignment="Center" FontWeight="Medium" />
-              <TextBox Grid.Row="2" Grid.Column="1" Text="{Binding Token}" PasswordChar="•" Classes="mono" PlaceholderText="(sin token)" />
-              <TextBlock Grid.Row="3" Text="Huella del certificado" VerticalAlignment="Center" FontWeight="Medium" />
-              <TextBox Grid.Row="3" Grid.Column="1" Text="{Binding Thumbprint}" Classes="mono" FontSize="11.5" PlaceholderText="(sin TLS)" />
+              <TextBox Grid.Row="2" Grid.Column="1" Text="{Binding Token}" PasswordChar="•" Classes="mono" PlaceholderText="{loc:T '(sin token)'}" />
+              <TextBlock Grid.Row="3" Text="{loc:T 'Huella del certificado'}" VerticalAlignment="Center" FontWeight="Medium" />
+              <TextBox Grid.Row="3" Grid.Column="1" Text="{Binding Thumbprint}" Classes="mono" FontSize="11.5" PlaceholderText="{loc:T '(sin TLS)'}" />
             </Grid>
           </StackPanel>
         </Border>
@@ -60,43 +61,43 @@
         <Border Classes="card" Padding="20">
           <StackPanel Spacing="12">
             <StackPanel Spacing="2">
-              <TextBlock Text="EQUIPO" Classes="caption" />
+              <TextBlock Text="{loc:T 'EQUIPO'}" Classes="caption" />
               <TextBlock Classes="muted" FontSize="12" TextWrapping="Wrap" Text="{Binding MachineHelp}" />
             </StackPanel>
-            <CheckBox Content="Este equipo (sin SSH)" IsChecked="{Binding LocalMachine}" />
+            <CheckBox Content="{loc:T 'Este equipo (sin SSH)'}" IsChecked="{Binding LocalMachine}" />
             <Grid ColumnDefinitions="170,*" RowDefinitions="Auto,Auto,Auto" RowSpacing="10" ColumnSpacing="16" IsVisible="{Binding IsSsh}">
-              <TextBlock Text="Equipo" VerticalAlignment="Center" FontWeight="Medium" />
+              <TextBlock Text="{loc:T 'Equipo'}" VerticalAlignment="Center" FontWeight="Medium" />
               <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="8">
-                <TextBox Text="{Binding SshHost}" Width="260" PlaceholderText="192.168.0.20 o pc-linea" />
-                <TextBlock Text="puerto" Classes="muted" VerticalAlignment="Center" />
+                <TextBox Text="{Binding SshHost}" Width="260" PlaceholderText="{loc:T '192.168.0.20 o pc-linea'}" />
+                <TextBlock Text="{loc:T 'puerto'}" Classes="muted" VerticalAlignment="Center" />
                 <NumericUpDown Value="{Binding SshPort}" Minimum="1" Maximum="65535" FormatString="0" Width="120" />
               </StackPanel>
-              <TextBlock Grid.Row="1" Text="Usuario" VerticalAlignment="Center" FontWeight="Medium" />
+              <TextBlock Grid.Row="1" Text="{loc:T 'Usuario'}" VerticalAlignment="Center" FontWeight="Medium" />
               <TextBox Grid.Row="1" Grid.Column="1" Text="{Binding SshUser}" Width="260" HorizontalAlignment="Left" />
-              <TextBlock Grid.Row="2" Text="Clave privada" VerticalAlignment="Center" FontWeight="Medium" />
-              <TextBox Grid.Row="2" Grid.Column="1" Text="{Binding SshKeyFile}" Classes="mono" PlaceholderText="(opcional) por defecto ~/.ssh/id_ed25519, id_ecdsa o id_rsa" />
+              <TextBlock Grid.Row="2" Text="{loc:T 'Clave privada'}" VerticalAlignment="Center" FontWeight="Medium" />
+              <TextBox Grid.Row="2" Grid.Column="1" Text="{Binding SshKeyFile}" Classes="mono" PlaceholderText="{loc:T '(opcional) por defecto ~/.ssh/id_ed25519, id_ecdsa o id_rsa'}" />
             </Grid>
             <Grid ColumnDefinitions="170,*" ColumnSpacing="16">
-              <TextBlock Text="Puerto del agente" VerticalAlignment="Center" FontWeight="Medium" />
+              <TextBlock Text="{loc:T 'Puerto del agente'}" VerticalAlignment="Center" FontWeight="Medium" />
               <NumericUpDown Grid.Column="1" Value="{Binding AgentPort}" Minimum="1" Maximum="65535" FormatString="0" Width="140" HorizontalAlignment="Left" />
             </Grid>
 
             <Border Background="{DynamicResource App.SurfaceAlt}" CornerRadius="8" Padding="14" Margin="0,4,0,0">
               <StackPanel Spacing="10">
-                <TextBlock Text="Para esta operación (no se guarda)" FontWeight="SemiBold" />
+                <TextBlock Text="{loc:T 'Para esta operación (no se guarda)'}" FontWeight="SemiBold" />
                 <Grid ColumnDefinitions="170,*" RowDefinitions="Auto,Auto,Auto" RowSpacing="10" ColumnSpacing="16">
-                  <TextBlock Text="Contraseña SSH / sudo" VerticalAlignment="Center" IsVisible="{Binding IsSsh}" />
-                  <TextBox Grid.Column="1" Text="{Binding SshPassword}" PasswordChar="•" Width="260" HorizontalAlignment="Left" PlaceholderText="vacía si entras con clave" IsVisible="{Binding IsSsh}" />
-                  <TextBlock Grid.Row="1" Text="Contraseña de sudo" VerticalAlignment="Center" IsVisible="{Binding ShowSudoPassword}" />
+                  <TextBlock Text="{loc:T 'Contraseña SSH / sudo'}" VerticalAlignment="Center" IsVisible="{Binding IsSsh}" />
+                  <TextBox Grid.Column="1" Text="{Binding SshPassword}" PasswordChar="•" Width="260" HorizontalAlignment="Left" PlaceholderText="{loc:T 'vacía si entras con clave'}" IsVisible="{Binding IsSsh}" />
+                  <TextBlock Grid.Row="1" Text="{loc:T 'Contraseña de sudo'}" VerticalAlignment="Center" IsVisible="{Binding ShowSudoPassword}" />
                   <TextBox Grid.Row="1" Grid.Column="1" Text="{Binding SudoPassword}" PasswordChar="•" Width="260" HorizontalAlignment="Left" PlaceholderText="{Binding SudoPlaceholder}" IsVisible="{Binding ShowSudoPassword}" />
-                  <TextBlock Grid.Row="2" Text="Carpeta del agente" VerticalAlignment="Center" />
-                  <TextBox Grid.Row="2" Grid.Column="1" Text="{Binding PackageFolder}" Classes="mono" PlaceholderText="(por defecto el agente incluido en la app)" />
+                  <TextBlock Grid.Row="2" Text="{loc:T 'Carpeta del agente'}" VerticalAlignment="Center" />
+                  <TextBox Grid.Row="2" Grid.Column="1" Text="{Binding PackageFolder}" Classes="mono" PlaceholderText="{loc:T '(por defecto el agente incluido en la app)'}" />
                 </Grid>
                 <WrapPanel Orientation="Horizontal">
-                  <CheckBox Content="Regenerar token y certificado" IsChecked="{Binding RegenerateCredentials}" Margin="0,0,20,4" />
-                  <CheckBox Content="Crear token de solo lectura" IsChecked="{Binding CreateReadOnlyToken}" Margin="0,0,20,4"
-                            ToolTip.Tip="Para quien solo debe ver: leer, tendencias e histórico, sin escribir ni configurar. Se crea al generar credenciales (instalación nueva, regenerar o renovar)." />
-                  <CheckBox Content="Conservar agent.json al desinstalar" IsChecked="{Binding KeepConfiguration}" Margin="0,0,20,4" />
+                  <CheckBox Content="{loc:T 'Regenerar token y certificado'}" IsChecked="{Binding RegenerateCredentials}" Margin="0,0,20,4" />
+                  <CheckBox Content="{loc:T 'Crear token de solo lectura'}" IsChecked="{Binding CreateReadOnlyToken}" Margin="0,0,20,4"
+                            ToolTip.Tip="{loc:T 'Para quien solo debe ver: leer, tendencias e histórico, sin escribir ni configurar. Se crea al generar credenciales (instalación nueva, regenerar o renovar).'}" />
+                  <CheckBox Content="{loc:T 'Conservar agent.json al desinstalar'}" IsChecked="{Binding KeepConfiguration}" Margin="0,0,20,4" />
                 </WrapPanel>
               </StackPanel>
             </Border>
@@ -105,32 +106,32 @@
               <Button Classes="accent" Command="{Binding InstallCommand}" Margin="0,0,8,8">
                 <StackPanel Orientation="Horizontal" Spacing="6">
                   <c:Icon Kind="server" />
-                  <TextBlock Text="Instalar / actualizar" />
+                  <TextBlock Text="{loc:T 'Instalar / actualizar'}" />
                 </StackPanel>
               </Button>
               <Button Classes="secondary" Command="{Binding RenewCredentialsCommand}" Margin="0,0,8,8"
-                      ToolTip.Tip="Token y certificado nuevos sin reinstalar: los anteriores dejan de valer.">
+                      ToolTip.Tip="{loc:T 'Token y certificado nuevos sin reinstalar: los anteriores dejan de valer.'}">
                 <StackPanel Orientation="Horizontal" Spacing="6">
                   <c:Icon Kind="refresh" />
-                  <TextBlock Text="Renovar credenciales" />
+                  <TextBlock Text="{loc:T 'Renovar credenciales'}" />
                 </StackPanel>
               </Button>
               <Button Classes="secondary" Command="{Binding StatusCommand}" Margin="0,0,8,8">
                 <StackPanel Orientation="Horizontal" Spacing="6">
                   <c:Icon Kind="pulse" />
-                  <TextBlock Text="Estado" />
+                  <TextBlock Text="{loc:T 'Estado'}" />
                 </StackPanel>
               </Button>
               <Button Classes="secondary" Command="{Binding LogsCommand}" Margin="0,0,8,8">
                 <StackPanel Orientation="Horizontal" Spacing="6">
                   <c:Icon Kind="list" />
-                  <TextBlock Text="Ver log" />
+                  <TextBlock Text="{loc:T 'Ver log'}" />
                 </StackPanel>
               </Button>
               <Button Classes="secondary danger" Command="{Binding UninstallCommand}" Margin="0,0,8,8">
                 <StackPanel Orientation="Horizontal" Spacing="6">
                   <c:Icon Kind="trash" />
-                  <TextBlock Text="Desinstalar" />
+                  <TextBlock Text="{loc:T 'Desinstalar'}" />
                 </StackPanel>
               </Button>
             </WrapPanel>
@@ -141,7 +142,7 @@
         <Border Classes="card" Padding="16" IsVisible="{Binding Log.Count, Converter={x:Static vm:Converters.IsPositive}}">
           <StackPanel Spacing="8">
             <StackPanel Orientation="Horizontal" Spacing="8">
-              <TextBlock Text="ACTIVIDAD" Classes="caption" VerticalAlignment="Center" />
+              <TextBlock Text="{loc:T 'ACTIVIDAD'}" Classes="caption" VerticalAlignment="Center" />
               <ProgressBar IsIndeterminate="True" Width="120" Height="4" IsVisible="{Binding IsBusy}" VerticalAlignment="Center" />
             </StackPanel>
             <ItemsControl ItemsSource="{Binding Log}">
@@ -158,13 +159,13 @@
           <Button Classes="accent" Command="{Binding SaveCommand}">
             <StackPanel Orientation="Horizontal" Spacing="6">
               <c:Icon Kind="save" />
-              <TextBlock Text="Guardar" />
+              <TextBlock Text="{loc:T 'Guardar'}" />
             </StackPanel>
           </Button>
           <Button Classes="ghost danger" Command="{Binding DeleteCommand}">
             <StackPanel Orientation="Horizontal" Spacing="6">
               <c:Icon Kind="trash" />
-              <TextBlock Text="Quitar de la lista" />
+              <TextBlock Text="{loc:T 'Quitar de la lista'}" />
             </StackPanel>
           </Button>
         </StackPanel>

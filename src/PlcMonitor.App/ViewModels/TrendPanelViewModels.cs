@@ -1,31 +1,31 @@
 using System.Collections.ObjectModel;
 using CommunityToolkit.Mvvm.ComponentModel;
 using PlcMonitor.App.Charts;
+using PlcMonitor.App.Localization;
 using PlcMonitor.App.Services;
 
 namespace PlcMonitor.App.ViewModels;
 
 /// <summary>Panel en la lista de la pestaña Tendencias.</summary>
-public sealed partial class TrendPanelItem(TrendPanel panel) : ObservableObject
+public sealed partial class TrendPanelItem(TrendPanel panel) : LocalizedObservableObject
 {
     public TrendPanel Panel { get; } = panel;
 
     [ObservableProperty]
     public partial string Name { get; set; } = panel.Name;
 
-    [ObservableProperty]
-    public partial string Description { get; set; } = Describe(panel);
+    public string Description => Describe(Panel);
 
     public void Refresh()
     {
         Name = Panel.Name;
-        Description = Describe(Panel);
+        OnPropertyChanged(nameof(Description));
     }
 
     private static string Describe(TrendPanel panel)
     {
-        var views = panel.Views.Count switch { 0 => "sin vistas", 1 => "1 vista", var n => $"{n} vistas" };
-        return $"{views} · {panel.Columns} {(panel.Columns == 1 ? "columna" : "columnas")}";
+        var views = panel.Views.Count switch { 0 => Loc.T("sin vistas"), 1 => Loc.T("1 vista"), var n => Loc.F("{0} vistas", n) };
+        return Loc.F("{0} · {1} {2}", views, panel.Columns, Loc.T(panel.Columns == 1 ? "columna" : "columnas"));
     }
 }
 

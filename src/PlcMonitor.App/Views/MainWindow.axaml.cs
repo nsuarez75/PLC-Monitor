@@ -6,6 +6,7 @@ using Avalonia.Markup.Xaml;
 using Avalonia.Threading;
 using Avalonia.VisualTree;
 using CommunityToolkit.Mvvm.Input;
+using PlcMonitor.App.Localization;
 using PlcMonitor.App.ViewModels;
 
 namespace PlcMonitor.App.Views;
@@ -102,10 +103,10 @@ public sealed partial class MainWindow : Window
         {
             if (folder.Name.Length > 0)
             {
-                menu.Items.Add(new MenuItem { Header = "Renombrar grupo…", Command = new RelayCommand(() => _ = device.RenameFolderAsync(folder)) });
+                menu.Items.Add(new MenuItem { Header = Loc.T("Renombrar grupo…"), Command = new RelayCommand(() => _ = device.RenameFolderAsync(folder)) });
                 menu.Items.Add(new MenuItem
                 {
-                    Header = "Deshacer el grupo (sus tags quedan sin grupo)",
+                    Header = Loc.T("Deshacer el grupo (sus tags quedan sin grupo)"),
                     Command = new RelayCommand(() => _ = device.MoveToFolderAsync([.. folder.Tags], "")),
                 });
             }
@@ -115,10 +116,10 @@ public sealed partial class MainWindow : Window
             if (selected.Length == 1)
             {
                 var tag = selected[0];
-                menu.Items.Add(new MenuItem { Header = "Editar…", Command = main.OpenTagDetailsCommand, CommandParameter = tag });
+                menu.Items.Add(new MenuItem { Header = Loc.T("Editar…"), Command = main.OpenTagDetailsCommand, CommandParameter = tag });
                 menu.Items.Add(new MenuItem
                 {
-                    Header = "Abrir su histórico",
+                    Header = Loc.T("Abrir su histórico"),
                     Command = main.OpenTagHistoryCommand,
                     CommandParameter = tag,
                     IsEnabled = tag.Historized && main.HistorianEnabled,
@@ -134,7 +135,7 @@ public sealed partial class MainWindow : Window
             {
                 menu.Items.Add(new MenuItem
                 {
-                    Header = disabled.Length == 1 ? "Activar tag" : $"Activar {disabled.Length} tags",
+                    Header = disabled.Length == 1 ? Loc.T("Activar tag") : Loc.F("Activar {0} tags", disabled.Length),
                     Command = new RelayCommand(() => _ = device.SetTagsEnabledAsync(disabled, enabled: true)),
                 });
             }
@@ -142,14 +143,14 @@ public sealed partial class MainWindow : Window
             {
                 menu.Items.Add(new MenuItem
                 {
-                    Header = enabled.Length == 1 ? "Desactivar tag" : $"Desactivar {enabled.Length} tags",
+                    Header = enabled.Length == 1 ? Loc.T("Desactivar tag") : Loc.F("Desactivar {0} tags", enabled.Length),
                     Command = new RelayCommand(() => _ = device.SetTagsEnabledAsync(enabled, enabled: false)),
                 });
             }
             menu.Items.Add(new Separator());
             menu.Items.Add(new MenuItem
             {
-                Header = selected.Length == 1 ? "Quitar tag…" : $"Quitar {selected.Length} tags…",
+                Header = selected.Length == 1 ? Loc.T("Quitar tag…") : Loc.F("Quitar {0} tags…", selected.Length),
                 Command = new RelayCommand(() => _ = device.RemoveTagsAsync(selected)),
                 InputGesture = new KeyGesture(Key.Delete),
             });
@@ -158,8 +159,8 @@ public sealed partial class MainWindow : Window
         {
             if (menu.Items.Count > 0)
                 menu.Items.Add(new Separator());
-            menu.Items.Add(new MenuItem { Header = "Desplegar todos los grupos", Command = device.SetAllFoldersCommand, CommandParameter = "true" });
-            menu.Items.Add(new MenuItem { Header = "Plegar todos los grupos", Command = device.SetAllFoldersCommand, CommandParameter = "false" });
+            menu.Items.Add(new MenuItem { Header = Loc.T("Desplegar todos los grupos"), Command = device.SetAllFoldersCommand, CommandParameter = "true" });
+            menu.Items.Add(new MenuItem { Header = Loc.T("Plegar todos los grupos"), Command = device.SetAllFoldersCommand, CommandParameter = "false" });
         }
         e.Cancel = menu.Items.Count == 0;
     }
@@ -181,7 +182,7 @@ public sealed partial class MainWindow : Window
         {
             menu.Items.Add(new MenuItem
             {
-                Header = MainViewModel.TagColumnTitles[i],
+                Header = Loc.T(MainViewModel.TagColumnTitles[i]),
                 ToggleType = MenuItemToggleType.CheckBox,
                 IsChecked = !main.IsTagColumnHidden(i),
                 Command = main.ToggleTagColumnCommand,
@@ -189,11 +190,11 @@ public sealed partial class MainWindow : Window
             });
         }
         menu.Items.Add(new Separator());
-        menu.Items.Add(new MenuItem { Header = "Mostrar todas las columnas", Command = main.ShowAllTagColumnsCommand, IsEnabled = main.TagHiddenColumns.Length > 0 });
-        menu.Items.Add(new MenuItem { Header = "Restablecer anchos de columna", Command = main.ResetTagColumnsCommand });
+        menu.Items.Add(new MenuItem { Header = Loc.T("Mostrar todas las columnas"), Command = main.ShowAllTagColumnsCommand, IsEnabled = main.TagHiddenColumns.Length > 0 });
+        menu.Items.Add(new MenuItem { Header = Loc.T("Restablecer anchos de columna"), Command = main.ResetTagColumnsCommand });
         menu.Items.Add(new MenuItem
         {
-            Header = "Restablecer orden de columnas",
+            Header = Loc.T("Restablecer orden de columnas"),
             Command = main.ResetTagColumnOrderCommand,
             IsEnabled = main.TagColumnOrder != MainViewModel.DefaultTagColumnOrder,
         });
@@ -201,7 +202,7 @@ public sealed partial class MainWindow : Window
 
     private static MenuItem MoveMenu(DeviceViewModel device, TagViewModel[] selected)
     {
-        var move = new MenuItem { Header = selected.Length == 1 ? "Mover a grupo" : $"Mover {selected.Length} tags a grupo" };
+        var move = new MenuItem { Header = selected.Length == 1 ? Loc.T("Mover a grupo") : Loc.F("Mover {0} tags a grupo", selected.Length) };
         foreach (var folder in device.Folders)
         {
             var name = folder;
@@ -214,10 +215,10 @@ public sealed partial class MainWindow : Window
         }
         if (device.Folders.Count > 0)
             move.Items.Add(new Separator());
-        move.Items.Add(new MenuItem { Header = "Nuevo grupo…", Command = new RelayCommand(() => _ = device.MoveToNewFolderAsync(selected)) });
+        move.Items.Add(new MenuItem { Header = Loc.T("Nuevo grupo…"), Command = new RelayCommand(() => _ = device.MoveToNewFolderAsync(selected)) });
         move.Items.Add(new MenuItem
         {
-            Header = "Sin grupo",
+            Header = Loc.T("Sin grupo"),
             Command = new RelayCommand(() => _ = device.MoveToFolderAsync(selected, "")),
             IsEnabled = selected.Any(t => t.Folder.Length > 0),
         });

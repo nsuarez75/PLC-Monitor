@@ -1,5 +1,6 @@
 using System.Globalization;
 using PlcMonitor.Agent.Contracts;
+using PlcMonitor.App.Localization;
 
 namespace PlcMonitor.App.Charts;
 
@@ -45,7 +46,7 @@ public static class PeriodBars
         var culture = CultureInfo.InvariantCulture;
         return period switch
         {
-            BarPeriod.Day => $"{WeekDays[(int)local.DayOfWeek]} {local.ToString("dd/MM", culture)}",
+            BarPeriod.Day => $"{Loc.T(WeekDays[(int)local.DayOfWeek])} {local.ToString("dd/MM", culture)}",
             BarPeriod.Shift => $"{local.AddHours(-Math.Clamp(shiftStartHour, 0, 23)).ToString("dd/MM", culture)} T{(((local.Hour - shiftStartHour + 24) % 24) / 8) + 1}",
             _ => local.ToString("dd/MM HH:mm", culture),
         };

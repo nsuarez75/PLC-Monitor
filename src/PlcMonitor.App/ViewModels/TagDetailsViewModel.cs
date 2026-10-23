@@ -6,6 +6,7 @@ using Grpc.Core;
 using PlcMonitor.Agent.Contracts;
 using PlcMonitor.Agent.Contracts.Client;
 using PlcMonitor.App.Charts;
+using PlcMonitor.App.Localization;
 
 namespace PlcMonitor.App.ViewModels;
 
@@ -13,7 +14,7 @@ namespace PlcMonitor.App.ViewModels;
 /// Ventana de detalle de un tag: su valor en vivo y su configuración (nombre, dirección, grupo de escaneo, escritura,
 /// tipo). Al guardar se reescribe el dispositivo en el agente, que valida todo antes de aplicarlo.
 /// </summary>
-public sealed partial class TagDetailsViewModel : ObservableObject
+public sealed partial class TagDetailsViewModel : LocalizedObservableObject
 {
     public const string AutomaticType = "Automático";
 
@@ -242,10 +243,10 @@ public sealed partial class TagDetailsViewModel : ObservableObject
 
     /// <summary>Los textos de la transformación elegida (p.ej. «0 = Parado · 1 = Marcha»).</summary>
     public string TransformPreview => SelectedTransform == NoTransform
-        ? "Las transformaciones se crean en «Transformaciones», en la barra superior."
+        ? Loc.T("Las transformaciones se crean en «Transformaciones», en la barra superior.")
         : _context.FindTransform(SelectedTransform) is { } transform
-            ? transform.Entries.Count == 0 ? "La transformación no tiene valores." : string.Join(" · ", transform.Entries.Select(e => $"{e.Value} = {e.Text}"))
-            : "Esta transformación ya no existe en el agente.";
+            ? transform.Entries.Count == 0 ? Loc.T("La transformación no tiene valores.") : string.Join(" · ", transform.Entries.Select(e => $"{e.Value} = {e.Text}"))
+            : Loc.T("Esta transformación ya no existe en el agente.");
 
     public ObservableCollection<string> DataTypes { get; }
 
@@ -274,12 +275,12 @@ public sealed partial class TagDetailsViewModel : ObservableObject
     {
         get
         {
-            const string note = "Los decimales se aplican a los reales. Solo cambia cómo se ve: el histórico guarda el valor completo.";
+            var note = Loc.T("Los decimales se aplican a los reales. Solo cambia cómo se ve: el histórico guarda el valor completo.");
             if (SelectedTransform != NoTransform)
-                return "Con transformación se ve su texto; la unidad y los decimales, en los valores que no tienen texto y en las gráficas.";
+                return Loc.T("Con transformación se ve su texto; la unidad y los decimales, en los valores que no tienen texto y en las gráficas.");
             if (Tag.IsBad || Tag.ValueText.Length == 0 || !Enum.TryParse<DataType>(Tag.DataType, out var type) || !ValueDisplay.IsNumeric(type))
                 return note;
-            return $"Se verá como {ValueDisplay.Format(Tag.ValueText, type, Decimals, Unit)}. {note}";
+            return Loc.F("Se verá como {0}. {1}", ValueDisplay.Format(Tag.ValueText, type, Decimals, Unit), note);
         }
     }
 
@@ -323,13 +324,13 @@ public sealed partial class TagDetailsViewModel : ObservableObject
             double.TryParse(text.Trim().Replace(',', '.'), NumberStyles.Float, CultureInfo.InvariantCulture, out value) && double.IsFinite(value);
         if (!Parse(ScaleRawMin, out var rawMin) || !Parse(ScaleRawMax, out var rawMax) || !Parse(ScaleEngMin, out var engMin) || !Parse(ScaleEngMax, out var engMax))
         {
-            error = "Los cuatro puntos del escalado deben ser números.";
+            error = Loc.T("Los cuatro puntos del escalado deben ser números.");
             return null;
         }
         if (rawMin == rawMax)
-            error = "El bruto mínimo y el máximo no pueden ser iguales.";
+            error = Loc.T("El bruto mínimo y el máximo no pueden ser iguales.");
         else if (engMin == engMax)
-            error = "El mínimo y el máximo de ingeniería no pueden ser iguales.";
+            error = Loc.T("El mínimo y el máximo de ingeniería no pueden ser iguales.");
         return new Scaling { RawMin = rawMin, RawMax = rawMax, EngMin = engMin, EngMax = engMax, Clamp = ScaleClamp };
     }
 
@@ -338,12 +339,12 @@ public sealed partial class TagDetailsViewModel : ObservableObject
     {
         get
         {
-            const string note = "Cambia los números: el histórico, las bandas muertas, los disparos y las escrituras usan el valor escalado.";
+            var note = Loc.T("Cambia los números: el histórico, las bandas muertas, los disparos y las escrituras usan el valor escalado.");
             var scaling = BuildScaling(out var error);
             if (error is not null)
                 return error;
             if (scaling is null)
-                return "El valor se usa tal como lo lee el PLC.";
+                return Loc.T("El valor se usa tal como lo lee el PLC.");
             // El bruto actual: el que manda el agente si ya escala, o el valor tal cual si aún no.
             var rawText = Tag.HasRaw ? Tag.RawText : _originalScaling is null ? Tag.ValueText : "";
             if (Tag.IsBad || !double.TryParse(rawText, NumberStyles.Float, CultureInfo.InvariantCulture, out var raw))
@@ -351,7 +352,7 @@ public sealed partial class TagDetailsViewModel : ObservableObject
             var engineering = (raw - scaling.RawMin) / (scaling.RawMax - scaling.RawMin) * (scaling.EngMax - scaling.EngMin) + scaling.EngMin;
             if (scaling.Clamp)
                 engineering = Math.Clamp(engineering, Math.Min(scaling.EngMin, scaling.EngMax), Math.Max(scaling.EngMin, scaling.EngMax));
-            return $"Bruto {rawText} → {ValueDisplay.Format(Number(engineering), Agent.Contracts.DataType.Double, Decimals, Unit)}. {note}";
+            return Loc.F("Bruto {0} → {1}. {2}", rawText, ValueDisplay.Format(Number(engineering), Agent.Contracts.DataType.Double, Decimals, Unit), note);
         }
     }
 
@@ -406,10 +407,10 @@ public sealed partial class TagDetailsViewModel : ObservableObject
         {
             var name = GroupName.Trim();
             if (!_groupIntervals.TryGetValue(name, out var current))
-                return $"Grupo nuevo: se creará con un periodo de {IntervalMs} ms.";
+                return Loc.F("Grupo nuevo: se creará con un periodo de {0} ms.", IntervalMs);
             return current == IntervalMs
-                ? $"El grupo «{name}» se lee cada {current} ms."
-                : $"Cambia el periodo de todo el grupo «{name}» (de {current} a {IntervalMs} ms).";
+                ? Loc.F("El grupo «{0}» se lee cada {1} ms.", name, current)
+                : Loc.F("Cambia el periodo de todo el grupo «{0}» (de {1} a {2} ms).", name, current, IntervalMs);
         }
     }
 
@@ -431,9 +432,9 @@ public sealed partial class TagDetailsViewModel : ObservableObject
         if (stored is null)
             return;
         if (saved.Scaling is not null && stored.Scaling is null)
-            _context.Report("El agente no aplica el escalado: actualízalo a la versión 1.9 o posterior.", isError: true);
+            _context.Report(Loc.T("El agente no aplica el escalado: actualízalo a la versión 1.9 o posterior."), isError: true);
         else if ((saved.Unit.Length > 0 || saved.HasDecimals) && stored.Unit.Length == 0 && !stored.HasDecimals)
-            _context.Report("El agente no guarda la unidad ni los decimales: actualízalo a la versión 1.8 o posterior.", isError: true);
+            _context.Report(Loc.T("El agente no guarda la unidad ni los decimales: actualízalo a la versión 1.8 o posterior."), isError: true);
     }
 
     private bool CanSave() => !IsBusy && !string.IsNullOrWhiteSpace(Name) && !string.IsNullOrWhiteSpace(Address);
@@ -451,8 +452,8 @@ public sealed partial class TagDetailsViewModel : ObservableObject
         }
         // Lo ya guardado se queda con la escala anterior: las muestras viejas y las nuevas no se pueden comparar.
         if (!Equals(scaling, _originalScaling) && HistorianEnabled && (Tag.Historized || HistoryEnabled)
-            && !await _context.Dialogs.ConfirmAsync("Escalado",
-                $"El histórico de «{_originalName}» ya guardado seguirá con la escala anterior: las muestras viejas y las nuevas no serán comparables.\n¿Cambiar el escalado?"))
+            && !await _context.Dialogs.ConfirmAsync(Loc.T("Escalado"),
+                Loc.F("El histórico de «{0}» ya guardado seguirá con la escala anterior: las muestras viejas y las nuevas no serán comparables.\n¿Cambiar el escalado?", _originalName)))
         {
             return;
         }
@@ -465,7 +466,7 @@ public sealed partial class TagDetailsViewModel : ObservableObject
             var (oldGroup, tag) = Find(device, _originalName);
             if (tag is null)
             {
-                Errors = $"El tag «{_originalName}» ya no existe en {Device}.";
+                Errors = Loc.F("El tag «{0}» ya no existe en {1}.", _originalName, Device);
                 return;
             }
             oldGroup!.Tags.Remove(tag);
@@ -523,18 +524,18 @@ public sealed partial class TagDetailsViewModel : ObservableObject
             }
 
             await client.PutDeviceAsync(new PutDeviceRequest { Device = device, Persist = true });
-            _context.Report($"Tag {Device}/{name} guardado" + retargeted switch
+            _context.Report(Loc.F("Tag {0}/{1} guardado", Device, name) + retargeted switch
             {
                 0 => "",
-                1 => " (1 tag sigue disparándose con él)",
-                _ => $" ({retargeted} tags siguen disparándose con él)",
+                1 => Loc.T(" (1 tag sigue disparándose con él)"),
+                _ => Loc.F(" ({0} tags siguen disparándose con él)", retargeted),
             });
             if (saved.Unit.Length > 0 || saved.HasDecimals || saved.Scaling is not null)
                 await WarnIfIgnoredAsync(client, saved, name);
             if (name != _originalName && HistorianEnabled && (Tag.Historized || HistoryEnabled))
             {
                 await HistoryMover.OfferAsync(_context, client,
-                    new HistoryRename { FromDevice = Device, FromTag = _originalName, ToDevice = Device, ToTag = name }, $"el tag «{_originalName}»", name);
+                    new HistoryRename { FromDevice = Device, FromTag = _originalName, ToDevice = Device, ToTag = name }, Loc.F("el tag «{0}»", _originalName), name);
             }
             Saved = true;
         }

@@ -4,6 +4,7 @@ using Google.Protobuf.WellKnownTypes;
 using Grpc.Core;
 using PlcMonitor.Agent.Contracts;
 using PlcMonitor.App.Charts;
+using PlcMonitor.App.Localization;
 using PlcMonitor.App.Services;
 
 namespace PlcMonitor.App.ViewModels;
@@ -12,7 +13,7 @@ namespace PlcMonitor.App.ViewModels;
 /// Barras por periodo de una vista: consulta el histórico del agente (una petición por dispositivo) agregado por el
 /// periodo elegido y dibuja un grupo de barras por periodo. No es en vivo: se vuelve a consultar con «Actualizar».
 /// </summary>
-public sealed partial class PeriodBarsViewModel : ObservableObject
+public sealed partial class PeriodBarsViewModel : LocalizedObservableObject
 {
     public static IReadOnlyList<Choice<BarPeriod>> Periods { get; } =
     [
@@ -40,6 +41,8 @@ public sealed partial class PeriodBarsViewModel : ObservableObject
     private readonly TrendView _view;
     private readonly Func<TrendTagRef, TagViewModel?>? _findTag;
     private readonly IReadOnlyDictionary<TrendTagRef, TrendSource>? _local;
+    private readonly Choice<int>? _rangeChoice;
+    private readonly string _file = "";
 
     public PeriodBarsViewModel(IAgentContext context, TrendView view, Func<TrendTagRef, TagViewModel?> findTag)
     {
@@ -49,7 +52,7 @@ public sealed partial class PeriodBarsViewModel : ObservableObject
         Chart.BarPeriod = view.BarPeriod;
         Chart.ShiftStartHour = view.ShiftStartHour;
         var range = Ranges.FirstOrDefault(r => r.Value == view.BarDays) ?? Ranges[0];
-        Description = $"{Text(Metrics, view.BarMetric)} por {Text(Periods, view.BarPeriod).ToLowerInvariant()} · {range.Text.ToLowerInvariant()}";
+        _rangeChoice = range;
     }
 
     /// <summary>Barras de los datos de un CSV, calculadas aquí (todo el fichero, sin agente).</summary>
@@ -57,15 +60,17 @@ public sealed partial class PeriodBarsViewModel : ObservableObject
     {
         _view = view;
         _local = local;
+        _file = file;
         Chart.BarPeriod = view.BarPeriod;
         Chart.ShiftStartHour = view.ShiftStartHour;
-        Description = $"{Text(Metrics, view.BarMetric)} por {Text(Periods, view.BarPeriod).ToLowerInvariant()} · CSV {file}";
     }
 
-    public ChartViewModel Chart { get; } = new() { Kind = ChartKind.Bars, EmptyText = "Consultando el histórico…" };
+    public ChartViewModel Chart { get; } = new() { Kind = ChartKind.Bars, EmptyText = Loc.N("Consultando el histórico…") };
 
     /// <summary>Qué se ve: cálculo, periodo y rango.</summary>
-    public string Description { get; }
+    public string Description => _local is null
+        ? Loc.F("{0} por {1} · {2}", Text(Metrics, _view.BarMetric), Text(Periods, _view.BarPeriod).ToLowerInvariant(), _rangeChoice!.Text.ToLowerInvariant())
+        : Loc.F("{0} por {1} · CSV {2}", Text(Metrics, _view.BarMetric), Text(Periods, _view.BarPeriod).ToLowerInvariant(), _file);
 
     [ObservableProperty]
     public partial string Summary { get; private set; } = "";
@@ -90,22 +95,22 @@ public sealed partial class PeriodBarsViewModel : ObservableObject
         }
         if (_context!.Client is not { } client)
         {
-            Chart.EmptyText = "Conéctate al agente para consultar su histórico";
+            Chart.EmptyText = Loc.N("Conéctate al agente para consultar su histórico");
             Chart.SetData([]);
             return;
         }
         var historized = _view.Tags.Where(t => _findTag!(t)?.Historized == true).ToList();
         var missing = _view.Tags.Except(historized).Select(t => t.ToString()).ToList();
-        Missing = missing.Count == 0 ? "" : $"Sin histórico en el agente: {string.Join(", ", missing)}";
+        Missing = missing.Count == 0 ? "" : Loc.F("Sin histórico en el agente: {0}", string.Join(", ", missing));
         if (historized.Count == 0)
         {
-            Chart.EmptyText = "Ningún tag de la vista se historiza: actívalo en la configuración del dispositivo";
+            Chart.EmptyText = Loc.N("Ningún tag de la vista se historiza: actívalo en la configuración del dispositivo");
             Chart.SetData([]);
             return;
         }
 
         IsBusy = true;
-        Summary = "Consultando…";
+        Summary = Loc.T("Consultando…");
         try
         {
             var period = _view.BarPeriod;
@@ -142,15 +147,17 @@ public sealed partial class PeriodBarsViewModel : ObservableObject
                     data.Add(new ChartSeriesData(key.ToString(), points, Step: false) { Display = Format(key) });
                 }
             }
-            Chart.EmptyText = "No hay histórico de estos tags en ese periodo";
+            Chart.EmptyText = Loc.N("No hay histórico de estos tags en ese periodo");
             Chart.SetData(data, from, now);
             var periods = data.SelectMany(d => d.Points).Select(p => p.Time).Distinct().Count();
-            Summary = $"{periods} {(periods == 1 ? "periodo" : "periodos")} · consultado a las {DateTime.Now:HH:mm:ss}" + (truncated ? " · resultado recortado" : "");
+            Summary = Loc.F(periods == 1 ? "{0} periodo" : "{0} periodos", periods)
+                + " · " + Loc.F("consultado a las {0}", DateTime.Now.ToString("HH:mm:ss", System.Globalization.CultureInfo.InvariantCulture))
+                + (truncated ? " · " + Loc.T("resultado recortado") : "");
         }
         catch (RpcException ex)
         {
             Summary = "";
-            Chart.EmptyText = "No se ha podido consultar el histórico";
+            Chart.EmptyText = Loc.N("No se ha podido consultar el histórico");
             _context.Report(_context.Describe(ex), isError: true);
         }
         finally
@@ -163,13 +170,13 @@ public sealed partial class PeriodBarsViewModel : ObservableObject
     {
         var present = _view.Tags.Where(local.ContainsKey).ToList();
         var missing = _view.Tags.Except(present).Select(t => t.ToString()).ToList();
-        Missing = missing.Count == 0 ? "" : $"No están en el CSV: {string.Join(", ", missing)}";
+        Missing = missing.Count == 0 ? "" : Loc.F("No están en el CSV: {0}", string.Join(", ", missing));
         var data = present.Select(t => new ChartSeriesData(t.ToString(),
             PeriodBars.Compute(local[t].Points, _view.BarPeriod, _view.BarMetric, _view.ShiftStartHour), Step: false) { Display = Format(t) }).ToList();
-        Chart.EmptyText = "El CSV no tiene valores de estos tags";
+        Chart.EmptyText = Loc.N("El CSV no tiene valores de estos tags");
         Chart.SetData(data);
         var periods = data.SelectMany(d => d.Points).Select(p => p.Time).Distinct().Count();
-        Summary = $"{periods} {(periods == 1 ? "periodo" : "periodos")}";
+        Summary = Loc.F(periods == 1 ? "{0} periodo" : "{0} periodos", periods);
     }
 
     private SeriesFormat Format(TrendTagRef tag) => _findTag?.Invoke(tag)?.SeriesFormat ?? SeriesFormat.None;

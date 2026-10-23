@@ -30,7 +30,10 @@ public static class CursorReadout
             var (va, vb) = (s.ValueAt(a), s.ValueAt(b));
             var text = $"A {s.Format(va)} · B {s.Format(vb)}";
             if (!s.IsBoolean && va is { } x && vb is { } y)
-                text += $" · Δ {(y - x >= 0 ? "+" : "−")}{s.Display.Format(Math.Abs(y - x))}";
+            {
+                var sign = y - x >= 0 ? "+" : "−";
+                text += $" · Δ {sign}{s.Display.Format(Math.Abs(y - x))}";
+            }
             return new CursorRow(s.Name, s.ColorIndex, va, vb, text);
         }).ToList();
 }

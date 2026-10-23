@@ -4,6 +4,7 @@ using Avalonia.Controls;
 using Avalonia.Input;
 using Avalonia.Media;
 using PlcMonitor.App.Charts;
+using PlcMonitor.App.Localization;
 
 namespace PlcMonitor.App.Controls;
 
@@ -260,7 +261,7 @@ public sealed class TrendChart : Control
         var withValues = series.Where(s => s.Points.Any(p => p.Value is not null)).ToArray();
         if (withValues.Length == 0)
         {
-            var empty = Text(EmptyText, muted, 13);
+            var empty = Text(Loc.T(EmptyText), muted, 13);
             context.DrawText(empty, new Point((bounds.Width - empty.Width) / 2, (bounds.Height - empty.Height) / 2));
             return;
         }
@@ -405,7 +406,7 @@ public sealed class TrendChart : Control
         }
         else
         {
-            lines.Add((Text(CursorA is null ? "Haz clic para poner el cursor A" : "Haz clic para poner el cursor B", muted, 11.5), null));
+            lines.Add((Text(Loc.T(CursorA is null ? "Haz clic para poner el cursor A" : "Haz clic para poner el cursor B"), muted, 11.5), null));
         }
         var width = lines.Max(l => l.Text.Width + (l.Swatch is null ? 0 : 16)) + 16;
         var height = lines.Sum(l => l.Text.Height + 2) + 10;

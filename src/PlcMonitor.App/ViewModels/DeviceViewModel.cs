@@ -4,11 +4,12 @@ using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using Grpc.Core;
 using PlcMonitor.Agent.Contracts;
+using PlcMonitor.App.Localization;
 
 namespace PlcMonitor.App.ViewModels;
 
 /// <summary>Un dispositivo del agente con su estado y sus tags.</summary>
-public sealed partial class DeviceViewModel : ObservableObject
+public sealed partial class DeviceViewModel : LocalizedObservableObject
 {
     private readonly IAgentContext _context;
 
@@ -39,11 +40,11 @@ public sealed partial class DeviceViewModel : ObservableObject
 
     public bool HasDisabledTags => DisabledCount > 0;
 
-    public string DisabledText => DisabledCount == 1 ? "1 desactivado" : $"{DisabledCount} desactivados";
+    public string DisabledText => DisabledCount == 1 ? Loc.T("1 desactivado") : Loc.F("{0} desactivados", DisabledCount);
 
     public bool HasTags => Tags.Count > 0;
 
-    public string TagCountText => Tags.Count == 1 ? "1 tag" : $"{Tags.Count} tags";
+    public string TagCountText => Tags.Count == 1 ? Loc.T("1 tag") : Loc.F("{0} tags", Tags.Count);
 
     private void OnTagChanged(object? sender, System.ComponentModel.PropertyChangedEventArgs e)
     {
@@ -150,7 +151,7 @@ public sealed partial class DeviceViewModel : ObservableObject
                 tag.Folder = folder;
             await client.PutDeviceAsync(new PutDeviceRequest { Device = device, Persist = true });
             var what = tags.Count == 1 ? $"{tags[0].Name}" : $"{tags.Count} tags";
-            _context.Report(folder.Length == 0 ? $"{what} sin grupo" : $"{what} en el grupo «{folder}»");
+            _context.Report(folder.Length == 0 ? Loc.F("{0} sin grupo", what) : Loc.F("{0} en el grupo «{1}»", what, folder));
         }
         catch (RpcException ex)
         {
@@ -212,8 +213,8 @@ public sealed partial class DeviceViewModel : ObservableObject
             }
             await client.PutDeviceAsync(new PutDeviceRequest { Device = device, Persist = true });
             var what = dragged.Count == 1 ? dragged[0].Name : $"{dragged.Count} tags";
-            _context.Report(folder is null ? $"{what} {(after ? "detrás" : "delante")} de {target.Name}"
-                : $"{what} en el grupo «{(folder.Length == 0 ? "Sin grupo" : folder)}», {(after ? "detrás" : "delante")} de {target.Name}");
+            _context.Report(folder is null ? Loc.F("{0} {1} de {2}", what, Loc.T(after ? "detrás" : "delante"), target.Name)
+                : Loc.F("{0} en el grupo «{1}», {2} de {3}", what, folder.Length == 0 ? Loc.T("Sin grupo") : folder, Loc.T(after ? "detrás" : "delante"), target.Name));
         }
         catch (RpcException ex)
         {
@@ -225,9 +226,9 @@ public sealed partial class DeviceViewModel : ObservableObject
     public async Task MoveToNewFolderAsync(IReadOnlyList<TagViewModel> tags)
     {
         ArgumentNullException.ThrowIfNull(tags);
-        var name = await _context.Dialogs.PromptAsync("Nuevo grupo", tags.Count == 1
-            ? $"Nombre del grupo para {tags[0].Name}:"
-            : $"Nombre del grupo para los {tags.Count} tags seleccionados:");
+        var name = await _context.Dialogs.PromptAsync(Loc.T("Nuevo grupo"), tags.Count == 1
+            ? Loc.F("Nombre del grupo para {0}:", tags[0].Name)
+            : Loc.F("Nombre del grupo para los {0} tags seleccionados:", tags.Count));
         if (!string.IsNullOrWhiteSpace(name))
             await MoveToFolderAsync(tags, name);
     }
@@ -241,7 +242,7 @@ public sealed partial class DeviceViewModel : ObservableObject
         ArgumentNullException.ThrowIfNull(folder);
         if (folder.Name.Length == 0)
             return;
-        var name = (await _context.Dialogs.PromptAsync("Renombrar grupo", $"Nombre nuevo del grupo «{folder.Name}»:", folder.Name))?.Trim();
+        var name = (await _context.Dialogs.PromptAsync(Loc.T("Renombrar grupo"), Loc.F("Nombre nuevo del grupo «{0}»:", folder.Name), folder.Name))?.Trim();
         if (string.IsNullOrEmpty(name) || name == folder.Name)
             return;
         if (!folder.IsExpanded)
@@ -271,11 +272,11 @@ public sealed partial class DeviceViewModel : ObservableObject
             var dependents = device.ScanGroups.SelectMany(g => g.Tags)
                 .Where(t => !names.Contains(EffectiveName(t)) && t.History?.Trigger is { } trigger && names.Contains(trigger.Tag))
                 .ToArray();
-            var what = tags.Count == 1 ? $"el tag {tags[0].Name} ({tags[0].Address})" : $"{tags.Count} tags ({string.Join(", ", tags.Take(5).Select(t => t.Name))}{(tags.Count > 5 ? "…" : "")})";
-            var message = $"¿Quitar {what} de {Name}?";
+            var what = tags.Count == 1 ? Loc.F("el tag {0} ({1})", tags[0].Name, tags[0].Address) : Loc.F("{0} tags ({1}{2})", tags.Count, string.Join(", ", tags.Take(5).Select(t => t.Name)), tags.Count > 5 ? "…" : "");
+            var message = Loc.F("¿Quitar {0} de {1}?", what, Name);
             if (dependents.Length > 0)
-                message += $"\nTambién se quita el disparo del histórico de {string.Join(", ", dependents.Select(EffectiveName))}.";
-            if (!await _context.Dialogs.ConfirmAsync(tags.Count == 1 ? "Quitar tag" : "Quitar tags", message))
+                message += "\n" + Loc.F("También se quita el disparo del histórico de {0}.", string.Join(", ", dependents.Select(EffectiveName)));
+            if (!await _context.Dialogs.ConfirmAsync(Loc.T(tags.Count == 1 ? "Quitar tag" : "Quitar tags"), message))
                 return;
             foreach (var group in device.ScanGroups.ToArray())
             {
@@ -289,7 +290,7 @@ public sealed partial class DeviceViewModel : ObservableObject
             foreach (var name in names)
                 device.TagOrder.Remove(name);
             await client.PutDeviceAsync(new PutDeviceRequest { Device = device, Persist = true });
-            _context.Report(tags.Count == 1 ? $"Tag {Name}/{tags[0].Name} quitado" : $"{tags.Count} tags quitados de {Name}");
+            _context.Report(tags.Count == 1 ? Loc.F("Tag {0}/{1} quitado", Name, tags[0].Name) : Loc.F("{0} tags quitados de {1}", tags.Count, Name));
         }
         catch (RpcException ex)
         {
@@ -313,8 +314,8 @@ public sealed partial class DeviceViewModel : ObservableObject
             foreach (var tag in device.ScanGroups.SelectMany(g => g.Tags).Where(t => names.Contains(EffectiveName(t))))
                 tag.Disabled = !enabled;
             await client.PutDeviceAsync(new PutDeviceRequest { Device = device, Persist = true });
-            var what = tags.Count == 1 ? $"Tag {Name}/{tags[0].Name}" : $"{tags.Count} tags de {Name}";
-            _context.Report(enabled ? $"{what}: activado{(tags.Count == 1 ? "" : "s")}" : $"{what}: desactivado{(tags.Count == 1 ? "" : "s")}");
+            var what = tags.Count == 1 ? Loc.F("Tag {0}/{1}", Name, tags[0].Name) : Loc.F("{0} tags de {1}", tags.Count, Name);
+            _context.Report(enabled ? Loc.F("{0}: {1}", what, Loc.T(tags.Count == 1 ? "activado" : "activados")) : Loc.F("{0}: {1}", what, Loc.T(tags.Count == 1 ? "desactivado" : "desactivados")));
         }
         catch (RpcException ex)
         {
@@ -366,13 +367,13 @@ public sealed partial class DeviceViewModel : ObservableObject
 
     public string StateText => State switch
     {
-        ConnectionState.Connected => "Conectado",
-        ConnectionState.Connecting => "Conectando…",
-        ConnectionState.Faulted => "En fallo",
-        _ => Enabled ? "Desconectado" : "Desactivado",
+        ConnectionState.Connected => Loc.T("Conectado"),
+        ConnectionState.Connecting => Loc.T("Conectando…"),
+        ConnectionState.Faulted => Loc.T("En fallo"),
+        _ => Loc.T(Enabled ? "Desconectado" : "Desactivado"),
     };
 
-    public string ToggleText => Enabled ? "Desactivar" : "Activar";
+    public string ToggleText => Loc.T(Enabled ? "Desactivar" : "Activar");
 
     public void Apply(Device device)
     {
@@ -384,7 +385,7 @@ public sealed partial class DeviceViewModel : ObservableObject
         State = device.State;
         var detail = device.Detail;
         if (device.NextRetry is not null)
-            detail = $"{detail} · reintento a las {device.NextRetry.ToDateTime().ToLocalTime().ToString("HH:mm:ss", CultureInfo.InvariantCulture)}".Trim(' ', '·');
+            detail = Loc.F("{0} · reintento a las {1}", detail, device.NextRetry.ToDateTime().ToLocalTime().ToString("HH:mm:ss", CultureInfo.InvariantCulture)).Trim(' ', '·');
         Detail = detail;
         Since = device.Since?.ToDateTime().ToLocalTime().ToString("dd/MM HH:mm:ss", CultureInfo.InvariantCulture) ?? "";
         OnPropertyChanged(nameof(StateText));
@@ -399,7 +400,7 @@ public sealed partial class DeviceViewModel : ObservableObject
         {
             // El estado lo trae la suscripción: aplicar aquí la respuesta podría pisar un estado más reciente.
             var device = await client.SetDeviceEnabledAsync(new SetDeviceEnabledRequest { Device = Name, Enabled = !Enabled, Persist = true });
-            _context.Report($"{Name} {(device.Enabled ? "activado" : "desactivado")}");
+            _context.Report(Loc.F("{0} {1}", Name, Loc.T(device.Enabled ? "activado" : "desactivado")));
         }
         catch (RpcException ex)
         {
