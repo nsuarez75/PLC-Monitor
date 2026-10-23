@@ -295,6 +295,9 @@
                   <Border Classes="pill bad" IsVisible="{Binding HasBadTags}">
                     <TextBlock><Run Text="{Binding BadCount}" /><Run Text=" con error" /></TextBlock>
                   </Border>
+                  <Border Classes="pill" IsVisible="{Binding HasDisabledTags}" ToolTip.Tip="No se leen, ni se historizan, ni se publican en OPC UA. Clic derecho en el tag → Activar">
+                    <TextBlock><Run Text="{Binding DisabledCount}" /><Run Text=" desactivados" /></TextBlock>
+                  </Border>
                 </StackPanel>
 
                 <Border Classes="card" ClipToBounds="True">
@@ -323,7 +326,7 @@
                       <TextBlock Classes="muted" Text="{Binding EmptyTagsHint}" HorizontalAlignment="Center" />
                     </StackPanel>
                     <ListBox x:Name="TagsList" Classes="table" ItemsSource="{Binding SelectedDevice.Rows}" SelectionMode="Multiple" DragDrop.AllowDrop="True"
-                             ToolTip.Tip="Doble clic para ver el detalle del tag. Clic derecho para editar, ver su histórico, agrupar o quitar (Ctrl o Mayús para elegir varios). Arrastra tags a un grupo para moverlos">
+                             ToolTip.Tip="Doble clic para ver el detalle del tag. Clic derecho para editar, ver su histórico, agrupar, activar o desactivar, o quitar (Ctrl o Mayús para elegir varios). Arrastra tags a un grupo para moverlos">
                       <ListBox.ContextMenu>
                         <ContextMenu x:Name="TagsMenu" />
                       </ListBox.ContextMenu>
@@ -344,7 +347,7 @@
                           </Button>
                         </DataTemplate>
                         <DataTemplate x:DataType="vm:TagViewModel">
-                          <c:TableRow Columns="{Binding $parent[Window].((vm:MainViewModel)DataContext).TagColumns, FallbackValue=*}" HideOrder="3,5,1" MinStarWidth="45" ColumnSpacing="12">
+                          <c:TableRow Columns="{Binding $parent[Window].((vm:MainViewModel)DataContext).TagColumns, FallbackValue=*}" HideOrder="3,5,1" MinStarWidth="45" ColumnSpacing="12" Classes.off="{Binding IsDisabled}">
                             <StackPanel VerticalAlignment="Center" Classes="tagname" Classes.infolder="{Binding IsInFolder}">
                               <DockPanel>
                                 <c:Icon DockPanel.Dock="Left" Kind="history" Width="13" Height="13" Margin="0,0,6,0" Foreground="{DynamicResource App.Accent}"
@@ -359,7 +362,7 @@
                                        Classes.error="{Binding IsBad}" TextTrimming="CharacterEllipsis" VerticalAlignment="Center" ToolTip.Tip="{Binding DisplayText}" />
                             <TextBlock Grid.Column="3" Text="{Binding DataType}" Classes="muted" VerticalAlignment="Center" TextTrimming="CharacterEllipsis" />
                             <Border Grid.Column="4" Classes="pill" HorizontalAlignment="Left" Classes.good="{Binding IsGood}" Classes.warn="{Binding IsUncertain}" Classes.bad="{Binding IsBad}">
-                              <TextBlock Text="{Binding Quality}" TextTrimming="CharacterEllipsis" ToolTip.Tip="{Binding Quality}" />
+                              <TextBlock Text="{Binding QualityText}" TextTrimming="CharacterEllipsis" ToolTip.Tip="{Binding QualityText}" />
                             </Border>
                             <TextBlock Grid.Column="5" Text="{Binding Time}" Classes="muted mono" FontSize="11.5" VerticalAlignment="Center" TextTrimming="CharacterEllipsis" />
                             <StackPanel Grid.Column="6" Orientation="Horizontal" Spacing="4" VerticalAlignment="Center">

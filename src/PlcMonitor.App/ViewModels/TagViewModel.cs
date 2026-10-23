@@ -21,8 +21,9 @@ public sealed partial class TagViewModel : ObservableObject
         Name = tag.Name;
         Address = tag.Address;
         Group = $"{tag.Group} ({tag.IntervalMs} ms)";
-        // Con el token de lectura el agente rechazaría la escritura: no se ofrece.
-        Writable = tag.Writable && !context.ReadOnlyAccess;
+        IsDisabled = tag.Disabled;
+        // Con el token de lectura el agente rechazaría la escritura: no se ofrece. Tampoco en un tag desactivado.
+        Writable = tag.Writable && !context.ReadOnlyAccess && !IsDisabled;
         Historized = tag.Historized;
         Transform = tag.Transform;
         Folder = tag.Folder;
@@ -42,6 +43,9 @@ public sealed partial class TagViewModel : ObservableObject
     public string Group { get; }
 
     public bool Writable { get; }
+
+    /// <summary>Tag desactivado en el agente: no se lee, ni se historiza, ni se publica en OPC UA.</summary>
+    public bool IsDisabled { get; }
 
     /// <summary>El agente guarda este tag en el histórico.</summary>
     public bool Historized { get; }
@@ -100,7 +104,7 @@ public sealed partial class TagViewModel : ObservableObject
     public partial string ValueText { get; set; } = "";
 
     [ObservableProperty]
-    [NotifyPropertyChangedFor(nameof(IsGood), nameof(IsUncertain), nameof(IsBad), nameof(IsTrue), nameof(IsFalse))]
+    [NotifyPropertyChangedFor(nameof(IsGood), nameof(IsUncertain), nameof(IsBad), nameof(IsTrue), nameof(IsFalse), nameof(QualityText))]
     public partial Quality Quality { get; set; } = Quality.BadNotConnected;
 
     [ObservableProperty]
@@ -119,7 +123,11 @@ public sealed partial class TagViewModel : ObservableObject
 
     public bool IsUncertain => Quality == Quality.Uncertain;
 
-    public bool IsBad => !IsGood && !IsUncertain;
+    /// <summary>Con error: calidad mala en un tag activo (uno desactivado no tiene valor, pero no es un error).</summary>
+    public bool IsBad => !IsGood && !IsUncertain && !IsDisabled;
+
+    /// <summary>Texto de la columna de calidad.</summary>
+    public string QualityText => IsDisabled ? "Desactivado" : Quality.ToString();
 
     public bool IsBoolean => DataType == nameof(Agent.Contracts.DataType.Boolean);
 

@@ -240,6 +240,7 @@ public sealed class MainViewModelTests : IDisposable
             .ShouldBe(("velocidad", "DB1.DBW0", "g", 50, false, TagDetailsViewModel.AutomaticType));
         details.WritesEnabled.ShouldBeTrue();
         (details.OpcUaPublished, details.DeviceOpcUaPublished).ShouldBe((true, false)); // tag publicado por defecto; el dispositivo no
+        details.TagEnabled.ShouldBeTrue();
         details.Groups.ShouldBe(["g"]);
         details.GroupNote.ShouldBe("El grupo «g» se lee cada 50 ms.");
 
@@ -254,18 +255,20 @@ public sealed class MainViewModelTests : IDisposable
         details.GroupNote.ShouldBe("Grupo nuevo: se creará con un periodo de 2000 ms.");
         details.Writable = true;
         details.OpcUaPublished = false;
+        details.TagEnabled = false;
         details.SelectedDataType = "Int16";
         await details.SaveCommand.ExecuteAsync(null);
 
         details.Saved.ShouldBeTrue(details.Errors);
         (await ConfigurationFileLoad(agent)).Devices[0].ScanGroups.Single(g => g.Name == "lento").Tags.Single().OpcUaPublished.ShouldBeFalse();
+        (await ConfigurationFileLoad(agent)).Devices[0].ScanGroups.Single(g => g.Name == "lento").Tags.Single().Enabled.ShouldBeFalse();
         var saved = (await ConfigurationFileLoad(agent)).Devices[0];
         var moved = saved.ScanGroups.Single(g => g.Name == "lento");
         moved.IntervalMs.ShouldBe(2000);
         var config = moved.Tags.ShouldHaveSingleItem();
         (config.Name, config.Address, config.Writable, config.DataType).ShouldBe(("consigna", "DB1.DBW0", true, (PlcMonitor.Abstractions.TagDataType?)PlcMonitor.Abstractions.TagDataType.Int16));
         saved.ScanGroups.Single(g => g.Name == "g").Tags.Select(t => t.Name).ShouldBe(["otro"]);
-        await Wait.UntilAsync(() => _ui.Read(() => vm.Devices[0].Tags.Any(t => t.Name == "consigna" && t.Writable)), "tag renombrado en la lista");
+        await Wait.UntilAsync(() => _ui.Read(() => vm.Devices[0].Tags.Any(t => t.Name == "consigna" && t.IsDisabled && !t.Writable)), "tag renombrado y desactivado en la lista");
     }
 
     [Fact]

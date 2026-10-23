@@ -116,6 +116,26 @@ public sealed partial class MainWindow : Window
             }
             menu.Items.Add(MoveMenu(device, selected));
             menu.Items.Add(new Separator());
+            // Activar los desactivados y desactivar los activos (con una selección mixta salen las dos opciones).
+            var disabled = selected.Where(t => t.IsDisabled).ToArray();
+            var enabled = selected.Where(t => !t.IsDisabled).ToArray();
+            if (disabled.Length > 0)
+            {
+                menu.Items.Add(new MenuItem
+                {
+                    Header = disabled.Length == 1 ? "Activar tag" : $"Activar {disabled.Length} tags",
+                    Command = new RelayCommand(() => _ = device.SetTagsEnabledAsync(disabled, enabled: true)),
+                });
+            }
+            if (enabled.Length > 0)
+            {
+                menu.Items.Add(new MenuItem
+                {
+                    Header = enabled.Length == 1 ? "Desactivar tag" : $"Desactivar {enabled.Length} tags",
+                    Command = new RelayCommand(() => _ = device.SetTagsEnabledAsync(enabled, enabled: false)),
+                });
+            }
+            menu.Items.Add(new Separator());
             menu.Items.Add(new MenuItem
             {
                 Header = selected.Length == 1 ? "Quitar tag…" : $"Quitar {selected.Length} tags…",

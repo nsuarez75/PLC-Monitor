@@ -73,7 +73,7 @@
       <Border Classes="card" Padding="20">
         <StackPanel Spacing="12">
           <TextBlock Text="CONFIGURACIÓN" Classes="caption" />
-          <Grid ColumnDefinitions="150,*" RowDefinitions="Auto,Auto,Auto,Auto,Auto,Auto,Auto,Auto,Auto,Auto,Auto" RowSpacing="10" ColumnSpacing="16">
+          <Grid ColumnDefinitions="150,*" RowDefinitions="Auto,Auto,Auto,Auto,Auto,Auto,Auto,Auto,Auto,Auto,Auto,Auto" RowSpacing="10" ColumnSpacing="16">
             <TextBlock Text="Nombre" VerticalAlignment="Center" FontWeight="Medium" />
             <TextBox Grid.Column="1" Text="{Binding Name}" />
             <TextBlock Grid.Row="1" Text="Dirección" VerticalAlignment="Center" FontWeight="Medium" />
@@ -137,6 +137,9 @@
               <TextBlock Classes="muted" FontSize="12" TextWrapping="Wrap" IsVisible="{Binding !DeviceOpcUaPublished}"
                          Text="El dispositivo no se publica en OPC UA (1.ª llave): actívalo en «Editar» del dispositivo." />
             </StackPanel>
+            <TextBlock Grid.Row="11" Text="Estado" VerticalAlignment="Center" FontWeight="Medium" />
+            <CheckBox Grid.Row="11" Grid.Column="1" Content="Activo" IsChecked="{Binding TagEnabled}"
+                      ToolTip.Tip="Desactivado, el tag sigue configurado pero el agente no lo lee, no lo historiza ni lo publica en OPC UA" />
           </Grid>
         </StackPanel>
       </Border>

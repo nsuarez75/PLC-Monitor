@@ -298,6 +298,10 @@
   <Style Selector="StackPanel.tagname.infolder">
     <Setter Property="Margin" Value="22,0,0,0" />
   </Style>
+  <!-- Tag desactivado: la fila atenuada -->
+  <Style Selector="c|TableRow.off">
+    <Setter Property="Opacity" Value="0.5" />
+  </Style>
   <!-- Fila sobre la que se van a soltar tags arrastrados -->
   <Style Selector="ListBox.table ListBoxItem.droptarget /template/ ContentPresenter">
     <Setter Property="Background" Value="{DynamicResource App.AccentSoft}" />

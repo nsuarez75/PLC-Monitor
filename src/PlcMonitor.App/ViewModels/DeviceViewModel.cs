@@ -30,10 +30,14 @@ public sealed partial class DeviceViewModel : ObservableObject
     /// <summary>Tags con calidad buena.</summary>
     public int GoodCount => Tags.Count(t => t.IsGood);
 
-    /// <summary>Tags con calidad mala o incierta.</summary>
-    public int BadCount => Tags.Count(t => !t.IsGood);
+    /// <summary>Tags activos con calidad mala o incierta.</summary>
+    public int BadCount => Tags.Count(t => !t.IsGood && !t.IsDisabled);
 
     public bool HasBadTags => BadCount > 0;
+
+    public int DisabledCount => Tags.Count(t => t.IsDisabled);
+
+    public bool HasDisabledTags => DisabledCount > 0;
 
     public bool HasTags => Tags.Count > 0;
 
@@ -54,6 +58,8 @@ public sealed partial class DeviceViewModel : ObservableObject
         OnPropertyChanged(nameof(GoodCount));
         OnPropertyChanged(nameof(BadCount));
         OnPropertyChanged(nameof(HasBadTags));
+        OnPropertyChanged(nameof(DisabledCount));
+        OnPropertyChanged(nameof(HasDisabledTags));
         OnPropertyChanged(nameof(HasTags));
         OnPropertyChanged(nameof(TagCountText));
     }
@@ -232,6 +238,31 @@ public sealed partial class DeviceViewModel : ObservableObject
                 dependent.History.Trigger = null;
             await client.PutDeviceAsync(new PutDeviceRequest { Device = device, Persist = true });
             _context.Report(tags.Count == 1 ? $"Tag {Name}/{tags[0].Name} quitado" : $"{tags.Count} tags quitados de {Name}");
+        }
+        catch (RpcException ex)
+        {
+            _context.Report(_context.Describe(ex), isError: true);
+        }
+    }
+
+    /// <summary>
+    /// Activa o desactiva tags, todos en un solo cambio de configuración. Uno desactivado sigue en la tabla pero el agente
+    /// no lo lee, no lo historiza ni lo publica en OPC UA; el cambio se aplica sin cerrar la conexión.
+    /// </summary>
+    public async Task SetTagsEnabledAsync(IReadOnlyList<TagViewModel> tags, bool enabled)
+    {
+        ArgumentNullException.ThrowIfNull(tags);
+        if (_context.Client is not { } client || tags.Count == 0)
+            return;
+        try
+        {
+            var names = tags.Select(t => t.Name).ToHashSet(StringComparer.Ordinal);
+            var device = await client.GetDeviceConfigAsync(new DeviceRequest { Device = Name });
+            foreach (var tag in device.ScanGroups.SelectMany(g => g.Tags).Where(t => names.Contains(EffectiveName(t))))
+                tag.Disabled = !enabled;
+            await client.PutDeviceAsync(new PutDeviceRequest { Device = device, Persist = true });
+            var what = tags.Count == 1 ? $"Tag {Name}/{tags[0].Name}" : $"{tags.Count} tags de {Name}";
+            _context.Report(enabled ? $"{what}: activado{(tags.Count == 1 ? "" : "s")}" : $"{what}: desactivado{(tags.Count == 1 ? "" : "s")}");
         }
         catch (RpcException ex)
         {

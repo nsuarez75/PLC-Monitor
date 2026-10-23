@@ -47,6 +47,7 @@ public sealed partial class TagDetailsViewModel : ObservableObject
         Address = config?.Address ?? tag.Address;
         Writable = config?.Writable ?? tag.Writable;
         OpcUaPublished = config?.OpcUaHidden != true;
+        TagEnabled = config?.Disabled != true;
         SelectedDataType = config is null || config.DataType == Agent.Contracts.DataType.Unknown ? AutomaticType : config.DataType.ToString();
         GroupName = group?.Name ?? "default";
         IntervalMs = group?.IntervalMs ?? 1000;
@@ -384,6 +385,10 @@ public sealed partial class TagDetailsViewModel : ObservableObject
     /// <summary>El dispositivo se publica en OPC UA (1.ª llave).</summary>
     public bool DeviceOpcUaPublished { get; }
 
+    /// <summary>Tag activo: si no, el agente no lo lee, no lo historiza ni lo publica en OPC UA.</summary>
+    [ObservableProperty]
+    public partial bool TagEnabled { get; set; } = true;
+
     [ObservableProperty]
     public partial string SelectedDataType { get; set; } = AutomaticType;
 
@@ -479,6 +484,7 @@ public sealed partial class TagDetailsViewModel : ObservableObject
                 Address = address,
                 Writable = Writable,
                 OpcUaHidden = !OpcUaPublished,
+                Disabled = !TagEnabled,
                 DataType = SelectedDataType == AutomaticType ? Agent.Contracts.DataType.Unknown : Enum.Parse<DataType>(SelectedDataType),
                 History = HistoryEnabled || HistoryMinIntervalMs > 0 || HistoryMaxIntervalMs > 0 || HistoryDeadband > 0 || TriggerEnabled
                     ? new HistoryConfig
