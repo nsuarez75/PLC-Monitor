@@ -249,6 +249,8 @@ message Tag {
   optional int32 decimals = 12;
   // Escalado a unidades de ingeniería que aplica el agente; ausente = el valor tal como lo lee el driver.
   Scaling scaling = 13;
+  // Tag desactivado: no se lee, no se historiza, no se publica en OPC UA ni se escribe.
+  bool disabled = 14;
 }
 
 message ListTagsRequest {
@@ -378,6 +380,9 @@ message TagConfig {
   // Segunda llave de publicación en OPC UA, al revés: true = no se publica aunque el dispositivo sí. Así, lo que no
   // envía un cliente anterior (false) deja el tag publicado, que es el valor por defecto.
   bool opc_ua_hidden = 11;
+  // Al revés, como opc_ua_hidden: true = desactivado (no se lee, no se historiza, no se publica en OPC UA ni se escribe).
+  // Un cliente anterior, que no lo envía, deja el tag activo.
+  bool disabled = 12;
 }
 
 message HistoryConfig {

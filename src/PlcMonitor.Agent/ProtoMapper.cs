@@ -54,6 +54,7 @@ internal static class ProtoMapper
             Folder = snapshot.Definition.Folder ?? "",
             Unit = snapshot.Definition.Unit ?? "",
             Scaling = ToProto(snapshot.Definition.Scaling),
+            Disabled = !snapshot.Definition.Enabled,
         };
         if (snapshot.Definition.Decimals is { } decimals)
             tag.Decimals = decimals;
@@ -129,6 +130,7 @@ internal static class ProtoMapper
                 Address = t.Address,
                 Writable = t.Writable,
                 OpcUaHidden = !t.OpcUaPublished,
+                Disabled = !t.Enabled,
                 DataType = t.DataType is { } type ? ToProto(type) : Api.DataType.Unknown,
                 History = t.History is { } h
                     ? new Api.HistoryConfig
@@ -195,6 +197,7 @@ internal static class ProtoMapper
                 Address = t.Address.Trim(),
                 Writable = t.Writable,
                 OpcUaPublished = !t.OpcUaHidden,
+                Enabled = !t.Disabled,
                 DataType = t.DataType == Api.DataType.Unknown ? null : FromProto(t.DataType),
                 History = t.History is { } h
                     ? new TagHistorySettings

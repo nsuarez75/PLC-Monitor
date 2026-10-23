@@ -68,7 +68,7 @@ internal sealed class PlcNodeManager : AsyncCustomNodeManager
             foreach (var status in subscription.InitialDevices.Where(d => d.OpcUaPublished))
             {
                 var device = CreateDevice(status);
-                foreach (var tag in tags[status.Device].Where(t => t.Definition.OpcUaPublished))
+                foreach (var tag in tags[status.Device].Where(t => t.Definition.IsOpcUaPublished))
                     CreateTag(device, tag);
             }
             await AddPredefinedNodeAsync(SystemContext, _root, cancellationToken);
@@ -225,7 +225,7 @@ internal sealed class PlcNodeManager : AsyncCustomNodeManager
             await RemoveDeviceAsync(status.Device, token);
             return;
         }
-        var tags = allTags.Where(t => t.Definition.OpcUaPublished).ToList();
+        var tags = allTags.Where(t => t.Definition.IsOpcUaPublished).ToList();
         if (!_devices.TryGetValue(status.Device, out var device))
         {
             device = CreateDevice(status);

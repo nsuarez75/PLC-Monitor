@@ -195,7 +195,7 @@ public sealed class AgentTagsCommand : AsyncCommand<AgentTagsSettings>
             {
                 table.AddRow(
                     Markup.Escape(t.Device),
-                    Markup.Escape(t.Name) + (t.Writable ? " [yellow]✎[/]" : string.Empty),
+                    Markup.Escape(t.Name) + (t.Writable ? " [yellow]✎[/]" : string.Empty) + (t.Disabled ? " [grey](desactivado)[/]" : string.Empty),
                     Markup.Escape(t.Address),
                     Markup.Escape(AgentRuntime.ValueText(t.Value, t)),
                     t.Value?.DataType.ToString() ?? string.Empty,
@@ -715,6 +715,8 @@ public sealed class AgentTagAddCommand : AsyncCommand<AgentTagAddSettings>
                 Writable = settings.Writable,
                 // La llave de publicación en OPC UA tampoco se toca: se conserva (nuevo = publicado).
                 OpcUaHidden = previous?.OpcUaHidden ?? false,
+                // Ni si está desactivado: se conserva (nuevo = activo).
+                Disabled = previous?.Disabled ?? false,
                 DataType = dataType,
                 History = settings.HistoryConfig(),
                 // La transformación y el grupo de visualización no se tocan desde aquí: se conservan los que tuviera.
@@ -768,6 +770,52 @@ public sealed class AgentTagRemoveCommand : AsyncCommand<AgentTagRemoveSettings>
             }
             await client.PutDeviceAsync(new PutDeviceRequest { Device = device, Persist = !settings.NoPersist }, cancellationToken: cancellationToken);
             AgentRuntime.Console.MarkupLine($"[green]Tag eliminado[/] {Markup.Escape(device.Name)}/{Markup.Escape(settings.Tag)}");
+            return 0;
+        });
+}
+
+public sealed class AgentTagToggleSettings : AgentPersistSettings
+{
+    [CommandArgument(0, "<DISPOSITIVO>")]
+    public string Device { get; set; } = "";
+
+    [CommandArgument(1, "<TAG>")]
+    [Description("Uno o varios tags.")]
+    public string[] Tags { get; set; } = [];
+}
+
+/// <summary>plcmon agent tag enable — activa tags desactivados.</summary>
+public sealed class AgentTagEnableCommand : AsyncCommand<AgentTagToggleSettings>
+{
+    public override Task<int> ExecuteAsync(CommandContext context, AgentTagToggleSettings settings, CancellationToken cancellationToken) =>
+        AgentTagToggle.RunAsync(settings, enabled: true, cancellationToken);
+}
+
+/// <summary>plcmon agent tag disable — desactiva tags: siguen configurados pero no se leen.</summary>
+public sealed class AgentTagDisableCommand : AsyncCommand<AgentTagToggleSettings>
+{
+    public override Task<int> ExecuteAsync(CommandContext context, AgentTagToggleSettings settings, CancellationToken cancellationToken) =>
+        AgentTagToggle.RunAsync(settings, enabled: false, cancellationToken);
+}
+
+internal static class AgentTagToggle
+{
+    public static Task<int> RunAsync(AgentTagToggleSettings settings, bool enabled, CancellationToken cancellationToken) =>
+        AgentRuntime.RunAsync(settings, async client =>
+        {
+            var device = await client.GetDeviceConfigAsync(new DeviceRequest { Device = settings.Device }, cancellationToken: cancellationToken);
+            var byName = device.ScanGroups.SelectMany(g => g.Tags)
+                .ToLookup(t => string.IsNullOrEmpty(t.Name) ? t.Address : t.Name, StringComparer.Ordinal);
+            var missing = settings.Tags.Where(t => !byName.Contains(t)).ToArray();
+            if (missing.Length > 0)
+            {
+                AgentRuntime.Console.MarkupLine($"[red]Error:[/] no existen en '{Markup.Escape(device.Name)}': {Markup.Escape(string.Join(", ", missing))}.");
+                return 1;
+            }
+            foreach (var tag in settings.Tags.SelectMany(t => byName[t]))
+                tag.Disabled = !enabled;
+            await client.PutDeviceAsync(new PutDeviceRequest { Device = device, Persist = !settings.NoPersist }, cancellationToken: cancellationToken);
+            AgentRuntime.Console.MarkupLine($"[green]{(enabled ? "Activados" : "Desactivados")}[/] {settings.Tags.Length} tag(s) en {Markup.Escape(device.Name)}");
             return 0;
         });
 }

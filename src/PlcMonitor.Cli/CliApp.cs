@@ -70,6 +70,8 @@ public static class CliApp
                     .WithDescription("Añade un tag a un grupo de escaneo (se crea si no existe).")
                     .WithExample("agent", "tag", "add", "prensa1", "\"MiDB\".Velocidad", "--name", "velocidad", "-g", "rapido", "-i", "250");
                 tag.AddCommand<AgentTagRemoveCommand>("remove").WithDescription("Quita un tag.");
+                tag.AddCommand<AgentTagEnableCommand>("enable").WithDescription("Activa uno o varios tags (vuelven a leerse).");
+                tag.AddCommand<AgentTagDisableCommand>("disable").WithDescription("Desactiva uno o varios tags (no se leen, ni se historizan, ni se publican en OPC UA).");
             });
             agent.AddCommand<AgentHistoryCommand>("history")
                 .WithDescription("Histórico de tags guardado por el agente (tabla o CSV).")
