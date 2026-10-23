@@ -9,8 +9,8 @@ namespace PlcMonitor.App.Controls;
 /// <summary>
 /// Fila de una tabla (cabecera o fila de datos) con columnas fijas y proporcionales, como un <see cref="Grid"/> de una
 /// sola fila, pero que se adapta al ancho: si a las proporcionales no les llega <see cref="MinStarWidth"/> por unidad,
-/// oculta columnas en el orden de <see cref="HideOrder"/> hasta que quepan. Cabecera y filas con los mismos
-/// parámetros ocultan lo mismo. Cada hijo va en su columna con <c>Grid.Column</c>.
+/// oculta columnas en el orden de <see cref="HideOrder"/> hasta que quepan. Las de <see cref="HiddenColumns"/> (las
+/// que oculta el usuario) no se muestran nunca. Cabecera y filas con los mismos parámetros ocultan lo mismo. Cada hijo va en su columna con <c>Grid.Column</c>.
 /// Con <see cref="CanResize"/> (la cabecera), arrastrar el borde entre dos columnas pasa ancho de una a la otra y
 /// cambia <see cref="Columns"/>; las filas que lo enlazan siguen el cambio.
 /// </summary>
@@ -21,6 +21,9 @@ public sealed class TableRow : Panel
 
     public static readonly StyledProperty<string> HideOrderProperty =
         AvaloniaProperty.Register<TableRow, string>(nameof(HideOrder), "");
+
+    public static readonly StyledProperty<string> HiddenColumnsProperty =
+        AvaloniaProperty.Register<TableRow, string>(nameof(HiddenColumns), "");
 
     public static readonly StyledProperty<double> ColumnSpacingProperty =
         AvaloniaProperty.Register<TableRow, double>(nameof(ColumnSpacing));
@@ -42,7 +45,7 @@ public sealed class TableRow : Panel
 
     private static readonly Cursor ResizeCursor = new(StandardCursorType.SizeWestEast);
 
-    private (string Columns, string HideOrder, double[] Values, bool[] Stars, int[] Order)? _parsed;
+    private (string Columns, string HideOrder, string Hidden, double[] Values, bool[] Stars, int[] Order, bool[] Off)? _parsed;
     private Drag? _drag;
 
     // Arrastre en curso: columnas a cada lado del borde y valores de partida.
@@ -50,7 +53,7 @@ public sealed class TableRow : Panel
 
     static TableRow()
     {
-        AffectsMeasure<TableRow>(ColumnsProperty, HideOrderProperty, ColumnSpacingProperty, MinStarWidthProperty);
+        AffectsMeasure<TableRow>(ColumnsProperty, HideOrderProperty, HiddenColumnsProperty, ColumnSpacingProperty, MinStarWidthProperty);
     }
 
     /// <summary>Anchos separados por comas: número (fijo) o <c>n*</c> (proporcional).</summary>
@@ -65,6 +68,13 @@ public sealed class TableRow : Panel
     {
         get => GetValue(HideOrderProperty);
         set => SetValue(HideOrderProperty, value);
+    }
+
+    /// <summary>Índices de las columnas que el usuario ha ocultado, separados por comas (no se muestran nunca).</summary>
+    public string HiddenColumns
+    {
+        get => GetValue(HiddenColumnsProperty);
+        set => SetValue(HiddenColumnsProperty, value);
     }
 
     public double ColumnSpacing
@@ -113,7 +123,9 @@ public sealed class TableRow : Panel
     public double[] Layout(double width)
     {
         var (values, stars, order) = Parse();
-        var visible = Enumerable.Repeat(true, values.Length).ToArray();
+        var off = _parsed!.Value.Off;
+        var visible = off.Select(o => !o).ToArray();
+        order = [.. order.Where(i => visible[i])];
         for (var hidden = 0; ; hidden++)
         {
             var count = visible.Count(v => v);
@@ -296,7 +308,7 @@ public sealed class TableRow : Panel
 
     private (double[] Values, bool[] Stars, int[] Order) Parse()
     {
-        if (_parsed is { } p && p.Columns == Columns && p.HideOrder == HideOrder)
+        if (_parsed is { } p && p.Columns == Columns && p.HideOrder == HideOrder && p.Hidden == HiddenColumns)
             return (p.Values, p.Stars, p.Order);
         var parts = Columns.Split(',', StringSplitOptions.TrimEntries | StringSplitOptions.RemoveEmptyEntries);
         var values = new double[parts.Length];
@@ -307,9 +319,14 @@ public sealed class TableRow : Panel
             var number = stars[i] ? parts[i][..^1] : parts[i];
             values[i] = number.Length == 0 ? 1 : double.Parse(number, CultureInfo.InvariantCulture);
         }
-        var order = HideOrder.Split(',', StringSplitOptions.TrimEntries | StringSplitOptions.RemoveEmptyEntries)
-            .Select(s => int.Parse(s, CultureInfo.InvariantCulture)).Where(i => i >= 0 && i < parts.Length).ToArray();
-        _parsed = (Columns, HideOrder, values, stars, order);
+        var order = Indices(HideOrder, parts.Length);
+        var off = new bool[parts.Length];
+        foreach (var i in Indices(HiddenColumns, parts.Length))
+            off[i] = true;
+        _parsed = (Columns, HideOrder, HiddenColumns, values, stars, order, off);
         return (values, stars, order);
+
+        static int[] Indices(string list, int count) => list.Split(',', StringSplitOptions.TrimEntries | StringSplitOptions.RemoveEmptyEntries)
+            .Select(s => int.TryParse(s, NumberStyles.Integer, CultureInfo.InvariantCulture, out var i) ? i : -1).Where(i => i >= 0 && i < count).ToArray();
     }
 }

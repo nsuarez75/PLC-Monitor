@@ -65,6 +65,7 @@ public sealed partial class MainViewModel : ObservableObject, IAgentContext, IAs
         Theme = settings.Theme is "light" or "dark" ? settings.Theme : "system";
         RecentAgents = [.. settings.RecentAgents];
         TagColumns = ValidTagColumns(settings.TagColumns) ?? DefaultTagColumns;
+        TagHiddenColumns = ValidHiddenColumns(settings.TagHiddenColumns);
         Browse = new BrowseViewModel(this, () => SelectedDevice);
         AddTag = new AddTagViewModel(this, () => SelectedDevice, DriverOf);
         History = new HistoryViewModel(this, () => SelectedDevice);
@@ -302,6 +303,50 @@ public sealed partial class MainViewModel : ObservableObject, IAgentContext, IAs
     /// <summary>Anchos de las columnas de la tabla de tags; se cambian arrastrando los bordes de la cabecera.</summary>
     [ObservableProperty]
     public partial string TagColumns { get; set; }
+
+    /// <summary>Títulos de las columnas de la tabla de tags, en orden.</summary>
+    public static IReadOnlyList<string> TagColumnTitles { get; } = ["Tag", "Dirección", "Valor", "Tipo", "Calidad", "Actualizado", "Escribir"];
+
+    /// <summary>
+    /// Columnas de la tabla de tags que el usuario ha ocultado (formato de <see cref="Controls.TableRow.HiddenColumns"/>).
+    /// La del nombre del tag no se puede ocultar.
+    /// </summary>
+    [ObservableProperty]
+    public partial string TagHiddenColumns { get; set; }
+
+    /// <summary>La columna <paramref name="index"/> de la tabla de tags está oculta por el usuario.</summary>
+    public bool IsTagColumnHidden(int index) => HiddenIndices(TagHiddenColumns).Contains(index);
+
+    /// <summary>Muestra u oculta una columna de la tabla de tags y lo guarda.</summary>
+    [RelayCommand]
+    private void ToggleTagColumn(int index)
+    {
+        if (index <= 0 || index >= TagColumnTitles.Count)
+            return;
+        var hidden = HiddenIndices(TagHiddenColumns);
+        if (!hidden.Remove(index))
+            hidden.Add(index);
+        SetHiddenTagColumns(hidden);
+    }
+
+    [RelayCommand]
+    private void ShowAllTagColumns() => SetHiddenTagColumns([]);
+
+    private void SetHiddenTagColumns(SortedSet<int> hidden)
+    {
+        TagHiddenColumns = string.Join(",", hidden.Select(i => i.ToString(System.Globalization.CultureInfo.InvariantCulture)));
+        _settings.TagHiddenColumns = TagHiddenColumns.Length == 0 ? null : TagHiddenColumns;
+        _settings.Save(_settingsPath);
+    }
+
+    private static SortedSet<int> HiddenIndices(string? list) =>
+        [.. (list ?? "").Split(',', StringSplitOptions.TrimEntries | StringSplitOptions.RemoveEmptyEntries)
+            .Select(s => int.TryParse(s, System.Globalization.NumberStyles.Integer, System.Globalization.CultureInfo.InvariantCulture, out var i) ? i : -1)
+            .Where(i => i > 0 && i < TagColumnTitles.Count)];
+
+    // Lo guardado se limpia: índices fuera de rango (o la columna del nombre) no se aplican.
+    private static string ValidHiddenColumns(string? list) =>
+        string.Join(",", HiddenIndices(list).Select(i => i.ToString(System.Globalization.CultureInfo.InvariantCulture)));
 
     public bool IsReconnecting => IsConnected && !IsLive;
 

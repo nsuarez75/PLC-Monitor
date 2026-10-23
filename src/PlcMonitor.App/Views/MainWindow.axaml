@@ -296,7 +296,7 @@
                     <TextBlock><Run Text="{Binding BadCount}" /><Run Text=" con error" /></TextBlock>
                   </Border>
                   <Border Classes="pill" IsVisible="{Binding HasDisabledTags}" ToolTip.Tip="No se leen, ni se historizan, ni se publican en OPC UA. Clic derecho en el tag → Activar">
-                    <TextBlock><Run Text="{Binding DisabledCount}" /><Run Text=" desactivados" /></TextBlock>
+                    <TextBlock Text="{Binding DisabledText}" />
                   </Border>
                 </StackPanel>
 
@@ -305,12 +305,11 @@
                     <c:TableRow x:Name="TagsHeader" DockPanel.Dock="Top" Classes="tablehead" HideOrder="3,5,1" MinStarWidth="45" ColumnSpacing="12" Margin="16,12,16,10"
                                 CanResize="True" Background="Transparent"
                                 Columns="{Binding $parent[Window].((vm:MainViewModel)DataContext).TagColumns, Mode=TwoWay, FallbackValue=*}"
+                                HiddenColumns="{Binding $parent[Window].((vm:MainViewModel)DataContext).TagHiddenColumns, FallbackValue=''}"
                                 ResizeCompletedCommand="{Binding $parent[Window].((vm:MainViewModel)DataContext).SaveTagColumnsCommand}"
-                                ToolTip.Tip="Arrastra el borde entre dos columnas para cambiar su ancho">
+                                ToolTip.Tip="Arrastra el borde entre dos columnas para cambiar su ancho. Clic derecho para ocultar o mostrar columnas">
                       <c:TableRow.ContextMenu>
-                        <ContextMenu>
-                          <MenuItem Header="Restablecer anchos de columna" Command="{Binding $parent[Window].((vm:MainViewModel)DataContext).ResetTagColumnsCommand}" />
-                        </ContextMenu>
+                        <ContextMenu x:Name="ColumnsMenu" />
                       </c:TableRow.ContextMenu>
                       <TextBlock Text="TAG" />
                       <TextBlock Grid.Column="1" Text="DIRECCIÓN" />
@@ -347,7 +346,8 @@
                           </Button>
                         </DataTemplate>
                         <DataTemplate x:DataType="vm:TagViewModel">
-                          <c:TableRow Columns="{Binding $parent[Window].((vm:MainViewModel)DataContext).TagColumns, FallbackValue=*}" HideOrder="3,5,1" MinStarWidth="45" ColumnSpacing="12" Classes.off="{Binding IsDisabled}">
+                          <c:TableRow Columns="{Binding $parent[Window].((vm:MainViewModel)DataContext).TagColumns, FallbackValue=*}" HideOrder="3,5,1" MinStarWidth="45" ColumnSpacing="12" Classes.off="{Binding IsDisabled}"
+                                      HiddenColumns="{Binding $parent[Window].((vm:MainViewModel)DataContext).TagHiddenColumns, FallbackValue=''}">
                             <StackPanel VerticalAlignment="Center" Classes="tagname" Classes.infolder="{Binding IsInFolder}">
                               <DockPanel>
                                 <c:Icon DockPanel.Dock="Left" Kind="history" Width="13" Height="13" Margin="0,0,6,0" Foreground="{DynamicResource App.Accent}"

@@ -20,6 +20,9 @@ public sealed class AppSettings
     /// <summary>Anchos de las columnas de la tabla de tags elegidos por el usuario (null = los de serie).</summary>
     public string? TagColumns { get; set; }
 
+    /// <summary>Columnas de la tabla de tags que el usuario ha ocultado (índices separados por comas; null = ninguna).</summary>
+    public string? TagHiddenColumns { get; set; }
+
     /// <summary>Grupos de visualización plegados en la tabla de tags (agente/dispositivo/grupo).</summary>
     public List<string> CollapsedFolders { get; init; } = [];
 

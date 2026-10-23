@@ -125,6 +125,96 @@ public class MainWindowTests
         AppSettings.Load(settingsPath).TagColumns.ShouldBeNull();
     });
 
+    [Fact]
+    public Task Disabled_tag_row_is_dimmed_and_says_so() => HeadlessApp.RunAsync(() =>
+    {
+        var vm = ViewModelWithData();
+        var off = Tag("parado", "DB1.DBW8", "", DataType.Unknown, Quality.Bad, Timestamp.FromDateTime(DateTime.UtcNow), true, "Tag desactivado");
+        off.Disabled = true;
+        var snapshot = new Snapshot();
+        snapshot.Devices.Add(new Device { Name = "casa1200", Driver = "s7-symbolic", Enabled = true, WritesEnabled = true, State = ConnectionState.Connected, TagCount = 1 });
+        snapshot.Tags.Add(off);
+        vm.Apply(new SubscribeEvent { Snapshot = snapshot });
+        var window = new MainWindow { DataContext = vm };
+        window.Width = 1400;
+        window.Show();
+        window.UpdateLayout();
+
+        var row = window.FindControl<ListBox>("TagsList")!.GetVisualDescendants().OfType<PlcMonitor.App.Controls.TableRow>().Single();
+        row.Classes.ShouldContain("off");
+        row.Opacity.ShouldBe(0.5);
+        var texts = row.GetVisualDescendants().OfType<TextBlock>().Select(t => t.Text).ToArray();
+        texts.ShouldContain("Desactivado");
+        row.GetVisualDescendants().OfType<TextBox>().ShouldAllBe(t => !t.IsEffectivelyVisible, "no se ofrece escribir");
+        texts.ShouldContain("—");
+        window.GetVisualDescendants().OfType<TextBlock>().Select(t => t.Text).ShouldContain("1 desactivado");
+        Capture(window, "main-window-disabled-tag.png");
+    });
+
+    [Fact]
+    public void Hidden_columns_are_not_shown_and_their_width_goes_to_the_proportional_ones()
+    {
+        var row = new PlcMonitor.App.Controls.TableRow { Columns = MainViewModel.DefaultTagColumns, ColumnSpacing = 12, MinStarWidth = 45 };
+        const double width = 1400;
+        var before = row.Layout(width);
+        before.ShouldAllBe(w => w > 0);
+
+        row.HiddenColumns = "1,6";
+        var after = row.Layout(width);
+
+        (after[1], after[6]).ShouldBe((0, 0));
+        after[0].ShouldBeGreaterThan(before[0]);
+        // Lo que dejan libre (más sus separaciones) lo reparten las proporcionales; las fijas no cambian.
+        (after.Sum() + (12 * 4)).ShouldBe(width, 0.5);
+        (after[3], after[4], after[5]).ShouldBe((before[3], before[4], before[5]));
+        // Ocultar por falta de ancho no vuelve a contar una columna ya oculta.
+        row.Layout(500).Count(w => w > 0).ShouldBeGreaterThan(1);
+    }
+
+    [Fact]
+    public Task Tag_columns_can_be_hidden_from_the_header_and_it_is_remembered() => HeadlessApp.RunAsync(() =>
+    {
+        var settingsPath = Path.GetTempFileName();
+        var vm = ViewModelWithData(settingsPath);
+        var window = new MainWindow { DataContext = vm };
+        window.Width = 1400;
+        window.Show();
+        window.UpdateLayout();
+        var header = window.FindControl<PlcMonitor.App.Controls.TableRow>("TagsHeader")!;
+        var row = window.FindControl<ListBox>("TagsList")!.GetVisualDescendants().OfType<PlcMonitor.App.Controls.TableRow>().First();
+
+        vm.ToggleTagColumnCommand.Execute(1);
+        vm.ToggleTagColumnCommand.Execute(5);
+        vm.ToggleTagColumnCommand.Execute(0); // la del nombre no se oculta
+        window.UpdateLayout();
+
+        vm.TagHiddenColumns.ShouldBe("1,5");
+        (vm.IsTagColumnHidden(1), vm.IsTagColumnHidden(2)).ShouldBe((true, false));
+        var widths = header.Layout(header.Bounds.Width);
+        (widths[0] > 0, widths[1], widths[5]).ShouldBe((true, 0, 0));
+        row.Layout(row.Bounds.Width).ShouldBe(widths, 0.5);
+        AppSettings.Load(settingsPath).TagHiddenColumns.ShouldBe("1,5");
+        Capture(window, "main-window-hidden-columns.png");
+
+        vm.ToggleTagColumnCommand.Execute(5);
+        vm.TagHiddenColumns.ShouldBe("1");
+        vm.ShowAllTagColumnsCommand.Execute(null);
+        vm.TagHiddenColumns.ShouldBe("");
+        AppSettings.Load(settingsPath).TagHiddenColumns.ShouldBeNull();
+    });
+
+    [Theory]
+    [InlineData("1,4", "1,4")]
+    [InlineData("4,1,1", "1,4")]
+    [InlineData("0,2,9,x", "2")]
+    [InlineData(null, "")]
+    public void Saved_hidden_columns_are_cleaned_up(string? saved, string applied)
+    {
+        var vm = new MainViewModel(new GrpcAgentConnector(), new ImmediateDispatcher(), new FakeDialogs(), new AppSettings { TagHiddenColumns = saved },
+            Path.GetTempFileName(), Path.Combine(Path.GetTempPath(), $"plcmon-agents-{Guid.NewGuid():N}.json"));
+        vm.TagHiddenColumns.ShouldBe(applied);
+    }
+
     [Theory]
     [InlineData(2, 50)]   // proporcional ← fija
     [InlineData(2, -40)]  // proporcional → fija
