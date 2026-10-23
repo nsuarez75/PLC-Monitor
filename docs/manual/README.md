@@ -48,8 +48,7 @@ Si es tu primera vez, sigue el capítulo [Instalación y primer uso](02-instalac
 - Los ejemplos usan nombres ficticios (`planta-demo.local`, `prensa-linea3`) y direcciones reservadas
   para documentación (`192.0.2.10`). No son datos de una instalación real.
 - Los avisos de seguridad se marcan como **Importante** o **Precaución**.
-- Las capturas se han generado con datos sintéticos. Consulta [PENDIENTES.md](PENDIENTES.md) para conocer
-  qué queda por validar.
+- Las capturas se han generado con datos sintéticos.
 
 ## Arquitectura en una página
 
@@ -91,4 +90,4 @@ por instalación y el token de solo lectura para quien únicamente deba consulta
 ## Estado de este manual
 
 El manual se ha escrito a partir del código y de capturas con datos sintéticos. Las pruebas con PLC reales,
-la instalación por SSH y algunos flujos de error siguen pendientes de validación. 
+la instalación por SSH y algunos flujos de error siguen pendientes de validación.
