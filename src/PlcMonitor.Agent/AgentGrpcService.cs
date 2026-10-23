@@ -147,6 +147,11 @@ public sealed class AgentGrpcService(EngineHost host, DriverRegistry registry, I
                         await responseStream.WriteAsync(
                             new Api.SubscribeEvent { DeviceRemoved = new Api.DeviceRemoved { Device = removed.Device } }, token);
                         break;
+                    case DevicesReordered reordered:
+                        var order = new Api.DeviceOrder();
+                        order.Devices.AddRange(reordered.Devices.Where(Wanted));
+                        await responseStream.WriteAsync(new Api.SubscribeEvent { DeviceOrder = order }, token);
+                        break;
                     case TransformsChanged transforms:
                         await responseStream.WriteAsync(new Api.SubscribeEvent { Transforms = ProtoMapper.ToProto(transforms.Transforms) }, token);
                         break;
@@ -216,6 +221,17 @@ public sealed class AgentGrpcService(EngineHost host, DriverRegistry registry, I
             await host.SaveConfigurationAsync(context.CancellationToken);
         _audit.LogInformation("Dispositivo {Device} dado de baja por {User}", request.Device, AgentCaller.Describe(context));
         return new Empty();
+    }
+
+    public override async Task<Api.DeviceOrder> ReorderDevices(Api.ReorderDevicesRequest request, ServerCallContext context)
+    {
+        var order = await Guard(() => Engine.ReorderDevicesAsync(request.Devices));
+        if (request.Persist)
+            await host.SaveConfigurationAsync(context.CancellationToken);
+        _audit.LogInformation("Orden de los dispositivos cambiado por {User}", AgentCaller.Describe(context));
+        var reply = new Api.DeviceOrder();
+        reply.Devices.AddRange(order);
+        return reply;
     }
 
     public override async Task<Api.HistoryReply> QueryHistory(Api.HistoryRequest request, ServerCallContext context)

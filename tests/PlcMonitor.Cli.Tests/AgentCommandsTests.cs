@@ -351,6 +351,20 @@ public sealed class AgentCommandsTests : IDisposable
     }
 
     [Fact]
+    public async Task Devices_are_reordered_and_the_order_is_saved()
+    {
+        await using var agent = new AgentFactory(Device("a", enabled: false), Device("b", enabled: false), Device("c", enabled: false));
+        UseAgent(agent);
+
+        (await RunAsync("agent", "device", "order", "c", "a")).ShouldBe(0);
+        (await RunAsync("agent", "device", "order", "noexiste")).ShouldBe(1);
+
+        Output.ShouldContain("c, a, b");
+        Output.ShouldContain("noexiste");
+        (await PlcMonitor.Engine.Configuration.ConfigurationFile.LoadAsync(agent.ConfigPath)).Devices.Select(d => d.Name).ShouldBe(["c", "a", "b"]);
+    }
+
+    [Fact]
     public async Task Invalid_device_shows_the_agent_validation_errors()
     {
         await using var agent = new AgentFactory();

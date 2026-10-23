@@ -62,6 +62,9 @@ public static class CliApp
                     .WithDescription("Da de alta un dispositivo o cambia sus ajustes (conserva sus tags).")
                     .WithExample("agent", "device", "add", "prensa1", "-d", "s7-symbolic", "-s", "{\"host\":\"192.168.0.10\"}");
                 device.AddCommand<AgentDeviceRemoveCommand>("remove").WithDescription("Da de baja un dispositivo y sus tags.");
+                device.AddCommand<AgentDeviceOrderCommand>("order")
+                    .WithDescription("Cambia el orden de los dispositivos: los indicados primero, en ese orden; los demás, detrás.")
+                    .WithExample("agent", "device", "order", "prensa1", "horno");
             });
             agent.AddBranch<AgentSettings>("tag", tag =>
             {

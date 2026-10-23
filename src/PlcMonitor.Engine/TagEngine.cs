@@ -193,7 +193,7 @@ public sealed class TagEngine : IAsyncDisposable, IEngineSink
         }
     }
 
-    /// <summary>Mismo dispositivo y misma conexión: solo cambian grupos, tags o las llaves de escritura y de OPC UA.</summary>
+    /// <summary>Mismo dispositivo y misma conexión: solo cambian grupos, tags, su orden o las llaves de escritura y de OPC UA.</summary>
     private static bool CanReconfigureInPlace(DeviceConfiguration current, DeviceConfiguration next)
     {
         if (!string.Equals(current.Name, next.Name, StringComparison.Ordinal))
@@ -204,6 +204,7 @@ public sealed class TagEngine : IAsyncDisposable, IEngineSink
             copy.ScanGroups.Clear();
             copy.WritesEnabled = false;
             copy.OpcUaPublished = false;
+            copy.TagOrder = null;
             return ConfigurationFile.Serialize(new AgentConfiguration { Devices = [copy] });
         }
         return ConnectionPart(current) == ConnectionPart(next);
@@ -369,6 +370,42 @@ public sealed class TagEngine : IAsyncDisposable, IEngineSink
                 Broadcast(new DeviceRemoved(supervisor.Name));
             }
             _logger.LogInformation("{Device}: dado de baja", supervisor.Name);
+        }
+        finally
+        {
+            _changes.Release();
+        }
+    }
+
+    /// <summary>
+    /// Cambia el orden de los dispositivos (el de la configuración, que es el que ven los clientes). Los nombres que se
+    /// indican van primero, en ese orden; los demás, detrás y como estaban. Los desconocidos y los repetidos se ignoran.
+    /// No toca las conexiones. Devuelve el orden resultante.
+    /// </summary>
+    public async Task<IReadOnlyList<string>> ReorderDevicesAsync(IReadOnlyList<string> devices)
+    {
+        ArgumentNullException.ThrowIfNull(devices);
+        await _changes.WaitAsync();
+        try
+        {
+            lock (_sync)
+            {
+                var current = Configuration.Devices.ToList();
+                var first = devices
+                    .Select(name => current.FirstOrDefault(d => string.Equals(d.Name, name?.Trim(), StringComparison.OrdinalIgnoreCase)))
+                    .OfType<DeviceConfiguration>()
+                    .Distinct()
+                    .ToList();
+                var next = first.Concat(current.Except(first)).ToList();
+                var names = next.Select(d => d.Name).ToArray();
+                if (next.SequenceEqual(current))
+                    return names;
+                Configuration.Devices.Clear();
+                Configuration.Devices.AddRange(next);
+                Broadcast(new DevicesReordered(names));
+                _logger.LogInformation("Dispositivos reordenados: {Devices}", string.Join(", ", names));
+                return names;
+            }
         }
         finally
         {

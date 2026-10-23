@@ -58,8 +58,23 @@ internal sealed class DeviceSupervisor : IAsyncDisposable
 
     public IReadOnlyList<TagDefinition> Tags { get; private set; }
 
-    /// <summary>Definiciones de los tags de una configuración de dispositivo.</summary>
-    public static TagDefinition[] BuildTags(DeviceConfiguration config) => config.ScanGroups
+    /// <summary>
+    /// Definiciones de los tags de una configuración de dispositivo, en el orden de <see cref="DeviceConfiguration.TagOrder"/>
+    /// (los que no están en él, detrás y en el orden de los grupos).
+    /// </summary>
+    public static TagDefinition[] BuildTags(DeviceConfiguration config)
+    {
+        var tags = Definitions(config);
+        if (config.TagOrder is not { Count: > 0 } order)
+            return tags;
+        var position = new Dictionary<string, int>(StringComparer.Ordinal);
+        foreach (var name in order)
+            position.TryAdd(name, position.Count);
+        // OrderBy es estable: los que no tienen posición conservan su orden.
+        return [.. tags.OrderBy(t => position.GetValueOrDefault(t.Key.Tag, int.MaxValue))];
+    }
+
+    private static TagDefinition[] Definitions(DeviceConfiguration config) => config.ScanGroups
         .SelectMany(g => g.Tags.Select(t => new TagDefinition(
             new TagKey(config.Name, t.EffectiveName), t.Address, g.Name, TimeSpan.FromMilliseconds(g.IntervalMs), t.Writable, t.DataType)
         {

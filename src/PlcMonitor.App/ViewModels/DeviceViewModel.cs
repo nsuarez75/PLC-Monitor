@@ -174,6 +174,53 @@ public sealed partial class DeviceViewModel : ObservableObject
         return folder is not null && dragged.Any(t => !string.Equals(t.Folder, folder, StringComparison.CurrentCultureIgnoreCase)) ? folder : null;
     }
 
+    /// <summary>
+    /// Soltar los tags arrastrados junto a <paramref name="target"/> haría algo: cambiar el orden o, si la tabla está
+    /// agrupada, llevarlos al grupo de ese tag.
+    /// </summary>
+    public bool CanMoveTags(IReadOnlyList<TagViewModel> dragged, TagViewModel target, bool after)
+    {
+        ArgumentNullException.ThrowIfNull(dragged);
+        ArgumentNullException.ThrowIfNull(target);
+        return !dragged.Contains(target) && (ListOrder.Move(Tags, dragged, target, after) is not null || ChangesFolder(dragged, target));
+    }
+
+    private static bool ChangesFolder(IReadOnlyList<TagViewModel> dragged, TagViewModel target) =>
+        target.IsInFolder && dragged.Any(t => !string.Equals(t.Folder, target.Folder, StringComparison.CurrentCultureIgnoreCase));
+
+    /// <summary>
+    /// Coloca los tags arrastrados justo antes (o después, con <paramref name="after"/>) de <paramref name="target"/>; si
+    /// la tabla está agrupada, además pasan al grupo de ese tag. El orden se guarda en el agente (orden de visualización,
+    /// no cambia cómo se leen) y la tabla se rehace al llegar el cambio por la suscripción.
+    /// </summary>
+    public async Task MoveTagsAsync(IReadOnlyList<TagViewModel> dragged, TagViewModel target, bool after)
+    {
+        if (_context.Client is not { } client || !CanMoveTags(dragged, target, after))
+            return;
+        var order = ListOrder.Move(Tags, dragged, target, after) ?? [.. Tags];
+        var folder = ChangesFolder(dragged, target) ? target.Folder : null;
+        try
+        {
+            var names = dragged.Select(t => t.Name).ToHashSet(StringComparer.Ordinal);
+            var device = await client.GetDeviceConfigAsync(new DeviceRequest { Device = Name });
+            device.TagOrder.Clear();
+            device.TagOrder.AddRange(order.Select(t => t.Name));
+            if (folder is not null)
+            {
+                foreach (var tag in device.ScanGroups.SelectMany(g => g.Tags).Where(t => names.Contains(EffectiveName(t))))
+                    tag.Folder = folder;
+            }
+            await client.PutDeviceAsync(new PutDeviceRequest { Device = device, Persist = true });
+            var what = dragged.Count == 1 ? dragged[0].Name : $"{dragged.Count} tags";
+            _context.Report(folder is null ? $"{what} {(after ? "detrás" : "delante")} de {target.Name}"
+                : $"{what} en el grupo «{(folder.Length == 0 ? "Sin grupo" : folder)}», {(after ? "detrás" : "delante")} de {target.Name}");
+        }
+        catch (RpcException ex)
+        {
+            _context.Report(_context.Describe(ex), isError: true);
+        }
+    }
+
     /// <summary>Pide el nombre de un grupo nuevo y mueve a él los tags.</summary>
     public async Task MoveToNewFolderAsync(IReadOnlyList<TagViewModel> tags)
     {
@@ -239,6 +286,8 @@ public sealed partial class DeviceViewModel : ObservableObject
             }
             foreach (var dependent in dependents)
                 dependent.History.Trigger = null;
+            foreach (var name in names)
+                device.TagOrder.Remove(name);
             await client.PutDeviceAsync(new PutDeviceRequest { Device = device, Persist = true });
             _context.Report(tags.Count == 1 ? $"Tag {Name}/{tags[0].Name} quitado" : $"{tags.Count} tags quitados de {Name}");
         }

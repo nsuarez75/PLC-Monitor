@@ -217,6 +217,12 @@ public sealed class DeviceConfiguration
     /// </summary>
     public bool OpcUaPublished { get; set; }
 
+    /// <summary>
+    /// Orden en que los clientes muestran los tags (nombres); los que no están van detrás, en el orden de los grupos de
+    /// escaneo. Solo es presentación: no cambia cómo se leen. null = el de los grupos.
+    /// </summary>
+    public List<string>? TagOrder { get; set; }
+
     /// <summary>Ajustes propios del driver (los mismos que acepta su factoría).</summary>
     public JsonElement Settings { get; set; }
 

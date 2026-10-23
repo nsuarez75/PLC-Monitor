@@ -280,6 +280,91 @@ public sealed class TagTableTests : IDisposable
         TagOf(vm, "b").IsDisabled.ShouldBeTrue();
     }
 
+    [Theory]
+    [InlineData("b", false, "a,c,b,d")]
+    [InlineData("d", true, "a,b,d,c")]
+    [InlineData("a", false, "c,a,b,d")]
+    public void List_order_moves_items_before_or_after_the_target(string target, bool after, string expected)
+    {
+        string[] items = ["a", "b", "c", "d"];
+
+        var result = ListOrder.Move(items, ["c"], target, after);
+
+        string.Join(",", result!).ShouldBe(expected);
+    }
+
+    [Fact]
+    public void List_order_keeps_the_relative_order_of_several_and_says_when_nothing_changes()
+    {
+        string[] items = ["a", "b", "c", "d", "e"];
+
+        string.Join(",", ListOrder.Move(items, ["d", "b"], "a", after: false)!).ShouldBe("b,d,a,c,e");
+        ListOrder.Move(items, ["b"], "c", after: false).ShouldBeNull("ya está delante de c");
+        ListOrder.Move(items, ["b"], "a", after: true).ShouldBeNull("ya está detrás de a");
+        ListOrder.Move(items, ["b"], "b", after: true).ShouldBeNull("sobre sí mismo");
+    }
+
+    [Fact]
+    public async Task Tags_are_reordered_by_dragging_and_keep_the_order_when_renamed_or_removed()
+    {
+        await using var agent = new AgentFactory(Device("plc1", enabled: false, tags: [T("DB1.DBW0", "a"), T("DB1.DBW2", "b"), T("DB1.DBW4", "c")]));
+        await using var vm = await ConnectAsync(agent);
+        var device = _ui.Read(() => vm.Devices[0]);
+        device.CanMoveTags([TagOf(vm, "a")], TagOf(vm, "b"), after: false).ShouldBeFalse("ya está ahí");
+
+        await device.MoveTagsAsync([TagOf(vm, "c")], TagOf(vm, "a"), after: false);
+
+        await Wait.UntilAsync(() => Rows(vm) == "c a b", "c delante de a");
+        vm.Message.ShouldBe("c delante de a");
+        (await ConfigurationFile.LoadAsync(agent.ConfigPath)).Devices[0].TagOrder.ShouldBe(["c", "a", "b"]);
+
+        await device.RemoveTagsAsync([TagOf(vm, "a")]);
+        await Wait.UntilAsync(() => Rows(vm) == "c b", "a quitado");
+        (await ConfigurationFile.LoadAsync(agent.ConfigPath)).Devices[0].TagOrder.ShouldBe(["c", "b"]);
+
+        await vm.OpenTagDetailsCommand.ExecuteAsync(TagOf(vm, "c"));
+        var details = _dialogs.TagDetails.Single();
+        details.Name = "c2";
+        await details.SaveCommand.ExecuteAsync(null);
+        details.Saved.ShouldBeTrue(details.Errors);
+        await Wait.UntilAsync(() => Rows(vm) == "c2 b", "renombrado en su sitio");
+    }
+
+    [Fact]
+    public async Task Dropping_on_a_tag_of_another_group_moves_it_there_at_that_place()
+    {
+        await using var agent = new AgentFactory(Device("plc1", enabled: false,
+            tags: [T("DB1.DBW0", "a", folder: "Horno"), T("DB1.DBW2", "b", folder: "Horno"), T("DB1.DBW4", "c", folder: "Cinta")]));
+        await using var vm = await ConnectAsync(agent);
+        Rows(vm).ShouldBe("[Cinta]   c [Horno]   a   b");
+        var device = _ui.Read(() => vm.Devices[0]);
+
+        await device.MoveTagsAsync([TagOf(vm, "c")], TagOf(vm, "b"), after: false);
+
+        await Wait.UntilAsync(() => Rows(vm) == "[Horno]   a   c   b", "c en Horno entre a y b");
+        vm.Message.ShouldBe("c en el grupo «Horno», delante de b");
+    }
+
+    [Fact]
+    public async Task Devices_are_reordered_by_dragging_and_every_client_follows()
+    {
+        await using var agent = new AgentFactory(Device("a", enabled: false), Device("b", enabled: false), Device("c", enabled: false));
+        await using var vm = await ConnectAsync(agent);
+        await using var other = new MainViewModel(new InMemoryConnector(agent), new LockingDispatcher(), new FakeDialogs(), new AppSettings(), _settingsPath, _profilesPath);
+        await other.ConnectCommand.ExecuteAsync(null);
+        string Order(MainViewModel m) => _ui.Read(() => string.Join(",", m.Devices.Select(d => d.Name)));
+        var devices = _ui.Read(() => vm.Devices.ToArray());
+        vm.SelectedDevice = devices[0];
+        vm.CanMoveDevices([devices[0]], devices[1], after: false).ShouldBeFalse();
+
+        await vm.MoveDevicesAsync([devices[0]], devices[2], after: true);
+
+        await Wait.UntilAsync(() => Order(vm) == "b,c,a", "orden nuevo");
+        await Wait.UntilAsync(() => Order(other) == "b,c,a", "el otro cliente también");
+        _ui.Read(() => vm.SelectedDevice?.Name).ShouldBe("a", "se conserva la selección");
+        (await ConfigurationFile.LoadAsync(agent.ConfigPath)).Devices.Select(d => d.Name).ShouldBe(["b", "c", "a"]);
+    }
+
     public void Dispose()
     {
         File.Delete(_settingsPath);

@@ -126,6 +126,28 @@ public class MainWindowTests
     });
 
     [Fact]
+    public Task Drop_marks_show_a_line_before_or_after_the_row() => HeadlessApp.RunAsync(() =>
+    {
+        var window = new MainWindow { DataContext = ViewModelWithData() };
+        window.Width = 1400;
+        window.Show();
+        window.UpdateLayout();
+        var tagItems = window.FindControl<ListBox>("TagsList")!.GetVisualDescendants().OfType<ListBoxItem>().ToArray();
+        var deviceItems = window.FindControl<ListBox>("DevicesList")!.GetVisualDescendants().OfType<ListBoxItem>().ToArray();
+
+        tagItems[1].Classes.Add("dropbefore");
+        deviceItems[0].Classes.Add("dropafter");
+        window.UpdateLayout();
+
+        Presenter(tagItems[1]).BorderThickness.ShouldBe(new Avalonia.Thickness(0, 2, 0, 0));
+        Presenter(deviceItems[0]).BorderThickness.ShouldBe(new Avalonia.Thickness(0, 0, 0, 2));
+        Capture(window, "main-window-drop-marks.png");
+
+        static Avalonia.Controls.Presenters.ContentPresenter Presenter(ListBoxItem item) =>
+            item.GetVisualDescendants().OfType<Avalonia.Controls.Presenters.ContentPresenter>().First();
+    });
+
+    [Fact]
     public Task Disabled_tag_row_is_dimmed_and_says_so() => HeadlessApp.RunAsync(() =>
     {
         var vm = ViewModelWithData();

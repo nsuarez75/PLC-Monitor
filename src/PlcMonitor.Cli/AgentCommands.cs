@@ -567,6 +567,35 @@ public sealed class AgentDeviceRemoveCommand : AsyncCommand<AgentDeviceRemoveSet
         });
 }
 
+public sealed class AgentDeviceOrderSettings : AgentPersistSettings
+{
+    [CommandArgument(0, "<DISPOSITIVO>")]
+    [Description("Dispositivos en el orden deseado (los que falten quedan detrás, como estaban).")]
+    public string[] Devices { get; set; } = [];
+}
+
+/// <summary>plcmon agent device order — cambia el orden de los dispositivos.</summary>
+public sealed class AgentDeviceOrderCommand : AsyncCommand<AgentDeviceOrderSettings>
+{
+    public override Task<int> ExecuteAsync(CommandContext context, AgentDeviceOrderSettings settings, CancellationToken cancellationToken) =>
+        AgentRuntime.RunAsync(settings, async client =>
+        {
+            var known = (await client.ListDevicesAsync(new Google.Protobuf.WellKnownTypes.Empty(), cancellationToken: cancellationToken)).Devices
+                .Select(d => d.Name).ToHashSet(StringComparer.OrdinalIgnoreCase);
+            var missing = settings.Devices.Where(d => !known.Contains(d)).ToArray();
+            if (missing.Length > 0)
+            {
+                AgentRuntime.Console.MarkupLine($"[red]Error:[/] dispositivos desconocidos: {Markup.Escape(string.Join(", ", missing))}.");
+                return 1;
+            }
+            var request = new ReorderDevicesRequest { Persist = !settings.NoPersist };
+            request.Devices.AddRange(settings.Devices);
+            var order = await client.ReorderDevicesAsync(request, cancellationToken: cancellationToken);
+            AgentRuntime.Console.MarkupLine($"[green]Orden:[/] {Markup.Escape(string.Join(", ", order.Devices))}");
+            return 0;
+        });
+}
+
 public sealed class AgentTagAddSettings : AgentPersistSettings
 {
     [CommandArgument(0, "<DISPOSITIVO>")]

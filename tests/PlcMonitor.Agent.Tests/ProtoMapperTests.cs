@@ -57,6 +57,18 @@ public class ProtoMapperTests
     }
 
     [Fact]
+    public void Tag_order_round_trips_and_is_absent_when_not_sent()
+    {
+        var device = new PlcMonitor.Engine.Configuration.DeviceConfiguration { Name = "plc1", Driver = "fake", TagOrder = ["b", "a"] };
+
+        var pb = ProtoMapper.ToProto(device);
+
+        pb.TagOrder.ShouldBe(["b", "a"]);
+        ProtoMapper.FromProto(pb).TagOrder.ShouldBe(["b", "a"]);
+        ProtoMapper.FromProto(new Api.DeviceConfig { Name = "plc2", Driver = "fake" }).TagOrder.ShouldBeNull();
+    }
+
+    [Fact]
     public void Disabled_tag_snapshot_says_so()
     {
         var definition = new PlcMonitor.Engine.TagDefinition(new PlcMonitor.Engine.TagKey("plc1", "t"), "DB1.DBW0", "g", TimeSpan.FromSeconds(1), false, null)
