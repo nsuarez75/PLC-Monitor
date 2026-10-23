@@ -124,7 +124,7 @@ public sealed class GaugePanel : Control
         var series = Series ?? [];
         if (series.Count == 0)
         {
-            var empty = Text(EmptyText, Brush("App.TextMuted", Brushes.Gray), 13);
+            var empty = Text(Loc.T(EmptyText), Brush("App.TextMuted", Brushes.Gray), 13);
             context.DrawText(empty, new Point((bounds.Width - empty.Width) / 2, (bounds.Height - empty.Height) / 2));
             return;
         }

@@ -4,6 +4,7 @@ using Avalonia.Controls;
 using Avalonia.Input;
 using Avalonia.Media;
 using PlcMonitor.App.Charts;
+using PlcMonitor.App.Localization;
 
 namespace PlcMonitor.App.Controls;
 
@@ -113,7 +114,7 @@ public sealed class BarChart : Control
         var series = (Series ?? []).Where(s => s.Points.Any(p => p.Value is not null)).ToArray();
         if (series.Length == 0)
         {
-            var empty = Text(EmptyText, muted, 13);
+            var empty = Text(Loc.T(EmptyText), muted, 13);
             context.DrawText(empty, new Point((bounds.Width - empty.Width) / 2, (bounds.Height - empty.Height) / 2));
             return;
         }

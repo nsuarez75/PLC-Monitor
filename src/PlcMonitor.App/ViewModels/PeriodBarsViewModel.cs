@@ -65,7 +65,7 @@ public sealed partial class PeriodBarsViewModel : LocalizedObservableObject
         Chart.ShiftStartHour = view.ShiftStartHour;
     }
 
-    public ChartViewModel Chart { get; } = new() { Kind = ChartKind.Bars, EmptyText = Loc.T("Consultando el histórico…") };
+    public ChartViewModel Chart { get; } = new() { Kind = ChartKind.Bars, EmptyText = Loc.N("Consultando el histórico…") };
 
     /// <summary>Qué se ve: cálculo, periodo y rango.</summary>
     public string Description => _local is null
@@ -95,7 +95,7 @@ public sealed partial class PeriodBarsViewModel : LocalizedObservableObject
         }
         if (_context!.Client is not { } client)
         {
-            Chart.EmptyText = Loc.T("Conéctate al agente para consultar su histórico");
+            Chart.EmptyText = Loc.N("Conéctate al agente para consultar su histórico");
             Chart.SetData([]);
             return;
         }
@@ -104,7 +104,7 @@ public sealed partial class PeriodBarsViewModel : LocalizedObservableObject
         Missing = missing.Count == 0 ? "" : Loc.F("Sin histórico en el agente: {0}", string.Join(", ", missing));
         if (historized.Count == 0)
         {
-            Chart.EmptyText = Loc.T("Ningún tag de la vista se historiza: actívalo en la configuración del dispositivo");
+            Chart.EmptyText = Loc.N("Ningún tag de la vista se historiza: actívalo en la configuración del dispositivo");
             Chart.SetData([]);
             return;
         }
@@ -147,7 +147,7 @@ public sealed partial class PeriodBarsViewModel : LocalizedObservableObject
                     data.Add(new ChartSeriesData(key.ToString(), points, Step: false) { Display = Format(key) });
                 }
             }
-            Chart.EmptyText = Loc.T("No hay histórico de estos tags en ese periodo");
+            Chart.EmptyText = Loc.N("No hay histórico de estos tags en ese periodo");
             Chart.SetData(data, from, now);
             var periods = data.SelectMany(d => d.Points).Select(p => p.Time).Distinct().Count();
             Summary = Loc.F(periods == 1 ? "{0} periodo" : "{0} periodos", periods)
@@ -157,7 +157,7 @@ public sealed partial class PeriodBarsViewModel : LocalizedObservableObject
         catch (RpcException ex)
         {
             Summary = "";
-            Chart.EmptyText = Loc.T("No se ha podido consultar el histórico");
+            Chart.EmptyText = Loc.N("No se ha podido consultar el histórico");
             _context.Report(_context.Describe(ex), isError: true);
         }
         finally
@@ -173,7 +173,7 @@ public sealed partial class PeriodBarsViewModel : LocalizedObservableObject
         Missing = missing.Count == 0 ? "" : Loc.F("No están en el CSV: {0}", string.Join(", ", missing));
         var data = present.Select(t => new ChartSeriesData(t.ToString(),
             PeriodBars.Compute(local[t].Points, _view.BarPeriod, _view.BarMetric, _view.ShiftStartHour), Step: false) { Display = Format(t) }).ToList();
-        Chart.EmptyText = Loc.T("El CSV no tiene valores de estos tags");
+        Chart.EmptyText = Loc.N("El CSV no tiene valores de estos tags");
         Chart.SetData(data);
         var periods = data.SelectMany(d => d.Points).Select(p => p.Time).Distinct().Count();
         Summary = Loc.F(periods == 1 ? "{0} periodo" : "{0} periodos", periods);

@@ -43,10 +43,10 @@ public sealed record HistoryRowViewModel(DateTimeOffset Timestamp, string Tag, s
     public bool IsBad => Quality is not (Quality.Good or Quality.Uncertain);
 }
 
-/// <summary>Opción de un desplegable con su texto, que sigue el idioma elegido.</summary>
-public sealed class Choice<T>(string text, T value) : LocalizedObservableObject
+/// <summary>Opción de un desplegable con su texto, que sigue el idioma elegido (con <paramref name="args"/>, rellena sus {0}…).</summary>
+public sealed class Choice<T>(string text, T value, params object?[] args) : LocalizedObservableObject
 {
-    public string Text => Loc.T(text);
+    public string Text => args.Length == 0 ? Loc.T(text) : Loc.F(text, args);
 
     public T Value { get; } = value;
 
@@ -93,7 +93,7 @@ public sealed partial class HistoryViewModel(IAgentContext context, Func<DeviceV
     public ObservableCollection<HistoryRowViewModel> Rows { get; } = [];
 
     /// <summary>Gráfica del resultado (los tags consultados, todos marcados).</summary>
-    public ChartViewModel Chart { get; } = new() { EmptyText = Loc.T("Consulta el histórico para ver la gráfica") };
+    public ChartViewModel Chart { get; } = new() { EmptyText = Loc.N("Consulta el histórico para ver la gráfica") };
 
     /// <summary>Se pide abrir los tags marcados y el periodo en una vista de Tendencias (con todos los tipos de gráfica).</summary>
     public event EventHandler<PlcMonitor.App.Services.TrendView>? OpenInTrendsRequested;

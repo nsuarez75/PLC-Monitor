@@ -221,8 +221,8 @@ public sealed partial class AgentsViewModel : LocalizedObservableObject
     private async Task RenewCredentialsAsync()
     {
         if (!await _main.Dialogs.ConfirmAsync(Loc.T("Renovar credenciales"),
-                Loc.F("¿Renovar el token y el certificado del agente de {0}?\nLos anteriores dejan de valer: los demás equipos y la CLI que los usen ", TargetName)
-                + Loc.T("perderán el acceso.") + (CreateReadOnlyToken ? Loc.T("\nSe crea un token de solo lectura nuevo.") : Loc.T("\nSi había token de solo lectura, también deja de valer."))))
+                Loc.F("¿Renovar el token y el certificado del agente de {0}?\nLos anteriores dejan de valer: los demás equipos y la CLI que los usen perderán el acceso.", TargetName)
+                + (CreateReadOnlyToken ? Loc.T("\nSe crea un token de solo lectura nuevo.") : Loc.T("\nSi había token de solo lectura, también deja de valer."))))
             return;
         await RunSshAsync(Loc.T("Renovando credenciales"), async (deployer, profile, ct) =>
         {

@@ -43,6 +43,12 @@ public static class Loc
         return EnglishStrings.Map.TryGetValue(source, out var text) ? text : source;
     }
 
+    /// <summary>
+    /// Marca un texto para traducirlo más tarde, al mostrarlo (p.ej. el aviso de una gráfica vacía): se guarda en
+    /// castellano y quien lo pinta llama a <see cref="T"/>, así sigue al idioma aunque se cambie después.
+    /// </summary>
+    public static string N(string source) => source;
+
     public static string F(string source, params object?[] args) =>
         string.Format(CultureInfo.InvariantCulture, T(source), args);
 

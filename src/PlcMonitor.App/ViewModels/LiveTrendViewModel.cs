@@ -50,7 +50,7 @@ public sealed partial class LiveTrendViewModel : LocalizedObservableObject, IDis
         _trigger = trigger;
         _triggerTag = triggerTag;
         _kind = kind;
-        Chart = chart ?? new ChartViewModel { EmptyText = Loc.T("Aún no hay valores de estos tags") };
+        Chart = chart ?? new ChartViewModel { EmptyText = Loc.N("Aún no hay valores de estos tags") };
         Chart.Kind = kind;
         Chart.Curves = [];
         Chart.Caption = "";

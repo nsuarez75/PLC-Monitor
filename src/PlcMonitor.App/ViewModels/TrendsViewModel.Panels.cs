@@ -13,7 +13,7 @@ public sealed partial class TrendsViewModel
     private readonly List<TrendPanel> _allPanels;
 
     public static IReadOnlyList<Choice<int>> ColumnChoices { get; } =
-        [.. Enumerable.Range(1, TrendPanel.MaxColumns).Select(n => new Choice<int>(n == 1 ? "1 columna" : $"{n} columnas", n))];
+        [.. Enumerable.Range(1, TrendPanel.MaxColumns).Select(n => new Choice<int>(n == 1 ? "1 columna" : "{0} columnas", n, n))];
 
     public ObservableCollection<TrendPanelItem> Panels { get; } = [];
 

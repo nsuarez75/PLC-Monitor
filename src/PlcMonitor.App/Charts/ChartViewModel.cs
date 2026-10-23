@@ -86,7 +86,7 @@ public sealed partial class ChartViewModel : LocalizedObservableObject
     public partial bool IsZoomed { get; private set; }
 
     [ObservableProperty]
-    public partial string EmptyText { get; set; } = Loc.T("Marca uno o más tags");
+    public partial string EmptyText { get; set; } = Loc.N("Marca uno o más tags");
 
     public bool HasOptions => Options.Count > 0;
 

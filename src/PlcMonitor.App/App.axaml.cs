@@ -3,6 +3,7 @@ using Avalonia.Controls.ApplicationLifetimes;
 using Avalonia.Markup.Xaml;
 using Avalonia.Styling;
 using Avalonia.Threading;
+using Avalonia.VisualTree;
 using PlcMonitor.App.Localization;
 using PlcMonitor.App.Services;
 using PlcMonitor.App.ViewModels;
@@ -22,6 +23,12 @@ public sealed class App : Application
             var settings = AppSettings.Load(path);
             // El idioma se fija antes de crear la ventana: el XAML se evalúa al construirla.
             Loc.SetLanguage(settings.Language);
+            // Las gráficas pintan sus textos a mano: al cambiar de idioma se repintan para traducirlos.
+            Loc.LanguageChanged += (_, _) =>
+            {
+                foreach (var visual in desktop.Windows.SelectMany(w => w.GetVisualDescendants()))
+                    visual.InvalidateVisual();
+            };
             var window = new MainWindow();
             var viewModel = new MainViewModel(new GrpcAgentConnector(), new AvaloniaDispatcher(), new WindowDialogs(window), settings, path);
             window.DataContext = viewModel;

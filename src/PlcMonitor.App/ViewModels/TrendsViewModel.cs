@@ -660,7 +660,7 @@ public sealed partial class TrendsViewModel : LocalizedObservableObject, IDispos
         {
             Window = LiveTrendViewModel.Windows.FirstOrDefault(w => (int)w.Value.TotalMinutes == view.WindowMinutes) ?? LiveTrendViewModel.Windows[1],
         };
-        live.Chart.EmptyText = Loc.T(view.Tags.Count == 0 ? "Esta vista no tiene tags: edítala y añade alguno"
+        live.Chart.EmptyText = Loc.N(view.Tags.Count == 0 ? "Esta vista no tiene tags: edítala y añade alguno"
             : trigger is not null ? "Esperando el disparo"
             : view.Kind == ChartKind.XY ? "Aún no hay valores de los dos ejes"
             : "Aún no hay valores de estos tags");
@@ -710,7 +710,7 @@ public sealed partial class TrendsViewModel : LocalizedObservableObject, IDispos
             HistoryText = Loc.F("Histórico {0} · {1} puntos", TrendHistory.Describe(view), points)
                 + (aggregated is { } every ? " · " + Loc.F("con muchos puntos: mín/máx cada {0}", StateTimeline.FormatDuration(every)) : ""),
         };
-        live.Chart.EmptyText = Loc.T(view.Tags.Count == 0 ? "Esta vista no tiene tags: edítala y añade alguno"
+        live.Chart.EmptyText = Loc.N(view.Tags.Count == 0 ? "Esta vista no tiene tags: edítala y añade alguno"
             : refs.Count == 0 ? "Ningún tag de la vista se historiza: actívalo en la configuración del tag"
             : "No hay histórico de estos tags en ese periodo");
         Configure(live, view);
@@ -756,7 +756,7 @@ public sealed partial class TrendsViewModel : LocalizedObservableObject, IDispos
             HistoryText = Loc.F("CSV {0} · {1} filas", file, content.Rows),
             MissingText = Loc.T("No están en el CSV"),
         };
-        live.Chart.EmptyText = Loc.T(view.Tags.Count == 0 ? "Esta vista no tiene tags: edítala y añade los del CSV" : "El CSV no tiene valores de estos tags");
+        live.Chart.EmptyText = Loc.N(view.Tags.Count == 0 ? "Esta vista no tiene tags: edítala y añade los del CSV" : "El CSV no tiene valores de estos tags");
         Configure(live, view);
         return new OpenedView(live, null);
     }

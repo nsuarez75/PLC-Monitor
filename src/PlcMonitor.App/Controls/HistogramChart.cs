@@ -134,7 +134,7 @@ public sealed class HistogramChart : Control
             .Where(d => d.Values.Count > 0).ToArray();
         if (data.Length == 0)
         {
-            var text = (Series ?? []).Any(s => s.IsBoolean) && (Series ?? []).All(s => s.IsBoolean) ? "El histograma no sirve para booleanos" : EmptyText;
+            var text = Loc.T((Series ?? []).Any(s => s.IsBoolean) && (Series ?? []).All(s => s.IsBoolean) ? "El histograma no sirve para booleanos" : EmptyText);
             var empty = Text(text, muted, 13);
             context.DrawText(empty, new Point((bounds.Width - empty.Width) / 2, (bounds.Height - empty.Height) / 2));
             return;
