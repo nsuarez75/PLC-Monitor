@@ -255,6 +255,12 @@ public sealed class TagConfiguration
     /// <summary>Dirección en la sintaxis del driver (p.ej. DB1.DBW10 o "Motor".Velocidad).</summary>
     public string Address { get; set; } = "";
 
+    /// <summary>
+    /// Tag activo (por defecto). Uno desactivado sigue en la configuración pero no se lee, no se historiza, no se publica
+    /// en OPC UA y no admite escrituras.
+    /// </summary>
+    public bool Enabled { get; set; } = true;
+
     /// <summary>Segunda llave de escritura: el tag se puede escribir solo si además el dispositivo tiene WritesEnabled.</summary>
     public bool Writable { get; set; }
 

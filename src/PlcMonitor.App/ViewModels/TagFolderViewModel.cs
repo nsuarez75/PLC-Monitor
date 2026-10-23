@@ -28,7 +28,7 @@ public sealed partial class TagFolderViewModel : ObservableObject
 
     public string CountText => Tags.Count == 1 ? "1 tag" : $"{Tags.Count} tags";
 
-    public int BadCount => Tags.Count(t => !t.IsGood);
+    public int BadCount => Tags.Count(t => !t.IsGood && !t.IsDisabled);
 
     public bool HasBadTags => BadCount > 0;
 

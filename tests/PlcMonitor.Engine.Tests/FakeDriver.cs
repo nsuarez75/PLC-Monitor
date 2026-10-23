@@ -60,6 +60,9 @@ internal sealed class FakePlc
 
     public int ReadCount;
 
+    /// <summary>Direcciones que se han leído alguna vez.</summary>
+    public ConcurrentDictionary<string, int> ReadAddresses { get; } = new(StringComparer.Ordinal);
+
     /// <summary>Si no es null, las lecturas leen los valores y esperan a que se complete (un PLC lento que no atiende la cancelación).</summary>
     public TaskCompletionSource? ReadGate { get; set; }
 
@@ -104,6 +107,8 @@ internal sealed class FakeConnection(string name, FakePlc plc) : DeviceConnectio
     {
         if (plc.Unplugged)
             throw new IOException("Cable desconectado");
+        foreach (var address in addresses)
+            plc.ReadAddresses.AddOrUpdate(address, 1, (_, n) => n + 1);
         var now = TimeProvider.GetUtcNow();
         IReadOnlyList<TagValue> result = addresses
             .Select(a => plc.Values.TryGetValue(a, out var v)

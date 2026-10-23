@@ -20,6 +20,7 @@ internal interface IEngineSink
 internal sealed class DeviceSupervisor : IAsyncDisposable
 {
     internal const string DisabledDetail = "Dispositivo deshabilitado";
+    internal const string TagDisabledDetail = "Tag desactivado";
 
     private DeviceConfiguration _config;
     private readonly IDriverFactory _factory;
@@ -69,8 +70,12 @@ internal sealed class DeviceSupervisor : IAsyncDisposable
             Decimals = t.Decimals,
             Scaling = t.Scaling,
             OpcUaPublished = t.OpcUaPublished,
+            Enabled = t.Enabled,
         }))
         .ToArray();
+
+    /// <summary>Valor fijo de un tag desactivado: no se lee, así que no tiene valor.</summary>
+    public static TagValue DisabledValue(DateTimeOffset timestamp) => TagValue.Bad(QualityCode.Bad, timestamp, TagDisabledDetail);
 
     /// <summary>
     /// Cambia en caliente los grupos, los tags y las llaves de escritura y de OPC UA sin tocar la conexión: los grupos de escaneo se
@@ -138,7 +143,7 @@ internal sealed class DeviceSupervisor : IAsyncDisposable
             _cts.Dispose();
             _cts = null;
             SetStatus(s => s with { Enabled = false, State = ConnectionState.Disconnected, Detail = DisabledDetail, NextRetry = null });
-            PublishBad(Tags.Select(t => t.Key).ToArray(), QualityCode.BadNotConnected, DisabledDetail);
+            PublishBad(Tags.Where(t => t.Enabled).Select(t => t.Key).ToArray(), QualityCode.BadNotConnected, DisabledDetail);
         }
         finally
         {
@@ -192,6 +197,8 @@ internal sealed class DeviceSupervisor : IAsyncDisposable
 
     private async Task<WriteResult> WriteCoreAsync(TagDefinition tag, string text, TagValue current, CancellationToken cancellationToken)
     {
+        if (!tag.Enabled)
+            return new WriteResult(tag.Address, QualityCode.BadConfiguration, "El tag está desactivado.");
         if (!_config.WritesEnabled)
             return new WriteResult(tag.Address, QualityCode.BadWriteDisabled, "Las escrituras están deshabilitadas en el dispositivo.");
         if (!tag.Writable)
@@ -243,7 +250,7 @@ internal sealed class DeviceSupervisor : IAsyncDisposable
         {
             _logger.LogError(ex, "{Device}: no se pudo crear la conexión", Name);
             SetStatus(s => s with { State = ConnectionState.Faulted, Detail = ex.Message });
-            PublishBad(Tags.Select(t => t.Key).ToArray(), QualityCode.BadConfiguration, ex.Message);
+            PublishBad(Tags.Where(t => t.Enabled).Select(t => t.Key).ToArray(), QualityCode.BadConfiguration, ex.Message);
             return;
         }
 
@@ -376,12 +383,15 @@ internal sealed class DeviceSupervisor : IAsyncDisposable
         }
     }
 
-    /// <summary>Agrupa los tags por grupo de escaneo. Los de dirección no válida quedan con calidad BadConfiguration.</summary>
+    /// <summary>
+    /// Agrupa los tags activos por grupo de escaneo (los desactivados no se leen). Los de dirección no válida quedan con
+    /// calidad BadConfiguration.
+    /// </summary>
     private List<ScanGroup> PrepareGroups(IDeviceConnection connection)
     {
         var groups = new List<ScanGroup>();
         var invalid = new List<TagUpdate>();
-        foreach (var group in Tags.GroupBy(t => t.Group))
+        foreach (var group in Tags.Where(t => t.Enabled).GroupBy(t => t.Group))
         {
             var keysByAddress = new Dictionary<string, List<TagKey>>(StringComparer.Ordinal);
             // Dos tags pueden leer la misma dirección con escalados distintos: se escala por tag, no por dirección.

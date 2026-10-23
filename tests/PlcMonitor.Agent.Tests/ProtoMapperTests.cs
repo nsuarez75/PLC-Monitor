@@ -35,6 +35,40 @@ public class ProtoMapperTests
     }
 
     [Fact]
+    public void Disabled_tags_round_trip_and_tags_without_the_field_stay_enabled()
+    {
+        var device = new PlcMonitor.Engine.Configuration.DeviceConfiguration
+        {
+            Name = "plc1",
+            Driver = "fake",
+            ScanGroups = { new PlcMonitor.Engine.Configuration.ScanGroupConfiguration { Name = "g", IntervalMs = 100, Tags = [
+                new PlcMonitor.Engine.Configuration.TagConfiguration { Address = "DB1.DBW0", Enabled = false },
+                new PlcMonitor.Engine.Configuration.TagConfiguration { Address = "DB1.DBW2" },
+            ] } },
+        };
+
+        var pb = ProtoMapper.ToProto(device);
+
+        pb.ScanGroups[0].Tags.Select(t => t.Disabled).ShouldBe([true, false]);
+        ProtoMapper.FromProto(pb).ScanGroups[0].Tags.Select(t => t.Enabled).ShouldBe([false, true]);
+        // Un cliente anterior no manda el campo: el tag queda activo.
+        var old = ProtoMapper.FromProto(new Api.DeviceConfig { Name = "plc2", Driver = "fake", ScanGroups = { new Api.ScanGroupConfig { Name = "g", IntervalMs = 100, Tags = { new Api.TagConfig { Address = "DB1.DBW0" } } } } });
+        old.ScanGroups[0].Tags[0].Enabled.ShouldBeTrue();
+    }
+
+    [Fact]
+    public void Disabled_tag_snapshot_says_so()
+    {
+        var definition = new PlcMonitor.Engine.TagDefinition(new PlcMonitor.Engine.TagKey("plc1", "t"), "DB1.DBW0", "g", TimeSpan.FromSeconds(1), false, null)
+        {
+            Enabled = false,
+        };
+
+        ProtoMapper.ToProto(new PlcMonitor.Engine.TagSnapshot(definition, TagValue.Bad(QualityCode.Bad, Now, "Tag desactivado"))).Disabled.ShouldBeTrue();
+        ProtoMapper.ToProto(new PlcMonitor.Engine.TagSnapshot(definition with { Enabled = true }, TagValue.Bad(QualityCode.Bad, Now))).Disabled.ShouldBeFalse();
+    }
+
+    [Fact]
     public void Every_quality_has_a_proto_equivalent()
     {
         foreach (var quality in Enum.GetValues<QualityCode>())

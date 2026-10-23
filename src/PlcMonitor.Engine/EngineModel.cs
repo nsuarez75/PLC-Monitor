@@ -17,7 +17,7 @@ public sealed record TagDefinition(TagKey Key, string Address, string Group, Tim
     /// <summary>Historización (null o Enabled=false = no se historiza).</summary>
     public Configuration.TagHistorySettings? History { get; init; }
 
-    public bool IsHistorized => History is { Enabled: true };
+    public bool IsHistorized => Enabled && History is { Enabled: true };
 
     /// <summary>Transformación con la que los clientes muestran el valor; null = ninguna.</summary>
     public string? Transform { get; init; }
@@ -36,6 +36,12 @@ public sealed record TagDefinition(TagKey Key, string Address, string Group, Tim
 
     /// <summary>Segunda llave de publicación en OPC UA (la primera es la del dispositivo).</summary>
     public bool OpcUaPublished { get; init; } = true;
+
+    /// <summary>Tag activo: uno desactivado no se lee, no se historiza, no se publica en OPC UA ni se escribe.</summary>
+    public bool Enabled { get; init; } = true;
+
+    /// <summary>Se publica en OPC UA: activo y con la segunda llave (la primera es la del dispositivo).</summary>
+    public bool IsOpcUaPublished => Enabled && OpcUaPublished;
 }
 
 /// <summary>Definición de un tag con su último valor conocido.</summary>

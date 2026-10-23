@@ -252,6 +252,34 @@ public sealed class TagTableTests : IDisposable
         history.Summary.ShouldBe("El final del intervalo debe ser posterior al inicio.");
     }
 
+    [Fact]
+    public async Task Tags_are_disabled_and_enabled_from_the_table_and_do_not_count_as_errors()
+    {
+        await using var agent = new AgentFactory(Device("plc1", enabled: false, writesEnabled: true,
+            tags: [new Tag { Address = "DB1.DBW0", Name = "a", Writable = true }, T("DB1.DBW2", "b"), T("DB1.DBW4", "c")]));
+        await using var vm = await ConnectAsync(agent);
+        var device = _ui.Read(() => vm.Devices[0]);
+        _ui.Read(() => device.BadCount).ShouldBe(3);
+
+        await device.SetTagsEnabledAsync([TagOf(vm, "a"), TagOf(vm, "b")], enabled: false);
+
+        await Wait.UntilAsync(() => TagOf(vm, "a").IsDisabled && TagOf(vm, "b").IsDisabled, "tags desactivados");
+        vm.Message.ShouldBe("2 tags de plc1: desactivados");
+        var a = TagOf(vm, "a");
+        a.QualityText.ShouldBe("Desactivado");
+        a.IsBad.ShouldBeFalse();
+        a.Writable.ShouldBeFalse("un tag desactivado no se escribe");
+        _ui.Read(() => (device.BadCount, device.DisabledCount)).ShouldBe((1, 2));
+        (await ConfigurationFile.LoadAsync(agent.ConfigPath)).Devices[0].ScanGroups[0].Tags.Select(t => t.Enabled).ShouldBe([false, false, true]);
+
+        await device.SetTagsEnabledAsync([TagOf(vm, "a")], enabled: true);
+
+        await Wait.UntilAsync(() => !TagOf(vm, "a").IsDisabled, "tag activado");
+        vm.Message.ShouldBe("Tag plc1/a: activado");
+        TagOf(vm, "a").Writable.ShouldBeTrue();
+        TagOf(vm, "b").IsDisabled.ShouldBeTrue();
+    }
+
     public void Dispose()
     {
         File.Delete(_settingsPath);

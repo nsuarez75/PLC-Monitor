@@ -327,6 +327,30 @@ public sealed class AgentCommandsTests : IDisposable
     }
 
     [Fact]
+    public async Task Tags_can_be_disabled_and_enabled_and_tag_add_keeps_the_state()
+    {
+        await using var agent = new AgentFactory(Device("plc1", enabled: false));
+        UseAgent(agent);
+        var client = agent.CreateGrpcClient();
+        (await RunAsync("agent", "tag", "add", "plc1", "DB1.DBW0", "--name", "a")).ShouldBe(0);
+        (await RunAsync("agent", "tag", "add", "plc1", "DB1.DBW2", "--name", "b")).ShouldBe(0);
+
+        (await RunAsync("agent", "tag", "disable", "plc1", "a", "b")).ShouldBe(0);
+        (await RunAsync("agent", "tag", "disable", "plc1", "noexiste")).ShouldBe(1);
+        (await RunAsync("agent", "tag", "enable", "plc1", "b")).ShouldBe(0);
+        // Volver a añadir un tag existente no lo reactiva.
+        (await RunAsync("agent", "tag", "add", "plc1", "DB1.DBW0", "--name", "a")).ShouldBe(0);
+        (await RunAsync("agent", "tags", "plc1")).ShouldBe(0);
+
+        var tags = (await client.GetDeviceConfigAsync(new DeviceRequest { Device = "plc1" })).ScanGroups.SelectMany(g => g.Tags).ToDictionary(t => t.Name);
+        tags["a"].Disabled.ShouldBeTrue();
+        tags["b"].Disabled.ShouldBeFalse();
+        Output.ShouldContain("(desactivado)");
+        var saved = await PlcMonitor.Engine.Configuration.ConfigurationFile.LoadAsync(agent.ConfigPath);
+        saved.Devices.Single().ScanGroups.SelectMany(g => g.Tags).Single(t => t.Name == "a").Enabled.ShouldBeFalse();
+    }
+
+    [Fact]
     public async Task Invalid_device_shows_the_agent_validation_errors()
     {
         await using var agent = new AgentFactory();

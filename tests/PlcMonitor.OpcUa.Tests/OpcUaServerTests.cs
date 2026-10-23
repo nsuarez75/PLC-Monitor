@@ -199,6 +199,22 @@ public class OpcUaServerTests
     }
 
     [Fact]
+    public async Task Disabled_tags_are_not_exposed_and_reappear_when_enabled()
+    {
+        var off = Tag("DB1.DBW2", "parado");
+        off.Enabled = false;
+        await using var f = new OpcUaFixture(devices: [Device("plc1", tags: [Tag("DB1.DBW0", "activo"), off])]);
+        await f.StartAsync();
+        var session = await f.ConnectAsync();
+
+        (await ExistsAsync(session, Node(session, "plc1/activo"))).ShouldBeTrue();
+        (await ExistsAsync(session, Node(session, "plc1/parado"))).ShouldBeFalse();
+
+        await f.Engine.PutDeviceAsync(Device("plc1", tags: [Tag("DB1.DBW0", "activo"), Tag("DB1.DBW2", "parado")]));
+        await EventuallyAsync(() => ExistsAsync(session, Node(session, "plc1/parado")), e => e);
+    }
+
+    [Fact]
     public async Task History_of_historized_tags_can_be_read()
     {
         await using var f = new OpcUaFixture(historian: true, Device("plc1", tags: [Tag("DB1.DBW0", "nivel", historized: true)]));

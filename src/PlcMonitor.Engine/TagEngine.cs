@@ -223,17 +223,25 @@ public sealed class TagEngine : IAsyncDisposable, IEngineSink
             var removed = new Dictionary<(string Address, TagDataType? Type, TagScaling? Scaling), TagValue>();
             foreach (var key in previous.Keys.Except(next.Select(t => t.Key)))
             {
-                removed.TryAdd((previous[key].Address, previous[key].DataType, previous[key].Scaling), _values[key].Value);
+                if (previous[key].Enabled)
+                    removed.TryAdd((previous[key].Address, previous[key].DataType, previous[key].Scaling), _values[key].Value);
                 _values.Remove(key);
             }
             var pending = TagValue.Bad(QualityCode.BadNotConnected, _time.GetUtcNow(),
                 supervisor.Status.State == ConnectionState.Connected ? "Esperando la primera lectura" : supervisor.Status.Detail ?? DeviceSupervisor.DisabledDetail);
             foreach (var tag in next)
             {
+                if (!tag.Enabled)
+                {
+                    _values[tag.Key] = previous.TryGetValue(tag.Key, out var was) && !was.Enabled
+                        ? _values[tag.Key] with { Definition = tag }
+                        : new TagSnapshot(tag, DeviceSupervisor.DisabledValue(_time.GetUtcNow()));
+                    continue;
+                }
                 // Un tag que sigue leyendo la misma dirección con el mismo escalado conserva su valor; si no, espera a la próxima lectura.
                 if (previous.TryGetValue(tag.Key, out var old))
                 {
-                    _values[tag.Key] = old.Address == tag.Address && old.DataType == tag.DataType && old.Scaling == tag.Scaling
+                    _values[tag.Key] = old.Enabled && old.Address == tag.Address && old.DataType == tag.DataType && old.Scaling == tag.Scaling
                         ? _values[tag.Key] with { Definition = tag }
                         : new TagSnapshot(tag, pending);
                 }
@@ -514,7 +522,7 @@ public sealed class TagEngine : IAsyncDisposable, IEngineSink
         _statuses[device.Name] = supervisor.Status;
         var initial = TagValue.Bad(QualityCode.BadNotConnected, _time.GetUtcNow(), DeviceSupervisor.DisabledDetail);
         foreach (var tag in supervisor.Tags)
-            _values[tag.Key] = new TagSnapshot(tag, initial);
+            _values[tag.Key] = new TagSnapshot(tag, tag.Enabled ? initial : DeviceSupervisor.DisabledValue(initial.Timestamp));
         return supervisor;
     }
 
