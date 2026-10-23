@@ -44,6 +44,7 @@ public sealed partial class MainWindow : Window
         _tags.AddHandler(DragDrop.DragLeaveEvent, (_, _) => SetDropTarget(null));
         _tags.AddHandler(DragDrop.DropEvent, OnTagsDrop);
         this.FindControl<ContextMenu>("TagsMenu")!.Opening += OnTagsMenuOpening;
+        this.FindControl<ContextMenu>("ColumnsMenu")!.Opening += OnColumnsMenuOpening;
         // La tendencia en vivo avanza con el reloj aunque no lleguen valores nuevos (solo si se está viendo: al volver a
         // la pestaña se pone al día en el siguiente paso, los valores se siguen recibiendo igual).
         var trend = new DispatcherTimer { Interval = TimeSpan.FromMilliseconds(500) };
@@ -151,6 +152,32 @@ public sealed partial class MainWindow : Window
             menu.Items.Add(new MenuItem { Header = "Plegar todos los grupos", Command = device.SetAllFoldersCommand, CommandParameter = "false" });
         }
         e.Cancel = menu.Items.Count == 0;
+    }
+
+    /// <summary>Menú de la cabecera de la tabla de tags: una casilla por columna (menos la del nombre) y los anchos de serie.</summary>
+    private void OnColumnsMenuOpening(object? sender, System.ComponentModel.CancelEventArgs e)
+    {
+        var menu = (ContextMenu)sender!;
+        menu.Items.Clear();
+        if (DataContext is not MainViewModel main)
+        {
+            e.Cancel = true;
+            return;
+        }
+        for (var i = 1; i < MainViewModel.TagColumnTitles.Count; i++)
+        {
+            menu.Items.Add(new MenuItem
+            {
+                Header = MainViewModel.TagColumnTitles[i],
+                ToggleType = MenuItemToggleType.CheckBox,
+                IsChecked = !main.IsTagColumnHidden(i),
+                Command = main.ToggleTagColumnCommand,
+                CommandParameter = i,
+            });
+        }
+        menu.Items.Add(new Separator());
+        menu.Items.Add(new MenuItem { Header = "Mostrar todas las columnas", Command = main.ShowAllTagColumnsCommand, IsEnabled = main.TagHiddenColumns.Length > 0 });
+        menu.Items.Add(new MenuItem { Header = "Restablecer anchos de columna", Command = main.ResetTagColumnsCommand });
     }
 
     private static MenuItem MoveMenu(DeviceViewModel device, TagViewModel[] selected)
