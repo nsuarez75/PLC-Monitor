@@ -121,6 +121,8 @@ internal static class ProtoMapper
                 Multiplier = device.Reconnect.Multiplier,
             },
         };
+        if (device.TagOrder is { } order)
+            pb.TagOrder.AddRange(order);
         foreach (var group in device.ScanGroups)
         {
             var g = new Api.ScanGroupConfig { Name = group.Name, IntervalMs = group.IntervalMs };
@@ -188,6 +190,8 @@ internal static class ProtoMapper
                 ? new ReconnectSettings()
                 : new ReconnectSettings { InitialDelayMs = pb.Reconnect.InitialDelayMs, MaxDelayMs = pb.Reconnect.MaxDelayMs, Multiplier = pb.Reconnect.Multiplier },
         };
+        if (pb.TagOrder.Count > 0)
+            device.TagOrder = [.. pb.TagOrder.Select(n => n.Trim()).Where(n => n.Length > 0)];
         foreach (var g in pb.ScanGroups)
         {
             var group = new ScanGroupConfiguration { Name = g.Name.Trim(), IntervalMs = g.IntervalMs };

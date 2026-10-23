@@ -82,5 +82,8 @@ public sealed record DeviceConfigured(DeviceStatus Status, IReadOnlyList<TagSnap
 /// <summary>Un dispositivo se ha dado de baja (o se ha renombrado).</summary>
 public sealed record DeviceRemoved(string Device) : EngineEvent;
 
+/// <summary>Ha cambiado el orden de los dispositivos: estos son todos, en el orden nuevo.</summary>
+public sealed record DevicesReordered(IReadOnlyList<string> Devices) : EngineEvent;
+
 /// <summary>Han cambiado las transformaciones: estas sustituyen a todas las anteriores.</summary>
 public sealed record TransformsChanged(IReadOnlyList<Configuration.ValueTransform> Transforms) : EngineEvent;

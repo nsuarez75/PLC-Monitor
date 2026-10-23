@@ -37,7 +37,7 @@ public sealed class TokenAuthInterceptor(IOptions<AgentSecurityOptions> options,
     /// <summary>Métodos que cambian algo (en el PLC, la configuración o el histórico): solo con acceso completo.</summary>
     internal static readonly HashSet<string> FullAccessMethods = new(StringComparer.Ordinal)
     {
-        "Write", "SetDeviceEnabled", "PutDevice", "DeleteDevice", "PutTransforms", "RenameHistory", "DeleteHistory",
+        "Write", "SetDeviceEnabled", "PutDevice", "DeleteDevice", "ReorderDevices", "PutTransforms", "RenameHistory", "DeleteHistory",
         "PutOpcUa", "TrustOpcUaCertificate", "DeleteOpcUaCertificate",
     };
 

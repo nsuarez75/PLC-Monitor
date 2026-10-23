@@ -56,6 +56,9 @@ service AgentService {
 
   // Baja de un dispositivo.
   rpc DeleteDevice(DeleteDeviceRequest) returns (google.protobuf.Empty);
+  // Cambia el orden de los dispositivos (el de agent.json, que ven todos los clientes): los indicados primero, en ese
+  // orden; los demás detrás, como estaban. Devuelve el orden resultante.
+  rpc ReorderDevices(ReorderDevicesRequest) returns (DeviceOrder);
 
   // Histórico de uno o varios tags entre dos instantes, en bruto o agregado por intervalo.
   // Si el historiador está desactivado: FAILED_PRECONDITION.
@@ -317,6 +320,8 @@ message SubscribeEvent {
     DeviceRemoved device_removed = 5;
     // Han cambiado las transformaciones: sustituyen a todas las anteriores.
     TransformList transforms = 6;
+    // Ha cambiado el orden de los dispositivos: todos, en el orden nuevo.
+    DeviceOrder device_order = 7;
   }
 }
 
@@ -327,6 +332,16 @@ message DeviceConfigured {
 
 message DeviceRemoved {
   string device = 1;
+}
+
+message DeviceOrder {
+  repeated string devices = 1;
+}
+
+message ReorderDevicesRequest {
+  repeated string devices = 1;
+  // Guardar en agent.json.
+  bool persist = 2;
 }
 
 message BrowseRequest {
@@ -475,6 +490,8 @@ message DeviceConfig {
   repeated ScanGroupConfig scan_groups = 7;
   // Primera llave de publicación en OPC UA: sin ella el dispositivo no aparece en el servidor OPC UA.
   bool opc_ua_published = 8;
+  // Orden en que se muestran los tags (nombres); los que no están, detrás. Solo presentación: no cambia la lectura.
+  repeated string tag_order = 9;
 }
 
 message Configuration {
