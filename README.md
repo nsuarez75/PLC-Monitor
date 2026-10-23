@@ -1,6 +1,6 @@
 # PLC-Monitor
 
-##Español
+## Español
 
 Aplicación de escritorio y agente para supervisar y diagnosticar PLCs. Lee variables por S7 y Modbus, las
 muestra en vivo, las historiza en SQLite y permite crear tendencias, paneles y transformaciones. También
