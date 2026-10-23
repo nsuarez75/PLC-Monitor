@@ -91,5 +91,4 @@ por instalación y el token de solo lectura para quien únicamente deba consulta
 ## Estado de este manual
 
 El manual se ha escrito a partir del código y de capturas con datos sintéticos. Las pruebas con PLC reales,
-la instalación por SSH y algunos flujos de error siguen pendientes de validación. Lo que falta está en
-[PENDIENTES.md](PENDIENTES.md).
+la instalación por SSH y algunos flujos de error siguen pendientes de validación. 
