@@ -68,7 +68,7 @@ sudo journalctl -u plcmon-agent -n 100 --no-pager
 En PowerShell como administrador:
 
 ```powershell
-Get-Service PLC-MonitorAgent
+Get-Service PLCMonitorAgent
 ```
 
 Y revisa `%ProgramFiles%\PLC-Monitor\agent\logs\`.
@@ -338,8 +338,8 @@ sudo systemctl status plcmon-agent
 Windows, en PowerShell como administrador:
 
 ```powershell
-Restart-Service PLC-MonitorAgent
-Get-Service PLC-MonitorAgent
+Restart-Service PLCMonitorAgent
+Get-Service PLCMonitorAgent
 ```
 
 El agente vuelca el histórico al parar. Evita reiniciarlo en mitad de un turno si puedes esperar.

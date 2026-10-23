@@ -104,7 +104,7 @@ sudo cp -p /opt/plc-monitor/agent/agent.json /opt/plc-monitor/agent/agent.json.b
 En Windows, para y copia con PowerShell como administrador:
 
 ```powershell
-Stop-Service PLC-MonitorAgent
+Stop-Service PLCMonitorAgent
 Copy-Item "$env:ProgramFiles\PLC-Monitor\agent\agent.json" "$env:ProgramFiles\PLC-Monitor\agent\agent.json.bak"
 ```
 
@@ -191,9 +191,9 @@ sudo systemctl start plcmon-agent
 Windows, en PowerShell como administrador:
 
 ```powershell
-Stop-Service PLC-MonitorAgent
+Stop-Service PLCMonitorAgent
 Compress-Archive "$env:ProgramFiles\PLC-Monitor\agent" "D:\backups\plcmon-agent.zip" -Force
-Start-Service PLC-MonitorAgent
+Start-Service PLCMonitorAgent
 ```
 
 Comprueba que la copia contiene `agent.json`, `agent.key`, `agent.settings.json`, `agent.pfx` y la carpeta
@@ -318,7 +318,7 @@ por defecto. El Visor de eventos solo recibe avisos y errores. La app puede most
 ### Cada día
 
 - Comprueba que el agente y los dispositivos están conectados.
-- Revisa si hay tags en **Bad** o dispositivos en **Faulted**.
+- Revisa si hay tags en **Bad** o dispositivos en **En fallo**.
 - Mira que el histórico reciente tiene datos.
 
 ### Cada semana
@@ -360,7 +360,7 @@ Si cambia el nombre del host, el certificado puede no validar.
 
 ## 13.10. Desinstalar
 
-Desde **Agentes**, **Desinstalar** para el servicio, elimina las reglas de firewall y borra la carpeta del
+Desde **Agentes**, **Desinstalar** detiene el servicio, elimina las reglas de firewall y borra la carpeta del
 agente.
 
 Si marcas **Conservar agent.json al desinstalar**, se guardan copias de `agent.json` y `agent.key` en:
