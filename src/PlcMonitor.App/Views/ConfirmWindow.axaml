@@ -1,5 +1,6 @@
 <Window xmlns="https://github.com/avaloniaui"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:loc="using:PlcMonitor.App.Localization"
         xmlns:c="using:PlcMonitor.App.Controls"
         x:Class="PlcMonitor.App.Views.ConfirmWindow"
         Icon="/Assets/plc-monitor.png"
@@ -16,8 +17,8 @@
       </StackPanel>
     </StackPanel>
     <StackPanel Orientation="Horizontal" HorizontalAlignment="Right" Spacing="8">
-      <Button x:Name="NoButton" Content="Cancelar" IsCancel="True" Classes="secondary" />
-      <Button x:Name="YesButton" Content="Aceptar" IsDefault="True" Classes="accent" />
+      <Button x:Name="NoButton" Content="{loc:T 'Cancelar'}" IsCancel="True" Classes="secondary" />
+      <Button x:Name="YesButton" Content="{loc:T 'Aceptar'}" IsDefault="True" Classes="accent" />
     </StackPanel>
   </StackPanel>
 </Window>

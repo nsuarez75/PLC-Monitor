@@ -1,4 +1,5 @@
 using PlcMonitor.Agent.Contracts;
+using PlcMonitor.App.Localization;
 
 namespace PlcMonitor.App.ViewModels;
 
@@ -41,14 +42,14 @@ internal static class TagAdder
         if (added.Count == 0)
         {
             return new Result(false, skipped.Count == 1
-                ? $"{skipped[0]} ya es un tag de {device}"
-                : $"Los {skipped.Count} tags ya existen en {device}");
+                ? Loc.F("{0} ya es un tag de {1}", skipped[0], device)
+                : Loc.F("Los {0} tags ya existen en {1}", skipped.Count, device));
         }
         await client.PutDeviceAsync(new PutDeviceRequest { Device = config, Persist = true });
-        var what = added.Count == 1 ? $"Añadido {added[0]}" : $"Añadidos {added.Count} tags ({added[0]} … {added[^1]})";
-        var message = $"{what} a {device} (grupo {group!.Name}, {group.IntervalMs} ms)";
+        var what = added.Count == 1 ? Loc.F("Añadido {0}", added[0]) : Loc.F("Añadidos {0} tags ({1} … {2})", added.Count, added[0], added[^1]);
+        var message = Loc.F("{0} a {1} (grupo {2}, {3} ms)", what, device, group!.Name, group.IntervalMs);
         if (skipped.Count > 0)
-            message += $"; {skipped.Count} ya existían";
+            message += Loc.F("; {0} ya existían", skipped.Count);
         return new Result(true, message);
     }
 }

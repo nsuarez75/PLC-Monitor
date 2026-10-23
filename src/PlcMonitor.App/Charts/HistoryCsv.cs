@@ -1,5 +1,6 @@
 using System.Globalization;
 using System.Text;
+using PlcMonitor.App.Localization;
 
 namespace PlcMonitor.App.Charts;
 
@@ -21,7 +22,7 @@ public static class HistoryCsv
         ArgumentNullException.ThrowIfNull(reader);
         var header = reader.ReadLine()?.Trim().TrimStart('﻿');
         if (!string.Equals(header, Header, StringComparison.OrdinalIgnoreCase) && !string.Equals(header, LegacyHeader, StringComparison.OrdinalIgnoreCase))
-            throw new FormatException($"No es un CSV de histórico de PLC-Monitor: la primera línea debe ser «{Header}».");
+            throw new FormatException(Loc.F("No es un CSV de histórico de PLC-Monitor: la primera línea debe ser «{0}».", Header));
 
         var rows = new List<(string Device, string Tag, DateTimeOffset Time, string Value, string Quality, string Unit)>();
         var skipped = 0;

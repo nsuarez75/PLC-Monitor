@@ -1,34 +1,35 @@
 <UserControl xmlns="https://github.com/avaloniaui"
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:loc="using:PlcMonitor.App.Localization"
              xmlns:vm="using:PlcMonitor.App.ViewModels"
              xmlns:c="using:PlcMonitor.App.Controls"
              x:Class="PlcMonitor.App.Views.ModbusSettingsView"
              x:DataType="vm:ModbusSettingsForm">
   <!-- Ajustes de un dispositivo Modbus: misma rejilla que el editor de dispositivos -->
   <Grid ColumnDefinitions="170,*" RowDefinitions="Auto,Auto,Auto,Auto,Auto,Auto,Auto" RowSpacing="14" ColumnSpacing="16">
-    <TextBlock Text="Conexión" VerticalAlignment="Center" FontWeight="Medium" />
-    <ComboBox Grid.Column="1" ItemsSource="{x:Static vm:ModbusSettingsForm.TransportOptions}" SelectedItem="{Binding Transport}" MinWidth="360" />
+    <TextBlock Text="{loc:T 'Conexión'}" VerticalAlignment="Center" FontWeight="Medium" />
+    <ComboBox Grid.Column="1" ItemsSource="{x:Static vm:ModbusSettingsForm.TransportOptions}" DisplayMemberBinding="{Binding Label}" SelectedItem="{Binding Transport}" MinWidth="360" />
 
     <!-- Equipo (TCP y RTU sobre TCP) o puerto y línea serie (RTU), en la misma fila -->
     <Panel Grid.Row="1" Grid.ColumnSpan="2">
       <Grid ColumnDefinitions="170,*" ColumnSpacing="16" IsVisible="{Binding IsNetwork}">
-        <TextBlock Text="Equipo" VerticalAlignment="Center" FontWeight="Medium" />
+        <TextBlock Text="{loc:T 'Equipo'}" VerticalAlignment="Center" FontWeight="Medium" />
         <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="8">
           <TextBox Text="{Binding Host}" PlaceholderText="192.168.0.20" Width="240" />
-          <TextBlock Text="puerto" Classes="muted" VerticalAlignment="Center" Margin="8,0,0,0" />
+          <TextBlock Text="{loc:T 'puerto'}" Classes="muted" VerticalAlignment="Center" Margin="8,0,0,0" />
           <NumericUpDown Value="{Binding Port}" Minimum="1" Maximum="65535" FormatString="0" Width="130" />
         </StackPanel>
       </Grid>
       <Grid ColumnDefinitions="170,*" RowDefinitions="Auto,Auto" RowSpacing="14" ColumnSpacing="16" IsVisible="{Binding IsSerial}">
         <StackPanel Spacing="2" Margin="0,6,0,0">
-          <TextBlock Text="Puerto serie" FontWeight="Medium" />
-          <TextBlock Text="del equipo del agente" Classes="muted" FontSize="11.5" />
+          <TextBlock Text="{loc:T 'Puerto serie'}" FontWeight="Medium" />
+          <TextBlock Text="{loc:T 'del equipo del agente'}" Classes="muted" FontSize="11.5" />
         </StackPanel>
         <StackPanel Grid.Column="1" Spacing="4">
           <StackPanel Orientation="Horizontal" Spacing="8">
             <AutoCompleteBox Text="{Binding SerialPort}" ItemsSource="{Binding SerialPorts}" MinimumPrefixLength="0" FilterMode="Contains"
-                             PlaceholderText="COM3 o /dev/ttyUSB0" Width="360" />
-            <Button Classes="ghost" Command="{Binding RefreshPortsCommand}" ToolTip.Tip="Volver a preguntar al agente por sus puertos serie">
+                             PlaceholderText="{loc:T 'COM3 o /dev/ttyUSB0'}" Width="360" />
+            <Button Classes="ghost" Command="{Binding RefreshPortsCommand}" ToolTip.Tip="{loc:T 'Volver a preguntar al agente por sus puertos serie'}">
               <c:Icon Kind="refresh" />
             </Button>
           </StackPanel>
@@ -37,44 +38,44 @@
         </StackPanel>
 
         <StackPanel Grid.Row="1" Spacing="2" Margin="0,6,0,0">
-          <TextBlock Text="Línea serie" FontWeight="Medium" />
-          <TextBlock Text="la misma en todo el bus" Classes="muted" FontSize="11.5" TextWrapping="Wrap" />
+          <TextBlock Text="{loc:T 'Línea serie'}" FontWeight="Medium" />
+          <TextBlock Text="{loc:T 'la misma en todo el bus'}" Classes="muted" FontSize="11.5" TextWrapping="Wrap" />
         </StackPanel>
         <WrapPanel Grid.Row="1" Grid.Column="1">
           <StackPanel Orientation="Horizontal" Spacing="8" Margin="0,0,16,6">
-            <TextBlock Text="baudios" Classes="muted" VerticalAlignment="Center" />
+            <TextBlock Text="{loc:T 'baudios'}" Classes="muted" VerticalAlignment="Center" />
             <ComboBox ItemsSource="{Binding BaudRates}" SelectedItem="{Binding BaudRate}" Width="120" />
           </StackPanel>
           <StackPanel Orientation="Horizontal" Spacing="8" Margin="0,0,16,6">
-            <TextBlock Text="paridad" Classes="muted" VerticalAlignment="Center" />
-            <ComboBox ItemsSource="{x:Static vm:ModbusSettingsForm.ParityOptions}" SelectedItem="{Binding Parity}" Width="110" />
+            <TextBlock Text="{loc:T 'paridad'}" Classes="muted" VerticalAlignment="Center" />
+            <ComboBox ItemsSource="{x:Static vm:ModbusSettingsForm.ParityOptions}" DisplayMemberBinding="{Binding Label}" SelectedItem="{Binding Parity}" Width="110" />
           </StackPanel>
-          <StackPanel Orientation="Horizontal" Spacing="8" Margin="0,0,0,6" ToolTip.Tip="Modbus RTU siempre usa 8 bits de datos">
-            <TextBlock Text="bits de parada" Classes="muted" VerticalAlignment="Center" />
-            <ComboBox ItemsSource="{x:Static vm:ModbusSettingsForm.StopBitsOptions}" SelectedItem="{Binding StopBits}" Width="80" />
+          <StackPanel Orientation="Horizontal" Spacing="8" Margin="0,0,0,6" ToolTip.Tip="{loc:T 'Modbus RTU siempre usa 8 bits de datos'}">
+            <TextBlock Text="{loc:T 'bits de parada'}" Classes="muted" VerticalAlignment="Center" />
+            <ComboBox ItemsSource="{x:Static vm:ModbusSettingsForm.StopBitsOptions}" DisplayMemberBinding="{Binding Label}" SelectedItem="{Binding StopBits}" Width="80" />
           </StackPanel>
         </WrapPanel>
       </Grid>
     </Panel>
 
-    <TextBlock Grid.Row="2" Text="Unit id (esclavo)" VerticalAlignment="Center" FontWeight="Medium" />
+    <TextBlock Grid.Row="2" Text="{loc:T 'Unit id (esclavo)'}" VerticalAlignment="Center" FontWeight="Medium" />
     <StackPanel Grid.Row="2" Grid.Column="1" Spacing="4">
       <NumericUpDown Value="{Binding UnitId}" Minimum="0" Maximum="255" FormatString="0" Width="130" HorizontalAlignment="Left" />
       <TextBlock Text="{Binding UnitIdHint}" Classes="muted" FontSize="11.5" TextWrapping="Wrap" />
     </StackPanel>
 
-    <TextBlock Grid.Row="3" Text="Direcciones" VerticalAlignment="Center" FontWeight="Medium" />
+    <TextBlock Grid.Row="3" Text="{loc:T 'Direcciones'}" VerticalAlignment="Center" FontWeight="Medium" />
     <CheckBox Grid.Row="3" Grid.Column="1" IsChecked="{Binding OneBasedAddresses}"
-              Content="Numerar desde 1 (HR1, C1… son el primer registro y el primer coil)"
-              ToolTip.Tip="Como en el manual del equipo. Las direcciones 40001, 30001… siempre empiezan en 1." />
+              Content="{loc:T 'Numerar desde 1 (HR1, C1… son el primer registro y el primer coil)'}"
+              ToolTip.Tip="{loc:T 'Como en el manual del equipo. Las direcciones 40001, 30001… siempre empiezan en 1.'}" />
 
     <StackPanel Grid.Row="4" Spacing="2" Margin="0,6,0,0">
-      <TextBlock Text="Orden de bytes" FontWeight="Medium" />
-      <TextBlock Text="valores de 32 y 64 bits" Classes="muted" FontSize="11.5" />
+      <TextBlock Text="{loc:T 'Orden de bytes'}" FontWeight="Medium" />
+      <TextBlock Text="{loc:T 'valores de 32 y 64 bits'}" Classes="muted" FontSize="11.5" />
     </StackPanel>
     <StackPanel Grid.Row="4" Grid.Column="1" Spacing="4">
-      <ComboBox ItemsSource="{x:Static vm:ModbusSettingsForm.ByteOrderOptions}" SelectedItem="{Binding ByteOrder}" MinWidth="300" />
-      <TextBlock Text="Si un real sale con un valor absurdo, prueba CDAB. Cada tag puede indicar otro orden en su dirección (HR10:FLOAT:CDAB)."
+      <ComboBox ItemsSource="{x:Static vm:ModbusSettingsForm.ByteOrderOptions}" DisplayMemberBinding="{Binding Label}" SelectedItem="{Binding ByteOrder}" MinWidth="300" />
+      <TextBlock Text="{loc:T 'Si un real sale con un valor absurdo, prueba CDAB. Cada tag puede indicar otro orden en su dirección (HR10:FLOAT:CDAB).'}"
                  Classes="muted" FontSize="11.5" TextWrapping="Wrap" />
     </StackPanel>
 
@@ -84,23 +85,23 @@
       <TextBlock Text="ms" Classes="muted" VerticalAlignment="Center" />
     </StackPanel>
 
-    <Expander Grid.Row="6" Grid.ColumnSpan="2" Header="Avanzado: tamaño de las peticiones y funciones de escritura" HorizontalAlignment="Stretch">
+    <Expander Grid.Row="6" Grid.ColumnSpan="2" Header="{loc:T 'Avanzado: tamaño de las peticiones y funciones de escritura'}" HorizontalAlignment="Stretch">
       <Grid ColumnDefinitions="154,*" RowDefinitions="Auto,Auto,Auto,Auto" RowSpacing="12" ColumnSpacing="16">
-        <TextBlock Text="Por petición" VerticalAlignment="Center" FontWeight="Medium" />
+        <TextBlock Text="{loc:T 'Por petición'}" VerticalAlignment="Center" FontWeight="Medium" />
         <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="8">
           <NumericUpDown Value="{Binding MaxRegistersPerRead}" Minimum="1" Maximum="125" FormatString="0" Width="110" />
-          <TextBlock Text="registros" Classes="muted" VerticalAlignment="Center" />
+          <TextBlock Text="{loc:T 'registros'}" Classes="muted" VerticalAlignment="Center" />
           <NumericUpDown Value="{Binding MaxBitsPerRead}" Minimum="1" Maximum="2000" Increment="8" FormatString="0" Width="120" Margin="8,0,0,0" />
           <TextBlock Text="bits" Classes="muted" VerticalAlignment="Center" />
         </StackPanel>
-        <TextBlock Grid.Row="1" Text="Hueco máximo" VerticalAlignment="Center" FontWeight="Medium" />
+        <TextBlock Grid.Row="1" Text="{loc:T 'Hueco máximo'}" VerticalAlignment="Center" FontWeight="Medium" />
         <StackPanel Grid.Row="1" Grid.Column="1" Orientation="Horizontal" Spacing="8">
           <NumericUpDown Value="{Binding ReadGap}" Minimum="0" Maximum="100" FormatString="0" Width="110" />
-          <TextBlock Text="registros o bits entre tags para leerlos juntos" Classes="muted" VerticalAlignment="Center" />
+          <TextBlock Text="{loc:T 'registros o bits entre tags para leerlos juntos'}" Classes="muted" VerticalAlignment="Center" />
         </StackPanel>
-        <TextBlock Grid.Row="2" Text="Escritura" VerticalAlignment="Center" FontWeight="Medium" />
+        <TextBlock Grid.Row="2" Text="{loc:T 'Escritura'}" VerticalAlignment="Center" FontWeight="Medium" />
         <CheckBox Grid.Row="2" Grid.Column="1" IsChecked="{Binding UseSingleWriteFunctions}"
-                  Content="Un solo registro o coil con las funciones 05/06 (si no, siempre 15/16)" />
+                  Content="{loc:T 'Un solo registro o coil con las funciones 05/06 (si no, siempre 15/16)'}" />
       </Grid>
     </Expander>
   </Grid>

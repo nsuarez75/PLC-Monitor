@@ -3,6 +3,7 @@ using Avalonia.Controls.ApplicationLifetimes;
 using Avalonia.Markup.Xaml;
 using Avalonia.Styling;
 using Avalonia.Threading;
+using PlcMonitor.App.Localization;
 using PlcMonitor.App.Services;
 using PlcMonitor.App.ViewModels;
 using PlcMonitor.App.Views;
@@ -17,9 +18,12 @@ public sealed class App : Application
     {
         if (ApplicationLifetime is IClassicDesktopStyleApplicationLifetime desktop)
         {
-            var window = new MainWindow();
             var path = AppSettings.DefaultPath;
-            var viewModel = new MainViewModel(new GrpcAgentConnector(), new AvaloniaDispatcher(), new WindowDialogs(window), AppSettings.Load(path), path);
+            var settings = AppSettings.Load(path);
+            // El idioma se fija antes de crear la ventana: el XAML se evalúa al construirla.
+            Loc.SetLanguage(settings.Language);
+            var window = new MainWindow();
+            var viewModel = new MainViewModel(new GrpcAgentConnector(), new AvaloniaDispatcher(), new WindowDialogs(window), settings, path);
             window.DataContext = viewModel;
             ApplyTheme(viewModel.Theme);
             viewModel.PropertyChanged += (_, e) =>
@@ -33,7 +37,7 @@ public sealed class App : Application
             {
                 e.Handled = true;
                 System.Diagnostics.Trace.WriteLine(e.Exception);
-                viewModel.Report($"Error inesperado: {e.Exception.Message}", isError: true);
+                viewModel.Report(Loc.F("Error inesperado: {0}", e.Exception.Message), isError: true);
             };
             desktop.MainWindow = window;
         }

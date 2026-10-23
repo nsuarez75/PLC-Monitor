@@ -3,12 +3,17 @@ using System.Text.Json;
 using System.Text.Json.Nodes;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
+using PlcMonitor.App.Localization;
 
 namespace PlcMonitor.App.ViewModels;
 
-/// <summary>Opción de un desplegable: el valor que va al JSON y el texto que ve el usuario.</summary>
-public sealed record SettingOption(string Value, string Label)
+/// <summary>Opción de un desplegable: el valor que va al JSON y el texto que ve el usuario, que sigue el idioma elegido.</summary>
+public sealed class SettingOption(string value, string label) : LocalizedObservableObject
 {
+    public string Value { get; } = value;
+
+    public string Label => Loc.T(label);
+
     public override string ToString() => Label;
 }
 
@@ -16,7 +21,7 @@ public sealed record SettingOption(string Value, string Label)
 /// Formulario de los ajustes de un driver conocido. Edita el mismo JSON que se guarda en el agente: las propiedades que el
 /// formulario no conoce (de una versión más nueva del driver, por ejemplo) se conservan tal cual.
 /// </summary>
-public abstract partial class DriverSettingsForm : ObservableObject
+public abstract partial class DriverSettingsForm : LocalizedObservableObject
 {
     private static readonly JsonSerializerOptions Indented = new() { WriteIndented = true };
     private JsonObject _json = [];
@@ -35,7 +40,7 @@ public abstract partial class DriverSettingsForm : ObservableObject
     public void Load(string json)
     {
         _json = JsonNode.Parse(string.IsNullOrWhiteSpace(json) ? "{}" : json) as JsonObject
-            ?? throw new JsonException("Los ajustes deben ser un objeto JSON ({ ... }).");
+            ?? throw new JsonException(Loc.T("Los ajustes deben ser un objeto JSON ({ ... })."));
         Read(_json);
     }
 
@@ -232,8 +237,8 @@ public sealed partial class ModbusSettingsForm : DriverSettingsForm
     public bool IsNetwork => !IsSerial;
 
     public string UnitIdHint => Transport.Value == "Tcp"
-        ? "En Modbus TCP directo suele ser 1 (o 255); detrás de una pasarela, el número del esclavo serie."
-        : "Número del esclavo en el bus (1-247).";
+        ? Loc.T("En Modbus TCP directo suele ser 1 (o 255); detrás de una pasarela, el número del esclavo serie.")
+        : Loc.T("Número del esclavo en el bus (1-247).");
 
     [ObservableProperty]
     public partial string Host { get; set; } = "";
@@ -297,9 +302,9 @@ public sealed partial class ModbusSettingsForm : DriverSettingsForm
             SerialPorts.Add(port);
         PortsHint = ports switch
         {
-            null => "No se pudo preguntar al agente por sus puertos serie: escríbelo (COM3, /dev/ttyUSB0...).",
-            { Count: 0 } => "El agente no encuentra puertos serie (o es anterior a la 1.15): escríbelo a mano. En Linux suele ser /dev/ttyUSB0.",
-            _ => $"{ports.Count} puerto(s) en el equipo del agente.",
+            null => Loc.T("No se pudo preguntar al agente por sus puertos serie: escríbelo (COM3, /dev/ttyUSB0...)."),
+            { Count: 0 } => Loc.T("El agente no encuentra puertos serie (o es anterior a la 1.15): escríbelo a mano. En Linux suele ser /dev/ttyUSB0."),
+            _ => Loc.F("{0} puerto(s) en el equipo del agente.", ports.Count),
         };
         if (string.IsNullOrWhiteSpace(SerialPort) && SerialPorts.Count > 0)
             SerialPort = SerialPorts[0];

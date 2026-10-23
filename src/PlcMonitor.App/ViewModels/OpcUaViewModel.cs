@@ -5,6 +5,7 @@ using CommunityToolkit.Mvvm.Input;
 using Google.Protobuf.WellKnownTypes;
 using Grpc.Core;
 using PlcMonitor.Agent.Contracts;
+using PlcMonitor.App.Localization;
 
 namespace PlcMonitor.App.ViewModels;
 
@@ -14,7 +15,7 @@ namespace PlcMonitor.App.ViewModels;
 /// certificados se leen al abrir, con «Actualizar» y solos cada pocos segundos mientras la pestaña está a la vista (así
 /// un cliente nuevo aparece pendiente sin pulsar nada).
 /// </summary>
-public sealed partial class OpcUaViewModel : ObservableObject, IDisposable
+public sealed partial class OpcUaViewModel : LocalizedObservableObject, IDisposable
 {
     private readonly MainViewModel _main;
     private CancellationTokenSource? _autoRefresh;
@@ -78,10 +79,10 @@ public sealed partial class OpcUaViewModel : ObservableObject, IDisposable
 
     public string StateText => State switch
     {
-        OpcUaState.Running => "En marcha",
-        OpcUaState.Starting => "Arrancando",
-        OpcUaState.Error => "Error",
-        _ => "Parado",
+        OpcUaState.Running => Loc.T("En marcha"),
+        OpcUaState.Starting => Loc.T("Arrancando"),
+        OpcUaState.Error => Loc.T("Error"),
+        _ => Loc.T("Parado"),
     };
 
     partial void OnEnabledChanged(bool value) => IsDirty = true;
@@ -193,9 +194,9 @@ public sealed partial class OpcUaViewModel : ObservableObject, IDisposable
     [RelayCommand]
     private void AddUser()
     {
-        var name = "usuario";
+        var name = Loc.T("usuario");
         for (var n = 2; Users.Any(u => string.Equals(u.Name, name, StringComparison.OrdinalIgnoreCase)); n++)
-            name = $"usuario{n}";
+            name = Loc.F("usuario{0}", n);
         Users.Add(new OpcUaUserItem(this, name, writer: false, hasPassword: false));
         IsDirty = true;
     }
@@ -228,11 +229,11 @@ public sealed partial class OpcUaViewModel : ObservableObject, IDisposable
         var missing = Users.FirstOrDefault(u => !u.HasPassword && string.IsNullOrEmpty(u.Password));
         if (missing is not null)
         {
-            Errors = $"Escribe una contraseña para «{missing.Name}».";
+            Errors = Loc.F("Escribe una contraseña para «{0}».", missing.Name);
             return;
         }
-        if (AllowWrites && !await _main.Dialogs.ConfirmAsync("Escritura por OPC UA",
-                "¿Permitir escribir en los PLC desde OPC UA?\nSolo podrán los usuarios con permiso de escritura, en los tags marcados como escribibles de los dispositivos con escritura activada."))
+        if (AllowWrites && !await _main.Dialogs.ConfirmAsync(Loc.T("Escritura por OPC UA"),
+                Loc.T("¿Permitir escribir en los PLC desde OPC UA?\nSolo podrán los usuarios con permiso de escritura, en los tags marcados como escribibles de los dispositivos con escritura activada.")))
             return;
         var request = new PutOpcUaRequest { Enabled = Enabled, Port = Port, AllowWrites = AllowWrites };
         request.Users.AddRange(Users.Select(u => new OpcUaUser
@@ -250,9 +251,9 @@ public sealed partial class OpcUaViewModel : ObservableObject, IDisposable
             Apply(info);
             _main.Report(info.State switch
             {
-                OpcUaState.Running => $"Servidor OPC UA en marcha: {info.EndpointUrl}",
-                OpcUaState.Error => $"Ajustes OPC UA guardados, pero el servidor no arranca: {info.Detail}",
-                _ => "Ajustes OPC UA guardados (servidor parado)",
+                OpcUaState.Running => Loc.F("Servidor OPC UA en marcha: {0}", info.EndpointUrl),
+                OpcUaState.Error => Loc.F("Ajustes OPC UA guardados, pero el servidor no arranca: {0}", info.Detail),
+                _ => Loc.T("Ajustes OPC UA guardados (servidor parado)"),
             }, isError: info.State == OpcUaState.Error);
         }
         catch (RpcException ex)
@@ -269,21 +270,21 @@ public sealed partial class OpcUaViewModel : ObservableObject, IDisposable
     {
         if (_main.Client is not { } client)
             return;
-        if (!await _main.Dialogs.ConfirmAsync("Aceptar cliente OPC UA",
-                $"¿Aceptar el certificado de «{certificate.Name}»?\nHuella: {certificate.Thumbprint}\nComprueba que coincide con la que muestra el cliente."))
+        if (!await _main.Dialogs.ConfirmAsync(Loc.T("Aceptar cliente OPC UA"),
+                Loc.F("¿Aceptar el certificado de «{0}»?\nHuella: {1}\nComprueba que coincide con la que muestra el cliente.", certificate.Name, certificate.Thumbprint)))
             return;
         await RunAsync(() => client.TrustOpcUaCertificateAsync(new OpcUaCertificateRequest { Thumbprint = certificate.Thumbprint }).ResponseAsync,
-            $"Cliente OPC UA «{certificate.Name}» aceptado");
+            Loc.F("Cliente OPC UA «{0}» aceptado", certificate.Name));
     }
 
     internal async Task RemoveAsync(OpcUaCertificateItem certificate)
     {
         if (_main.Client is not { } client)
             return;
-        if (!await _main.Dialogs.ConfirmAsync("Quitar cliente OPC UA", $"¿Quitar el certificado de «{certificate.Name}»?\nEse cliente dejará de poder conectar."))
+        if (!await _main.Dialogs.ConfirmAsync(Loc.T("Quitar cliente OPC UA"), Loc.F("¿Quitar el certificado de «{0}»?\nEse cliente dejará de poder conectar.", certificate.Name)))
             return;
         await RunAsync(() => client.DeleteOpcUaCertificateAsync(new OpcUaCertificateRequest { Thumbprint = certificate.Thumbprint }).ResponseAsync,
-            $"Cliente OPC UA «{certificate.Name}» quitado");
+            Loc.F("Cliente OPC UA «{0}» quitado", certificate.Name));
     }
 
     private async Task RunAsync(Func<Task<OpcUaInfo>> call, string done)
@@ -307,7 +308,7 @@ public sealed partial class OpcUaViewModel : ObservableObject, IDisposable
 }
 
 /// <summary>Usuario OPC UA en edición. La contraseña solo se escribe para ponerla o cambiarla.</summary>
-public sealed partial class OpcUaUserItem(OpcUaViewModel owner, string name, bool writer, bool hasPassword) : ObservableObject
+public sealed partial class OpcUaUserItem(OpcUaViewModel owner, string name, bool writer, bool hasPassword) : LocalizedObservableObject
 {
     [ObservableProperty]
     public partial string Name { get; set; } = name;
@@ -323,7 +324,7 @@ public sealed partial class OpcUaUserItem(OpcUaViewModel owner, string name, boo
     /// <summary>El agente ya tiene una contraseña para este usuario (vacía = se conserva).</summary>
     public bool HasPassword { get; } = hasPassword;
 
-    public string PasswordHint => HasPassword ? "(sin cambios)" : "contraseña";
+    public string PasswordHint => Loc.T(HasPassword ? "(sin cambios)" : "contraseña");
 
     partial void OnNameChanged(string value) => owner.MarkDirty();
 
@@ -333,7 +334,7 @@ public sealed partial class OpcUaUserItem(OpcUaViewModel owner, string name, boo
 }
 
 /// <summary>Certificado de un cliente OPC UA: pendiente de aceptar o ya aceptado.</summary>
-public sealed partial class OpcUaCertificateItem(OpcUaViewModel owner, OpcUaCertificate certificate)
+public sealed partial class OpcUaCertificateItem(OpcUaViewModel owner, OpcUaCertificate certificate) : LocalizedObservableObject
 {
     public string Thumbprint { get; } = certificate.Thumbprint;
 
@@ -344,12 +345,12 @@ public sealed partial class OpcUaCertificateItem(OpcUaViewModel owner, OpcUaCert
 
     public string ApplicationUri { get; } = certificate.ApplicationUri;
 
-    public string StateText => Trusted ? "Aceptado" : "Pendiente de aceptar";
+    public string StateText => Loc.T(Trusted ? "Aceptado" : "Pendiente de aceptar");
 
     public string Details => string.Join(" · ", new[]
     {
         string.IsNullOrEmpty(certificate.ApplicationUri) ? null : certificate.ApplicationUri,
-        certificate.NotAfter is null ? null : $"caduca el {certificate.NotAfter.ToDateTime().ToLocalTime().ToString("dd/MM/yyyy", CultureInfo.InvariantCulture)}",
+        certificate.NotAfter is null ? null : Loc.F("caduca el {0}", certificate.NotAfter.ToDateTime().ToLocalTime().ToString("dd/MM/yyyy", CultureInfo.InvariantCulture)),
     }.Where(p => p is not null));
 
     [RelayCommand]

@@ -1,6 +1,7 @@
 using System.Collections.ObjectModel;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
+using PlcMonitor.App.Localization;
 using PlcMonitor.App.Services;
 
 namespace PlcMonitor.App.ViewModels;
@@ -136,7 +137,7 @@ public sealed partial class TrendsViewModel
         if (SelectedPanel is not { } item)
             return;
         ApplyPanel(item);
-        _main.Report($"Panel «{item.Name}» guardado");
+        _main.Report(Loc.F("Panel «{0}» guardado", item.Name));
     }
 
     /// <summary>Guarda el panel y abre las gráficas de todas sus vistas (las del histórico se consultan a la vez).</summary>
@@ -149,7 +150,7 @@ public sealed partial class TrendsViewModel
         var views = item.Panel.Views.Select(id => _all.FirstOrDefault(v => v.Id == id)).OfType<TrendView>().ToList();
         if (views.Count == 0)
         {
-            PanelError = "Añade al menos una vista al panel.";
+            PanelError = Loc.T("Añade al menos una vista al panel.");
             return;
         }
         PanelError = "";
@@ -182,7 +183,7 @@ public sealed partial class TrendsViewModel
     {
         if (SelectedPanel is not { } item)
             return;
-        if (!await _main.Dialogs.ConfirmAsync("Borrar panel", $"¿Borrar el panel «{item.Name}»? Las vistas no se borran."))
+        if (!await _main.Dialogs.ConfirmAsync(Loc.T("Borrar panel"), Loc.F("¿Borrar el panel «{0}»? Las vistas no se borran.", item.Name)))
             return;
         _allPanels.Remove(item.Panel);
         Panels.Remove(item);

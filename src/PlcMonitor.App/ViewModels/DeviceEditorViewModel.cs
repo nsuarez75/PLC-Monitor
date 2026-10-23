@@ -5,11 +5,12 @@ using CommunityToolkit.Mvvm.Input;
 using Google.Protobuf.Collections;
 using Grpc.Core;
 using PlcMonitor.Agent.Contracts;
+using PlcMonitor.App.Localization;
 
 namespace PlcMonitor.App.ViewModels;
 
 /// <summary>Formulario de alta o edición de un dispositivo (sin sus tags, que se conservan).</summary>
-public sealed partial class DeviceEditorViewModel : ObservableObject
+public sealed partial class DeviceEditorViewModel : LocalizedObservableObject
 {
     private static readonly JsonSerializerOptions Indented = new() { WriteIndented = true };
     private readonly IAgentContext _context;
@@ -25,7 +26,6 @@ public sealed partial class DeviceEditorViewModel : ObservableObject
         _saved = saved;
         DriverIds = [.. drivers.Select(d => d.Id)];
         DriverOptions = [.. drivers.Select(d => new SettingOption(d.Id, string.IsNullOrWhiteSpace(d.Name) ? d.Id : d.Name))];
-        Title = "Nuevo dispositivo";
         Enabled = true;
         DriverId = DriverIds.FirstOrDefault() ?? "";
     }
@@ -36,7 +36,6 @@ public sealed partial class DeviceEditorViewModel : ObservableObject
     {
         ArgumentNullException.ThrowIfNull(config);
         OriginalName = config.Name;
-        Title = $"Editar {config.Name}";
         Name = config.Name;
         DriverId = config.Driver;
         SettingsJson = Pretty(config.SettingsJson);
@@ -50,7 +49,6 @@ public sealed partial class DeviceEditorViewModel : ObservableObject
             Multiplier = r.Multiplier;
         }
         _groups.AddRange(config.ScanGroups);
-        TagSummary = $"{_groups.Sum(g => g.Tags.Count)} tags en {_groups.Count} grupos (se conservan)";
         LoadForm(SettingsJson);
     }
 
@@ -59,7 +57,7 @@ public sealed partial class DeviceEditorViewModel : ObservableObject
 
     public bool IsNew => OriginalName is null;
 
-    public string Title { get; }
+    public string Title => IsNew ? Loc.T("Nuevo dispositivo") : Loc.F("Editar {0}", OriginalName);
 
     public ObservableCollection<string> DriverIds { get; }
 
@@ -125,8 +123,7 @@ public sealed partial class DeviceEditorViewModel : ObservableObject
     [ObservableProperty]
     public partial string Errors { get; set; } = "";
 
-    [ObservableProperty]
-    public partial string TagSummary { get; set; } = "";
+    public string TagSummary => Loc.F("{0} tags en {1} grupos (se conservan)", _groups.Sum(g => g.Tags.Count), _groups.Count);
 
     [ObservableProperty]
     [NotifyCanExecuteChangedFor(nameof(SaveCommand))]
@@ -159,7 +156,7 @@ public sealed partial class DeviceEditorViewModel : ObservableObject
         }
         catch (JsonException ex)
         {
-            Errors = $"El JSON no es válido: {ex.Message}";
+            Errors = Loc.F("El JSON no es válido: {0}", ex.Message);
             ShowJson = true;
         }
     }
@@ -222,11 +219,11 @@ public sealed partial class DeviceEditorViewModel : ObservableObject
             };
             config.ScanGroups.AddRange(_groups);
             var status = await client.PutDeviceAsync(new PutDeviceRequest { Device = config, OriginalName = OriginalName ?? "", Persist = true });
-            _context.Report($"{status.Name} guardado");
+            _context.Report(Loc.F("{0} guardado", status.Name));
             if (OriginalName is { } original && original != status.Name && _groups.SelectMany(g => g.Tags).Any(t => t.History?.Enabled == true))
             {
                 await HistoryMover.OfferAsync(_context, client, new HistoryRename { FromDevice = original, ToDevice = status.Name },
-                    $"los tags de «{original}»", status.Name);
+                    Loc.F("los tags de «{0}»", original), status.Name);
             }
             _saved(status.Name);
         }

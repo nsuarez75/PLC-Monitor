@@ -6,6 +6,7 @@ using Avalonia.Markup.Xaml;
 using Avalonia.Media;
 using Avalonia.Media.Imaging;
 using PlcMonitor.App.Charts;
+using PlcMonitor.App.Localization;
 using PlcMonitor.App.ViewModels;
 
 namespace PlcMonitor.App.Views;
@@ -72,18 +73,18 @@ public sealed partial class TrendsView : UserControl
     {
         if (DataContext is not TrendsViewModel { OpenPanel: { } panel } || Main is not { } main)
             return;
-        var path = await main.Dialogs.SaveFileAsync("Exportar panel", ChartExport.FileName(panel.Name, DateTime.Now, "png"), "png");
+        var path = await main.Dialogs.SaveFileAsync(Loc.T("Exportar panel"), ChartExport.FileName(panel.Name, DateTime.Now, "png"), "png");
         if (path is null)
             return;
         try
         {
             using var image = RenderPanelImage();
             image?.Save(path, PngBitmapEncoderOptions.Default);
-            main.Report($"Panel guardado en {path}");
+            main.Report(Loc.F("Panel guardado en {0}", path));
         }
         catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
         {
-            main.Report($"No se ha podido guardar la imagen: {ex.Message}", isError: true);
+            main.Report(Loc.F("No se ha podido guardar la imagen: {0}", ex.Message), isError: true);
         }
     }
 
@@ -95,6 +96,6 @@ public sealed partial class TrendsView : UserControl
         if (image is null)
             return;
         await clipboard.SetBitmapAsync(image);
-        Main?.Report("Imagen del panel copiada al portapapeles");
+        Main?.Report(Loc.T("Imagen del panel copiada al portapapeles"));
     }
 }

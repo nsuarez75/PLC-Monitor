@@ -2,6 +2,7 @@ using System.Globalization;
 using Avalonia;
 using Avalonia.Controls;
 using Avalonia.Media;
+using PlcMonitor.App.Localization;
 using PlcMonitor.App.Charts;
 
 namespace PlcMonitor.App.Controls;
@@ -249,7 +250,7 @@ public sealed class GaugePanel : Control
         }
         if (alarm)
         {
-            var warn = Text(value < (LowLimit ?? double.NegativeInfinity) ? "Bajo el límite" : "Sobre el límite", bad, 11, FontWeight.SemiBold);
+            var warn = Text(Loc.T(value < (LowLimit ?? double.NegativeInfinity) ? "Bajo el límite" : "Sobre el límite"), bad, 11, FontWeight.SemiBold);
             context.DrawText(warn, new Point(tile.Right - warn.Width - 12, tile.Y + 10));
         }
     }

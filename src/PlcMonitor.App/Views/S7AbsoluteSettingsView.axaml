@@ -1,5 +1,6 @@
 <UserControl xmlns="https://github.com/avaloniaui"
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:loc="using:PlcMonitor.App.Localization"
              xmlns:vm="using:PlcMonitor.App.ViewModels"
              x:Class="PlcMonitor.App.Views.S7AbsoluteSettingsView"
              x:DataType="vm:S7AbsoluteSettingsForm">
@@ -8,16 +9,16 @@
     <TextBlock Text="PLC" VerticalAlignment="Center" FontWeight="Medium" />
     <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="8">
       <TextBox Text="{Binding Host}" PlaceholderText="192.168.0.10" Width="240" />
-      <TextBlock Text="puerto" Classes="muted" VerticalAlignment="Center" Margin="8,0,0,0" />
+      <TextBlock Text="{loc:T 'puerto'}" Classes="muted" VerticalAlignment="Center" Margin="8,0,0,0" />
       <NumericUpDown Value="{Binding Port}" Minimum="1" Maximum="65535" FormatString="0" Width="130" />
     </StackPanel>
 
     <TextBlock Grid.Row="1" Text="CPU" VerticalAlignment="Center" FontWeight="Medium" />
-    <ComboBox Grid.Row="1" Grid.Column="1" ItemsSource="{x:Static vm:S7AbsoluteSettingsForm.CpuOptions}" SelectedItem="{Binding Cpu}" Width="160" />
+    <ComboBox Grid.Row="1" Grid.Column="1" ItemsSource="{x:Static vm:S7AbsoluteSettingsForm.CpuOptions}" DisplayMemberBinding="{Binding Label}" SelectedItem="{Binding Cpu}" Width="160" />
 
     <StackPanel Grid.Row="2" Spacing="2" Margin="0,6,0,0">
-      <TextBlock Text="Rack y slot" FontWeight="Medium" />
-      <TextBlock Text="de la CPU en el bastidor" Classes="muted" FontSize="11.5" />
+      <TextBlock Text="{loc:T 'Rack y slot'}" FontWeight="Medium" />
+      <TextBlock Text="{loc:T 'de la CPU en el bastidor'}" Classes="muted" FontSize="11.5" />
     </StackPanel>
     <StackPanel Grid.Row="2" Grid.Column="1" Spacing="4">
       <StackPanel Orientation="Horizontal" Spacing="8">
@@ -26,7 +27,7 @@
         <TextBlock Text="slot" Classes="muted" VerticalAlignment="Center" Margin="8,0,0,0" />
         <NumericUpDown Value="{Binding Slot}" Minimum="0" Maximum="31" FormatString="0" Width="100" />
       </StackPanel>
-      <TextBlock Text="Lo habitual: slot 2 en S7-300 y 1 en S7-1200/1500. Hace falta «Permitir acceso vía PUT/GET» en la CPU."
+      <TextBlock Text="{loc:T 'Lo habitual: slot 2 en S7-300 y 1 en S7-1200/1500. Hace falta «Permitir acceso vía PUT/GET» en la CPU.'}"
                  Classes="muted" FontSize="11.5" TextWrapping="Wrap" />
     </StackPanel>
 
@@ -37,12 +38,12 @@
     </StackPanel>
 
     <StackPanel Grid.Row="4" Spacing="2" Margin="0,6,0,0">
-      <TextBlock Text="Hueco máximo" FontWeight="Medium" />
-      <TextBlock Text="para leer juntos" Classes="muted" FontSize="11.5" />
+      <TextBlock Text="{loc:T 'Hueco máximo'}" FontWeight="Medium" />
+      <TextBlock Text="{loc:T 'para leer juntos'}" Classes="muted" FontSize="11.5" />
     </StackPanel>
     <StackPanel Grid.Row="4" Grid.Column="1" Orientation="Horizontal" Spacing="8">
       <NumericUpDown Value="{Binding ReadGapBytes}" Minimum="0" Maximum="1024" FormatString="0" Width="130" />
-      <TextBlock Text="bytes entre variables del mismo DB o área" Classes="muted" VerticalAlignment="Center" />
+      <TextBlock Text="{loc:T 'bytes entre variables del mismo DB o área'}" Classes="muted" VerticalAlignment="Center" />
     </StackPanel>
   </Grid>
 </UserControl>

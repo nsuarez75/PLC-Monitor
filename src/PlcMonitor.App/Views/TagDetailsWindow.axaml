@@ -1,5 +1,6 @@
 <Window xmlns="https://github.com/avaloniaui"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:loc="using:PlcMonitor.App.Localization"
         xmlns:vm="using:PlcMonitor.App.ViewModels"
         xmlns:c="using:PlcMonitor.App.Controls"
         x:Class="PlcMonitor.App.Views.TagDetailsWindow"
@@ -17,11 +18,11 @@
       </Border>
 
       <StackPanel Orientation="Horizontal" Spacing="8" HorizontalAlignment="Right">
-        <Button x:Name="CloseButton" Classes="secondary" Content="Cerrar" IsCancel="True" />
+        <Button x:Name="CloseButton" Classes="secondary" Content="{loc:T 'Cerrar'}" IsCancel="True" />
         <Button Classes="accent" Command="{Binding SaveCommand}" IsDefault="True">
           <StackPanel Orientation="Horizontal" Spacing="6">
             <c:Icon Kind="save" />
-            <TextBlock Text="Guardar" />
+            <TextBlock Text="{loc:T 'Guardar'}" />
           </StackPanel>
         </Button>
       </StackPanel>
@@ -45,7 +46,7 @@
       <Border Classes="card" Padding="16">
         <Grid ColumnDefinitions="*,Auto,Auto" ColumnSpacing="14">
           <StackPanel Spacing="2">
-            <TextBlock Text="VALOR ACTUAL" Classes="caption" />
+            <TextBlock Text="{loc:T 'VALOR ACTUAL'}" Classes="caption" />
             <TextBlock Text="{Binding Tag.DetailText}" Classes="mono" FontSize="22" FontWeight="SemiBold"
                        Classes.error="{Binding Tag.IsBad}" TextWrapping="Wrap" />
           </StackPanel>
@@ -54,7 +55,7 @@
               <TextBlock Text="{Binding Tag.Quality}" />
             </Border>
             <TextBlock Classes="muted" FontSize="12" HorizontalAlignment="Right">
-              <Run Text="{Binding Tag.DataType}" /><Run Text="  ·  " /><Run Text="{Binding Tag.Time}" />
+              <Run Text="{Binding Tag.DataType}" /><Run Text="{loc:T '  ·  '}" /><Run Text="{Binding Tag.Time}" />
             </TextBlock>
           </StackPanel>
         </Grid>
@@ -63,83 +64,83 @@
       <!-- Mini tendencia -->
       <Border Classes="card" Padding="16,12" IsVisible="{Binding Tag.IsChartable}">
         <StackPanel Spacing="6">
-          <TextBlock Text="ÚLTIMOS 5 MINUTOS" Classes="caption" />
+          <TextBlock Text="{loc:T 'ÚLTIMOS 5 MINUTOS'}" Classes="caption" />
           <c:TrendChart Height="140" ShowLegend="False" Series="{Binding Trend}" From="{Binding TrendFrom}" To="{Binding TrendTo}"
-                        Revision="{Binding TrendRevision}" EmptyText="Aún no hay valores" />
+                        Revision="{Binding TrendRevision}" EmptyText="{loc:T 'Aún no hay valores'}" />
         </StackPanel>
       </Border>
 
       <!-- Configuración -->
       <Border Classes="card" Padding="20">
         <StackPanel Spacing="12">
-          <TextBlock Text="CONFIGURACIÓN" Classes="caption" />
+          <TextBlock Text="{loc:T 'CONFIGURACIÓN'}" Classes="caption" />
           <Grid ColumnDefinitions="150,*" RowDefinitions="Auto,Auto,Auto,Auto,Auto,Auto,Auto,Auto,Auto,Auto,Auto,Auto" RowSpacing="10" ColumnSpacing="16">
-            <TextBlock Text="Nombre" VerticalAlignment="Center" FontWeight="Medium" />
+            <TextBlock Text="{loc:T 'Nombre'}" VerticalAlignment="Center" FontWeight="Medium" />
             <TextBox Grid.Column="1" Text="{Binding Name}" />
-            <TextBlock Grid.Row="1" Text="Dirección" VerticalAlignment="Center" FontWeight="Medium" />
+            <TextBlock Grid.Row="1" Text="{loc:T 'Dirección'}" VerticalAlignment="Center" FontWeight="Medium" />
             <TextBox Grid.Row="1" Grid.Column="1" Text="{Binding Address}" Classes="mono" FontSize="12.5" />
-            <TextBlock Grid.Row="2" Text="Grupo de escaneo" VerticalAlignment="Center" FontWeight="Medium" />
+            <TextBlock Grid.Row="2" Text="{loc:T 'Grupo de escaneo'}" VerticalAlignment="Center" FontWeight="Medium" />
             <StackPanel Grid.Row="2" Grid.Column="1" Orientation="Horizontal" Spacing="8">
               <AutoCompleteBox Text="{Binding GroupName}" ItemsSource="{Binding Groups}" MinimumPrefixLength="0" Width="180" />
-              <TextBlock Text="cada" Classes="muted" VerticalAlignment="Center" />
+              <TextBlock Text="{loc:T 'cada'}" Classes="muted" VerticalAlignment="Center" />
               <NumericUpDown Value="{Binding IntervalMs}" Minimum="50" Increment="250" FormatString="0" Width="130" />
               <TextBlock Text="ms" Classes="muted" VerticalAlignment="Center" />
             </StackPanel>
             <TextBlock Grid.Row="3" Grid.Column="1" Text="{Binding GroupNote}" Classes="muted" FontSize="12" TextWrapping="Wrap" />
-            <TextBlock Grid.Row="4" Text="Escritura" VerticalAlignment="Center" FontWeight="Medium" />
+            <TextBlock Grid.Row="4" Text="{loc:T 'Escritura'}" VerticalAlignment="Center" FontWeight="Medium" />
             <StackPanel Grid.Row="4" Grid.Column="1" Spacing="4">
-              <CheckBox Content="Escribible (2.ª llave)" IsChecked="{Binding Writable}" />
+              <CheckBox Content="{loc:T 'Escribible (2.ª llave)'}" IsChecked="{Binding Writable}" />
               <TextBlock Classes="muted" FontSize="12" TextWrapping="Wrap" IsVisible="{Binding !WritesEnabled}"
-                         Text="El dispositivo tiene las escrituras deshabilitadas (1.ª llave): actívalas en «Editar» del dispositivo." />
+                         Text="{loc:T 'El dispositivo tiene las escrituras deshabilitadas (1.ª llave): actívalas en «Editar» del dispositivo.'}" />
             </StackPanel>
-            <TextBlock Grid.Row="5" Text="Tipo para escribir" VerticalAlignment="Center" FontWeight="Medium" />
-            <ComboBox Grid.Row="5" Grid.Column="1" ItemsSource="{Binding DataTypes}" SelectedItem="{Binding SelectedDataType}" MinWidth="180" />
-            <TextBlock Grid.Row="6" Text="Grupo en la tabla" VerticalAlignment="Center" FontWeight="Medium" />
+            <TextBlock Grid.Row="5" Text="{loc:T 'Tipo para escribir'}" VerticalAlignment="Center" FontWeight="Medium" />
+            <ComboBox Grid.Row="5" Grid.Column="1" ItemsSource="{Binding DataTypes}" SelectedItem="{Binding SelectedDataType}" DisplayMemberBinding="{Binding Converter={x:Static vm:Converters.Localized}}" MinWidth="180" />
+            <TextBlock Grid.Row="6" Text="{loc:T 'Grupo en la tabla'}" VerticalAlignment="Center" FontWeight="Medium" />
             <StackPanel Grid.Row="6" Grid.Column="1" Spacing="4">
               <AutoCompleteBox Text="{Binding Folder}" ItemsSource="{Binding Folders}" MinimumPrefixLength="0" Width="240" HorizontalAlignment="Left"
-                               PlaceholderText="Sin grupo" />
+                               PlaceholderText="{loc:T 'Sin grupo'}" />
               <TextBlock Classes="muted" FontSize="12" TextWrapping="Wrap"
-                         Text="Los tags con el mismo grupo se pliegan juntos en la tabla de tags. Escribe un nombre nuevo para crear un grupo." />
+                         Text="{loc:T 'Los tags con el mismo grupo se pliegan juntos en la tabla de tags. Escribe un nombre nuevo para crear un grupo.'}" />
             </StackPanel>
-            <TextBlock Grid.Row="7" Text="Mostrar valor como" VerticalAlignment="Center" FontWeight="Medium" />
+            <TextBlock Grid.Row="7" Text="{loc:T 'Mostrar valor como'}" VerticalAlignment="Center" FontWeight="Medium" />
             <StackPanel Grid.Row="7" Grid.Column="1" Spacing="4">
-              <ComboBox ItemsSource="{Binding Transforms}" SelectedItem="{Binding SelectedTransform}" MinWidth="240" />
+              <ComboBox ItemsSource="{Binding Transforms}" SelectedItem="{Binding SelectedTransform}" DisplayMemberBinding="{Binding Converter={x:Static vm:Converters.Localized}}" MinWidth="240" />
               <TextBlock Classes="muted" FontSize="12" TextWrapping="Wrap" Text="{Binding TransformPreview}" />
             </StackPanel>
-            <TextBlock Grid.Row="8" Text="Unidad" VerticalAlignment="Center" FontWeight="Medium" />
+            <TextBlock Grid.Row="8" Text="{loc:T 'Unidad'}" VerticalAlignment="Center" FontWeight="Medium" />
             <StackPanel Grid.Row="8" Grid.Column="1" Spacing="4">
               <StackPanel Orientation="Horizontal" Spacing="8">
                 <TextBox Text="{Binding Unit}" Width="120" PlaceholderText="bar, °C, rpm…" MaxLength="16" />
-                <TextBlock Text="Decimales" Classes="muted" VerticalAlignment="Center" Margin="8,0,0,0" />
-                <ComboBox ItemsSource="{Binding DecimalChoices}" SelectedItem="{Binding SelectedDecimals}" MinWidth="120" />
+                <TextBlock Text="{loc:T 'Decimales'}" Classes="muted" VerticalAlignment="Center" Margin="8,0,0,0" />
+                <ComboBox ItemsSource="{Binding DecimalChoices}" SelectedItem="{Binding SelectedDecimals}" DisplayMemberBinding="{Binding Converter={x:Static vm:Converters.Localized}}" MinWidth="120" />
               </StackPanel>
               <TextBlock Classes="muted" FontSize="12" TextWrapping="Wrap" Text="{Binding DisplayPreview}" />
             </StackPanel>
-            <TextBlock Grid.Row="9" Text="Escalado" VerticalAlignment="Top" Margin="0,6,0,0" FontWeight="Medium" />
+            <TextBlock Grid.Row="9" Text="{loc:T 'Escalado'}" VerticalAlignment="Top" Margin="0,6,0,0" FontWeight="Medium" />
             <StackPanel Grid.Row="9" Grid.Column="1" Spacing="6">
-              <CheckBox Content="Convertir el valor bruto a unidades de ingeniería" IsChecked="{Binding ScalingEnabled}" />
+              <CheckBox Content="{loc:T 'Convertir el valor bruto a unidades de ingeniería'}" IsChecked="{Binding ScalingEnabled}" />
               <Grid ColumnDefinitions="Auto,110,Auto,110" RowDefinitions="Auto,Auto" ColumnSpacing="8" RowSpacing="6" IsVisible="{Binding ScalingEnabled}">
-                <TextBlock Text="Bruto de" Classes="muted" VerticalAlignment="Center" />
+                <TextBlock Text="{loc:T 'Bruto de'}" Classes="muted" VerticalAlignment="Center" />
                 <TextBox Grid.Column="1" Text="{Binding ScaleRawMin}" />
-                <TextBlock Grid.Column="2" Text="a" Classes="muted" VerticalAlignment="Center" />
+                <TextBlock Grid.Column="2" Text="{loc:T 'a'}" Classes="muted" VerticalAlignment="Center" />
                 <TextBox Grid.Column="3" Text="{Binding ScaleRawMax}" />
-                <TextBlock Grid.Row="1" Text="Ingeniería de" Classes="muted" VerticalAlignment="Center" />
+                <TextBlock Grid.Row="1" Text="{loc:T 'Ingeniería de'}" Classes="muted" VerticalAlignment="Center" />
                 <TextBox Grid.Row="1" Grid.Column="1" Text="{Binding ScaleEngMin}" />
-                <TextBlock Grid.Row="1" Grid.Column="2" Text="a" Classes="muted" VerticalAlignment="Center" />
+                <TextBlock Grid.Row="1" Grid.Column="2" Text="{loc:T 'a'}" Classes="muted" VerticalAlignment="Center" />
                 <TextBox Grid.Row="1" Grid.Column="3" Text="{Binding ScaleEngMax}" />
               </Grid>
-              <CheckBox Content="Limitar al rango de ingeniería" IsChecked="{Binding ScaleClamp}" IsVisible="{Binding ScalingEnabled}" />
+              <CheckBox Content="{loc:T 'Limitar al rango de ingeniería'}" IsChecked="{Binding ScaleClamp}" IsVisible="{Binding ScalingEnabled}" />
               <TextBlock Classes="muted" FontSize="12" TextWrapping="Wrap" Text="{Binding ScalingPreview}" />
             </StackPanel>
             <TextBlock Grid.Row="10" Text="OPC UA" VerticalAlignment="Center" FontWeight="Medium" />
             <StackPanel Grid.Row="10" Grid.Column="1" Spacing="4">
-              <CheckBox Content="Publicar en OPC UA (2.ª llave)" IsChecked="{Binding OpcUaPublished}" />
+              <CheckBox Content="{loc:T 'Publicar en OPC UA (2.ª llave)'}" IsChecked="{Binding OpcUaPublished}" />
               <TextBlock Classes="muted" FontSize="12" TextWrapping="Wrap" IsVisible="{Binding !DeviceOpcUaPublished}"
-                         Text="El dispositivo no se publica en OPC UA (1.ª llave): actívalo en «Editar» del dispositivo." />
+                         Text="{loc:T 'El dispositivo no se publica en OPC UA (1.ª llave): actívalo en «Editar» del dispositivo.'}" />
             </StackPanel>
-            <TextBlock Grid.Row="11" Text="Estado" VerticalAlignment="Center" FontWeight="Medium" />
-            <CheckBox Grid.Row="11" Grid.Column="1" Content="Activo" IsChecked="{Binding TagEnabled}"
-                      ToolTip.Tip="Desactivado, el tag sigue configurado pero el agente no lo lee, no lo historiza ni lo publica en OPC UA" />
+            <TextBlock Grid.Row="11" Text="{loc:T 'Estado'}" VerticalAlignment="Center" FontWeight="Medium" />
+            <CheckBox Grid.Row="11" Grid.Column="1" Content="{loc:T 'Activo'}" IsChecked="{Binding TagEnabled}"
+                      ToolTip.Tip="{loc:T 'Desactivado, el tag sigue configurado pero el agente no lo lee, no lo historiza ni lo publica en OPC UA'}" />
           </Grid>
         </StackPanel>
       </Border>
@@ -148,53 +149,53 @@
       <Border Classes="card" Padding="20">
         <StackPanel Spacing="12">
           <StackPanel Orientation="Horizontal" Spacing="8">
-            <TextBlock Text="HISTÓRICO" Classes="caption" VerticalAlignment="Center" />
+            <TextBlock Text="{loc:T 'HISTÓRICO'}" Classes="caption" VerticalAlignment="Center" />
             <c:Icon Kind="history" Width="14" Height="14" Foreground="{DynamicResource App.Accent}" />
           </StackPanel>
           <TextBlock Classes="muted" FontSize="12" TextWrapping="Wrap" IsVisible="{Binding !HistorianEnabled}"
-                     Text="El historiador está desactivado en este agente (historian.enabled en agent.json): la configuración se guarda, pero no se registrará nada." />
-          <CheckBox Content="Guardar este tag en el histórico" IsChecked="{Binding HistoryEnabled}" />
+                     Text="{loc:T 'El historiador está desactivado en este agente (historian.enabled en agent.json): la configuración se guarda, pero no se registrará nada.'}" />
+          <CheckBox Content="{loc:T 'Guardar este tag en el histórico'}" IsChecked="{Binding HistoryEnabled}" />
           <Grid ColumnDefinitions="150,*" RowDefinitions="Auto,Auto,Auto" RowSpacing="10" ColumnSpacing="16" IsEnabled="{Binding HistoryEnabled}">
-            <TextBlock Text="Frecuencia mínima" VerticalAlignment="Center" />
+            <TextBlock Text="{loc:T 'Frecuencia mínima'}" VerticalAlignment="Center" />
             <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="8">
               <NumericUpDown Value="{Binding HistoryMinIntervalMs}" Minimum="0" Increment="500" FormatString="0" Width="140" />
-              <TextBlock Text="ms entre muestras (0 = cada cambio)" Classes="muted" VerticalAlignment="Center" />
+              <TextBlock Text="{loc:T 'ms entre muestras (0 = cada cambio)'}" Classes="muted" VerticalAlignment="Center" />
             </StackPanel>
-            <TextBlock Grid.Row="1" Text="Banda muerta" VerticalAlignment="Center" />
+            <TextBlock Grid.Row="1" Text="{loc:T 'Banda muerta'}" VerticalAlignment="Center" />
             <StackPanel Grid.Row="1" Grid.Column="1" Orientation="Horizontal" Spacing="8">
               <NumericUpDown Value="{Binding HistoryDeadband}" Minimum="0" Increment="0.1" FormatString="0.###" Width="140" />
-              <CheckBox Content="en % del último valor" IsChecked="{Binding HistoryDeadbandPercent}" />
+              <CheckBox Content="{loc:T 'en % del último valor'}" IsChecked="{Binding HistoryDeadbandPercent}" />
             </StackPanel>
-            <TextBlock Grid.Row="2" Text="Tiempo máximo" VerticalAlignment="Center" />
+            <TextBlock Grid.Row="2" Text="{loc:T 'Tiempo máximo'}" VerticalAlignment="Center" />
             <StackPanel Grid.Row="2" Grid.Column="1" Orientation="Horizontal" Spacing="8">
               <NumericUpDown Value="{Binding HistoryMaxIntervalMs}" Minimum="0" Increment="1000" FormatString="0" Width="140" />
-              <TextBlock Text="ms sin guardar como mucho (0 = nunca)" Classes="muted" VerticalAlignment="Center" />
+              <TextBlock Text="{loc:T 'ms sin guardar como mucho (0 = nunca)'}" Classes="muted" VerticalAlignment="Center" />
             </StackPanel>
           </Grid>
           <!-- Disparo -->
           <StackPanel Spacing="10" IsEnabled="{Binding HistoryEnabled}">
-            <CheckBox Content="Solo mientras otro tag cumpla una condición (disparo)" IsChecked="{Binding TriggerEnabled}" IsEnabled="{Binding HasTriggerTags}" />
+            <CheckBox Content="{loc:T 'Solo mientras otro tag cumpla una condición (disparo)'}" IsChecked="{Binding TriggerEnabled}" IsEnabled="{Binding HasTriggerTags}" />
             <Grid ColumnDefinitions="150,*" RowDefinitions="Auto,Auto,Auto" RowSpacing="10" ColumnSpacing="16" IsVisible="{Binding TriggerEnabled}">
-              <TextBlock Text="Tag de disparo" VerticalAlignment="Center" />
-              <ComboBox Grid.Column="1" ItemsSource="{Binding TriggerTags}" SelectedItem="{Binding TriggerTag}" MinWidth="240" PlaceholderText="Elige un tag del dispositivo" />
-              <TextBlock Grid.Row="1" Text="Guardar mientras" VerticalAlignment="Center" />
+              <TextBlock Text="{loc:T 'Tag de disparo'}" VerticalAlignment="Center" />
+              <ComboBox Grid.Column="1" ItemsSource="{Binding TriggerTags}" SelectedItem="{Binding TriggerTag}" MinWidth="240" PlaceholderText="{loc:T 'Elige un tag del dispositivo'}" />
+              <TextBlock Grid.Row="1" Text="{loc:T 'Guardar mientras'}" VerticalAlignment="Center" />
               <StackPanel Grid.Row="1" Grid.Column="1" Orientation="Horizontal" Spacing="8">
-                <TextBlock Text="valga" Classes="muted" VerticalAlignment="Center" IsVisible="{Binding IsBooleanTrigger}" />
-                <ComboBox ItemsSource="{x:Static vm:TagDetailsViewModel.BoolChoices}" SelectedItem="{Binding TriggerBool}" MinWidth="100" IsVisible="{Binding IsBooleanTrigger}" />
-                <ComboBox ItemsSource="{x:Static vm:TagDetailsViewModel.Conditions}" SelectedItem="{Binding TriggerCondition}" MinWidth="70" IsVisible="{Binding IsValueTrigger}" />
-                <TextBox Text="{Binding TriggerValue}" Width="140" PlaceholderText="valor" IsVisible="{Binding IsValueTrigger}" />
+                <TextBlock Text="{loc:T 'valga'}" Classes="muted" VerticalAlignment="Center" IsVisible="{Binding IsBooleanTrigger}" />
+                <ComboBox ItemsSource="{x:Static vm:TagDetailsViewModel.BoolChoices}" DisplayMemberBinding="{Binding Text}" SelectedItem="{Binding TriggerBool}" MinWidth="100" IsVisible="{Binding IsBooleanTrigger}" />
+                <ComboBox ItemsSource="{x:Static vm:TagDetailsViewModel.Conditions}" DisplayMemberBinding="{Binding Text}" SelectedItem="{Binding TriggerCondition}" MinWidth="70" IsVisible="{Binding IsValueTrigger}" />
+                <TextBox Text="{Binding TriggerValue}" Width="140" PlaceholderText="{loc:T 'valor'}" IsVisible="{Binding IsValueTrigger}" />
               </StackPanel>
-              <TextBlock Grid.Row="2" Text="Y después" VerticalAlignment="Center" />
+              <TextBlock Grid.Row="2" Text="{loc:T 'Y después'}" VerticalAlignment="Center" />
               <StackPanel Grid.Row="2" Grid.Column="1" Orientation="Horizontal" Spacing="8">
                 <NumericUpDown Value="{Binding TriggerHoldMs}" Minimum="0" Increment="1000" FormatString="0" Width="140" />
-                <TextBlock Text="ms más tras dejar de cumplirse" Classes="muted" VerticalAlignment="Center" />
+                <TextBlock Text="{loc:T 'ms más tras dejar de cumplirse'}" Classes="muted" VerticalAlignment="Center" />
               </StackPanel>
             </Grid>
             <TextBlock Classes="muted" FontSize="11.5" TextWrapping="Wrap" IsVisible="{Binding TriggerEnabled}"
-                       Text="Al cumplirse se guarda el valor actual y, mientras dure, lo normal (frecuencia, banda muerta, tiempo máximo). Al terminar se guarda un último punto." />
+                       Text="{loc:T 'Al cumplirse se guarda el valor actual y, mientras dure, lo normal (frecuencia, banda muerta, tiempo máximo). Al terminar se guarda un último punto.'}" />
           </StackPanel>
           <TextBlock Classes="muted" FontSize="11.5" TextWrapping="Wrap"
-                     Text="Los cambios de calidad (p.ej. pérdida de conexión) se guardan siempre. Si cambia más rápido que la frecuencia mínima, se guarda el último valor al cumplirse el intervalo." />
+                     Text="{loc:T 'Los cambios de calidad (p.ej. pérdida de conexión) se guardan siempre. Si cambia más rápido que la frecuencia mínima, se guarda el último valor al cumplirse el intervalo.'}" />
         </StackPanel>
       </Border>
 

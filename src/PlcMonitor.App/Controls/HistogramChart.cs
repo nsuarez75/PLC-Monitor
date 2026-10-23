@@ -3,6 +3,7 @@ using Avalonia;
 using Avalonia.Controls;
 using Avalonia.Input;
 using Avalonia.Media;
+using PlcMonitor.App.Localization;
 using PlcMonitor.App.Charts;
 
 namespace PlcMonitor.App.Controls;
@@ -163,8 +164,8 @@ public sealed class HistogramChart : Control
         string F(double v) => series.Display.Format(series.Display.Decimals is null ? Math.Round(v, 4) : v);
         var parts = new List<(string Text, IBrush Brush)>
         {
-            ($"n {stats.Count}", muted), ($"media {F(stats.Mean)}", muted), ($"σ {F(stats.StdDev)}", muted),
-            ($"mín {F(stats.Min)}", muted), ($"máx {F(stats.Max)}", muted),
+            (Loc.F("n {0}", stats.Count), muted), (Loc.F("media {0}", F(stats.Mean)), muted), ($"σ {F(stats.StdDev)}", muted),
+            (Loc.F("mín {0}", F(stats.Min)), muted), (Loc.F("máx {0}", F(stats.Max)), muted),
         };
         if (stats.Cp is { } cp)
             parts.Add(($"Cp {cp.ToString("0.00", CultureInfo.InvariantCulture)}", CapabilityBrush(cp)));

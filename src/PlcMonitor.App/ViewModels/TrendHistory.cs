@@ -2,6 +2,7 @@ using System.Globalization;
 using Google.Protobuf.WellKnownTypes;
 using PlcMonitor.Agent.Contracts;
 using PlcMonitor.App.Charts;
+using PlcMonitor.App.Localization;
 using PlcMonitor.App.Services;
 
 namespace PlcMonitor.App.ViewModels;
@@ -50,8 +51,8 @@ public static class TrendHistory
 
     /// <summary>Texto del periodo: «últimas 8 h» o «del 17/10/2026 06:00 al 17/10/2026 14:00».</summary>
     public static string Describe(TrendView view) => view.HistoryMinutes > 0 || view.HistoryFrom is null || view.HistoryTo is null
-        ? (Ranges.FirstOrDefault(r => r.Value == view.HistoryMinutes)?.Text ?? $"últimos {view.HistoryMinutes} min").ToLowerInvariant()
-        : $"del {Format(view.HistoryFrom.Value)} al {Format(view.HistoryTo.Value)}";
+        ? (Ranges.FirstOrDefault(r => r.Value == view.HistoryMinutes)?.Text ?? Loc.F("últimos {0} min", view.HistoryMinutes)).ToLowerInvariant()
+        : Loc.F("del {0} al {1}", Format(view.HistoryFrom.Value), Format(view.HistoryTo.Value));
 
     /// <summary>Intervalos en que se agrega un tag con demasiados puntos (mínimo y máximo de cada uno).</summary>
     public const int AggregatedBuckets = 10_000;

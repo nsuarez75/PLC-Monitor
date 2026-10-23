@@ -1,6 +1,7 @@
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using PlcMonitor.App.Charts;
+using PlcMonitor.App.Localization;
 using PlcMonitor.App.Services;
 
 namespace PlcMonitor.App.ViewModels;
@@ -22,7 +23,7 @@ public sealed record TrendSource(List<ChartPoint> Points, bool IsBoolean, bool S
 /// reloj (se pausa al hacer zoom o con el botón; «Seguir» quita el zoom y continúa). Del histórico, con una ventana
 /// fija (<see cref="FixedWindow"/>) y los puntos leídos del agente.
 /// </summary>
-public sealed partial class LiveTrendViewModel : ObservableObject, IDisposable
+public sealed partial class LiveTrendViewModel : LocalizedObservableObject, IDisposable
 {
     private readonly Func<IReadOnlyList<(string Name, TrendSource? Tag)>> _tags;
     private readonly TrendTrigger? _trigger;
@@ -49,7 +50,7 @@ public sealed partial class LiveTrendViewModel : ObservableObject, IDisposable
         _trigger = trigger;
         _triggerTag = triggerTag;
         _kind = kind;
-        Chart = chart ?? new ChartViewModel { EmptyText = "Aún no hay valores de estos tags" };
+        Chart = chart ?? new ChartViewModel { EmptyText = Loc.T("Aún no hay valores de estos tags") };
         Chart.Kind = kind;
         Chart.Curves = [];
         Chart.Caption = "";
@@ -150,14 +151,14 @@ public sealed partial class LiveTrendViewModel : ObservableObject, IDisposable
     /// <summary>Es una tendencia de disparo.</summary>
     public bool IsTriggered => _trigger is not null;
 
-    public string TriggerText => _trigger is null ? "" : $"Disparo: {_trigger}";
+    public string TriggerText => _trigger is null ? "" : Loc.F("Disparo: {0}", _trigger);
 
     /// <summary>El disparo se cumple ahora (o sigue en su tiempo extra).</summary>
     [ObservableProperty]
     [NotifyPropertyChangedFor(nameof(TriggerState))]
     public partial bool TriggerActive { get; private set; }
 
-    public string TriggerState => TriggerActive ? "Activo" : "Esperando";
+    public string TriggerState => Loc.T(TriggerActive ? "Activo" : "Esperando");
 
     public static IReadOnlyList<Choice<TimeSpan>> Windows { get; } =
     [
@@ -176,7 +177,7 @@ public sealed partial class LiveTrendViewModel : ObservableObject, IDisposable
     [NotifyPropertyChangedFor(nameof(PauseText))]
     public partial bool Paused { get; set; }
 
-    public string PauseText => Paused ? "Seguir" : "Pausa";
+    public string PauseText => Loc.T(Paused ? "Seguir" : "Pausa");
 
     /// <summary>Tags de la vista que el agente ya no tiene (se han borrado o renombrado).</summary>
     [ObservableProperty]
@@ -198,20 +199,20 @@ public sealed partial class LiveTrendViewModel : ObservableObject, IDisposable
         {
             (_xName, _xSource) = tags[0];
             plotted = tags.Skip(1).ToArray();
-            Chart.XLabel = $"X: {_xName}";
+            Chart.XLabel = Loc.F("X: {0}", _xName);
         }
         else if (_kind == ChartKind.Cycles)
         {
-            Chart.XLabel = "s desde el disparo";
+            Chart.XLabel = Loc.T("s desde el disparo");
         }
         Chart.SetData(
             plotted.Where(t => t.Tag is not null).Select(t => new ChartSeriesData(t.Name, Shown(t.Tag!), t.Tag!.Step, t.Tag!.IsBoolean) { Display = t.Tag!.Display }),
             from, now, selectFirst);
         var missing = tags.Where(t => t.Tag is null).Select(t => t.Name).ToList();
         if (_trigger is not null && _triggerSource is null)
-            missing.Add($"{_trigger.Ref} (disparo)");
+            missing.Add(Loc.F("{0} (disparo)", _trigger.Ref));
         Missing = missing.Count == 0 ? ""
-            : $"{MissingText ?? (IsLive ? "No disponibles en el agente" : "Sin histórico en el agente")}: {string.Join(", ", missing)}";
+            : Loc.F("{0}: {1}", MissingText ?? Loc.T(IsLive ? "No disponibles en el agente" : "Sin histórico en el agente"), string.Join(", ", missing));
         Refresh(now);
     }
 
@@ -310,12 +311,17 @@ public sealed partial class LiveTrendViewModel : ObservableObject, IDisposable
                 }
             }
             Chart.Bands = bands;
-            var count = activations.Count switch { 0 => "", 1 => "1 ciclo", var n => $"{n} ciclos{(n == MaxCycles ? " (los últimos)" : "")}" };
+            var count = activations.Count switch
+            {
+                0 => "",
+                1 => Loc.T("1 ciclo"),
+                var n => Loc.F("{0} ciclos", n) + (n == MaxCycles ? " " + Loc.T("(los últimos)") : ""),
+            };
             var outCount = outside.Count(o => o);
             Chart.CaptionAlarm = outside.Length > 0 && outside[^1];
             Chart.Caption = bands.Count == 0 || count.Length == 0 ? count
-                : Chart.CaptionAlarm ? $"{count} · {outCount} fuera de tolerancia · ¡el último se sale!"
-                : $"{count} · {outCount} fuera de tolerancia";
+                : Chart.CaptionAlarm ? Loc.F("{0} · {1} fuera de tolerancia · ¡el último se sale!", count, outCount)
+                : Loc.F("{0} · {1} fuera de tolerancia", count, outCount);
         }
         else if (_xSource is { } xTag)
         {
@@ -329,7 +335,7 @@ public sealed partial class LiveTrendViewModel : ObservableObject, IDisposable
                 for (var i = 0; i < windows.Count; i++)
                     curves.Add(new XYCurve(option.Name, XYData.Pairs(x, y, windows[i].Item1, windows[i].Item2), option.ColorIndex, Highlight: i == windows.Count - 1) { Display = option.Display });
             }
-            Chart.Caption = _trigger is null ? "" : activations.Count switch { 0 => "", 1 => "1 ciclo", var n => $"{n} ciclos" };
+            Chart.Caption = _trigger is null ? "" : activations.Count switch { 0 => "", 1 => Loc.T("1 ciclo"), var n => Loc.F("{0} ciclos", n) };
         }
         Chart.Curves = curves;
     }

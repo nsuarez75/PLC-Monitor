@@ -7,6 +7,7 @@ using Google.Protobuf.WellKnownTypes;
 using Grpc.Core;
 using PlcMonitor.Agent.Contracts;
 using PlcMonitor.App.Charts;
+using PlcMonitor.App.Localization;
 
 namespace PlcMonitor.App.ViewModels;
 
@@ -42,14 +43,18 @@ public sealed record HistoryRowViewModel(DateTimeOffset Timestamp, string Tag, s
     public bool IsBad => Quality is not (Quality.Good or Quality.Uncertain);
 }
 
-/// <summary>Opción de un desplegable con su texto.</summary>
-public sealed record Choice<T>(string Text, T Value)
+/// <summary>Opción de un desplegable con su texto, que sigue el idioma elegido.</summary>
+public sealed class Choice<T>(string text, T value) : LocalizedObservableObject
 {
+    public string Text => Loc.T(text);
+
+    public T Value { get; } = value;
+
     public override string ToString() => Text;
 }
 
 /// <summary>Consulta del histórico del dispositivo seleccionado: tags, periodo, agregado, tabla y exportación a CSV.</summary>
-public sealed partial class HistoryViewModel(IAgentContext context, Func<DeviceViewModel?> device) : ObservableObject
+public sealed partial class HistoryViewModel(IAgentContext context, Func<DeviceViewModel?> device) : LocalizedObservableObject
 {
     public static IReadOnlyList<Choice<TimeSpan>> Ranges { get; } =
     [
@@ -88,7 +93,7 @@ public sealed partial class HistoryViewModel(IAgentContext context, Func<DeviceV
     public ObservableCollection<HistoryRowViewModel> Rows { get; } = [];
 
     /// <summary>Gráfica del resultado (los tags consultados, todos marcados).</summary>
-    public ChartViewModel Chart { get; } = new() { EmptyText = "Consulta el histórico para ver la gráfica" };
+    public ChartViewModel Chart { get; } = new() { EmptyText = Loc.T("Consulta el histórico para ver la gráfica") };
 
     /// <summary>Se pide abrir los tags marcados y el periodo en una vista de Tendencias (con todos los tipos de gráfica).</summary>
     public event EventHandler<PlcMonitor.App.Services.TrendView>? OpenInTrendsRequested;
@@ -157,11 +162,11 @@ public sealed partial class HistoryViewModel(IAgentContext context, Func<DeviceV
         var tags = Tags.Where(t => t.IsSelected).Select(t => t.Name).ToArray();
         if (tags.Length == 0)
         {
-            Summary = "Marca al menos un tag.";
+            Summary = Loc.T("Marca al menos un tag.");
             return;
         }
         IsBusy = true;
-        Summary = "Consultando…";
+        Summary = Loc.T("Consultando…");
         try
         {
             var to = DateTimeOffset.UtcNow;
@@ -182,7 +187,7 @@ public sealed partial class HistoryViewModel(IAgentContext context, Func<DeviceV
                          .SelectMany(s => s.Points.Select(p => Row(p, s.Tag, known.GetValueOrDefault(s.Tag))))
                          .OrderByDescending(r => r.Timestamp))
                 Rows.Add(row);
-            Chart.Title = $"Histórico {target.Name}";
+            Chart.Title = Loc.F("Histórico {0}", target.Name);
             Chart.Source = context.AgentTitle;
             Chart.SetData(
                 reply.Series.Select(s => new ChartSeriesData(
@@ -196,9 +201,9 @@ public sealed partial class HistoryViewModel(IAgentContext context, Func<DeviceV
                 }).ToArray(),
                 request.From.ToDateTimeOffset(), request.To.ToDateTimeOffset());
             var truncated = reply.Series.Any(s => s.Truncated);
-            Summary = $"{Rows.Count} puntos de {tags.Length} tags · {Range.Text.ToLowerInvariant()}" +
-                      (Aggregate.Value is null ? "" : $" · {Aggregate.Text.ToLowerInvariant()} cada {Interval.Text}") +
-                      (truncated ? " · hay más puntos: usa un agregado o un periodo más corto" : "");
+            Summary = Loc.F("{0} puntos de {1} tags · {2}", Rows.Count, tags.Length, Range.Text.ToLowerInvariant())
+                + (Aggregate.Value is null ? "" : " · " + Loc.F("{0} cada {1}", Aggregate.Text.ToLowerInvariant(), Interval.Text))
+                + (truncated ? " · " + Loc.T("hay más puntos: usa un agregado o un periodo más corto") : "");
         }
         catch (RpcException ex)
         {
@@ -255,23 +260,24 @@ public sealed partial class HistoryViewModel(IAgentContext context, Func<DeviceV
         var tags = Tags.Where(t => t.IsSelected).Select(t => t.Name).ToArray();
         if (tags.Length == 0)
         {
-            Summary = "Marca al menos un tag.";
+            Summary = Loc.T("Marca al menos un tag.");
             return;
         }
         if (DeleteRange() is not { } range)
         {
-            Summary = "Indica el día de inicio y el de final.";
+            Summary = Loc.T("Indica el día de inicio y el de final.");
             return;
         }
         if (range.To <= range.From)
         {
-            Summary = "El final del intervalo debe ser posterior al inicio.";
+            Summary = Loc.T("El final del intervalo debe ser posterior al inicio.");
             return;
         }
         const string format = "dd/MM/yyyy HH:mm";
-        var what = tags.Length == 1 ? $"del tag {tags[0]}" : $"de {tags.Length} tags ({string.Join(", ", tags)})";
-        if (!await context.Dialogs.ConfirmAsync("Borrar histórico",
-                $"¿Borrar los datos guardados {what} de {target.Name} entre el {range.From.ToString(format, CultureInfo.InvariantCulture)} y el {range.To.ToString(format, CultureInfo.InvariantCulture)}?\nNo se puede deshacer."))
+        var what = tags.Length == 1 ? Loc.F("del tag {0}", tags[0]) : Loc.F("de {0} tags ({1})", tags.Length, string.Join(", ", tags));
+        if (!await context.Dialogs.ConfirmAsync(Loc.T("Borrar histórico"),
+                Loc.F("¿Borrar los datos guardados {0} de {1} entre el {2} y el {3}?\nNo se puede deshacer.",
+                    what, target.Name, range.From.ToString(format, CultureInfo.InvariantCulture), range.To.ToString(format, CultureInfo.InvariantCulture))))
             return;
         IsBusy = true;
         try
@@ -284,12 +290,12 @@ public sealed partial class HistoryViewModel(IAgentContext context, Func<DeviceV
             };
             request.Tags.AddRange(tags);
             var reply = await client.DeleteHistoryAsync(request);
-            context.Report(reply.Deleted == 0 ? "No había datos en ese intervalo" : $"{reply.Deleted} datos borrados del histórico {what}");
+            context.Report(reply.Deleted == 0 ? Loc.T("No había datos en ese intervalo") : Loc.F("{0} datos borrados del histórico {1}", reply.Deleted, what));
             ShowDelete = false;
         }
         catch (RpcException ex) when (ex.StatusCode == StatusCode.Unimplemented)
         {
-            context.Report("Este agente no sabe borrar histórico: actualízalo desde «Agentes» (Instalar / actualizar).", isError: true);
+            context.Report(Loc.T("Este agente no sabe borrar histórico: actualízalo desde «Agentes» (Instalar / actualizar)."), isError: true);
             return;
         }
         catch (RpcException ex)
@@ -315,12 +321,12 @@ public sealed partial class HistoryViewModel(IAgentContext context, Func<DeviceV
         var tags = Tags.Where(t => t.IsSelected).Select(t => new PlcMonitor.App.Services.TrendTagRef(target.Name, t.Name)).ToList();
         if (tags.Count == 0)
         {
-            Summary = "Marca al menos un tag.";
+            Summary = Loc.T("Marca al menos un tag.");
             return;
         }
         OpenInTrendsRequested?.Invoke(this, new PlcMonitor.App.Services.TrendView
         {
-            Name = $"{target.Name} · {Range.Text.ToLowerInvariant()}",
+            Name = Loc.F("{0} · {1}", target.Name, Range.Text.ToLowerInvariant()),
             Tags = tags,
             DataSource = TrendDataSource.History,
             HistoryMinutes = (int)Range.Value.TotalMinutes,
@@ -333,10 +339,10 @@ public sealed partial class HistoryViewModel(IAgentContext context, Func<DeviceV
     {
         if (Rows.Count == 0 || device() is not { } target)
         {
-            context.Report("No hay nada que exportar: haz antes una consulta.");
+            context.Report(Loc.T("No hay nada que exportar: haz antes una consulta."));
             return;
         }
-        var path = await context.Dialogs.SaveFileAsync("Exportar histórico", $"{target.Name}-{DateTime.Now:yyyyMMdd-HHmm}.csv", "csv");
+        var path = await context.Dialogs.SaveFileAsync(Loc.T("Exportar histórico"), $"{target.Name}-{DateTime.Now:yyyyMMdd-HHmm}.csv", "csv");
         if (path is null)
             return;
         var csv = new StringBuilder(HistoryCsv.Header).Append('\n');
@@ -347,7 +353,7 @@ public sealed partial class HistoryViewModel(IAgentContext context, Func<DeviceV
                .Append(Escape(row.Value)).Append(',').Append(row.Quality).Append(',').Append(Escape(row.Unit)).Append('\n');
         }
         await File.WriteAllTextAsync(path, csv.ToString(), new UTF8Encoding(false));
-        context.Report($"Histórico guardado en {path} ({Rows.Count} filas)");
+        context.Report(Loc.F("Histórico guardado en {0} ({1} filas)", path, Rows.Count));
     }
 
     /// <summary>Fila de un punto: en la tabla, los números con la unidad y los decimales del tag (si se conoce y no es booleano).</summary>
