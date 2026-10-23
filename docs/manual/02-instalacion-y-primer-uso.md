@@ -9,10 +9,10 @@ un agente instalado y solo quieres añadir un dispositivo, puedes ir directament
 La release se publica como un único ejecutable por plataforma:
 
 ```text
-artifacts/release/1.16.0/
-├── plcmon-app-1.16.0-win-x64.exe
-├── plcmon-app-1.16.0-linux-x64
-└── plcmon-app-1.16.0-linux-arm64
+artifacts/release/2.0.0/
+├── plcmon-app-2.0.0-win-x64.exe
+├── plcmon-app-2.0.0-linux-x64
+└── plcmon-app-2.0.0-linux-arm64
 ```
 
 El ejecutable es autocontenido: incluye el runtime de .NET y las librerías nativas. No necesitas instalar
@@ -31,13 +31,13 @@ El ejecutable es autocontenido: incluye el runtime de .NET y las librerías nati
 2. Dale permiso de ejecución:
 
    ```bash
-   chmod +x plcmon-app-1.16.0-linux-x64
+   chmod +x plcmon-app-2.0.0-linux-x64
    ```
 
 3. Ejecútalo desde la terminal o desde el explorador de archivos:
 
    ```bash
-   ./plcmon-app-1.16.0-linux-x64
+   ./plcmon-app-2.0.0-linux-x64
    ```
 
 La app guarda sus preferencias en la carpeta de datos del usuario:

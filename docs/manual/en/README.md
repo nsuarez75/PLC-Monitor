@@ -1,6 +1,6 @@
 # PLC-Monitor user manual
 
-**Version 1.16.0**
+**Version 2.0.0**
 
 **Language:** [Español](../README.md) · [English](README.md)
 

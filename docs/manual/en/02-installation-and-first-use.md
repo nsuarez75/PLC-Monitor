@@ -9,10 +9,10 @@ an agent installed and only want to add a device, you can go directly to the
 The release is published as a single executable per platform:
 
 ```text
-artifacts/release/1.16.0/
-├── plcmon-app-1.16.0-win-x64.exe
-├── plcmon-app-1.16.0-linux-x64
-└── plcmon-app-1.16.0-linux-arm64
+artifacts/release/2.0.0/
+├── plcmon-app-2.0.0-win-x64.exe
+├── plcmon-app-2.0.0-linux-x64
+└── plcmon-app-2.0.0-linux-arm64
 ```
 
 The executable is self-contained: it includes the .NET runtime and the native libraries. You do not need to
@@ -31,13 +31,13 @@ install .NET or copy additional folders.
 2. Give it execute permission:
 
    ```bash
-   chmod +x plcmon-app-1.16.0-linux-x64
+   chmod +x plcmon-app-2.0.0-linux-x64
    ```
 
 3. Run it from the terminal or from the file browser:
 
    ```bash
-   ./plcmon-app-1.16.0-linux-x64
+   ./plcmon-app-2.0.0-linux-x64
    ```
 
 The app saves its preferences in the user data folder:
