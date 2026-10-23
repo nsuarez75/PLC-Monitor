@@ -306,9 +306,11 @@
                     <c:TableRow x:Name="TagsHeader" DockPanel.Dock="Top" Classes="tablehead" HideOrder="3,5,1" MinStarWidth="45" ColumnSpacing="12" Margin="16,12,16,10"
                                 CanResize="True" Background="Transparent"
                                 Columns="{Binding $parent[Window].((vm:MainViewModel)DataContext).TagColumns, Mode=TwoWay, FallbackValue=*}"
+                                DisplayOrder="{Binding $parent[Window].((vm:MainViewModel)DataContext).TagColumnOrder, Mode=TwoWay, FallbackValue=''}"
+                                CanReorder="True" ReorderCompletedCommand="{Binding $parent[Window].((vm:MainViewModel)DataContext).SaveTagColumnOrderCommand}"
                                 HiddenColumns="{Binding $parent[Window].((vm:MainViewModel)DataContext).TagHiddenColumns, FallbackValue=''}"
                                 ResizeCompletedCommand="{Binding $parent[Window].((vm:MainViewModel)DataContext).SaveTagColumnsCommand}"
-                                ToolTip.Tip="Arrastra el borde entre dos columnas para cambiar su ancho. Clic derecho para ocultar o mostrar columnas">
+                                ToolTip.Tip="Arrastra una columna para cambiar su sitio, o el borde entre dos para cambiar su ancho. Clic derecho para ocultar o mostrar columnas">
                       <c:TableRow.ContextMenu>
                         <ContextMenu x:Name="ColumnsMenu" />
                       </c:TableRow.ContextMenu>
@@ -348,7 +350,8 @@
                         </DataTemplate>
                         <DataTemplate x:DataType="vm:TagViewModel">
                           <c:TableRow Columns="{Binding $parent[Window].((vm:MainViewModel)DataContext).TagColumns, FallbackValue=*}" HideOrder="3,5,1" MinStarWidth="45" ColumnSpacing="12" Classes.off="{Binding IsDisabled}"
-                                      HiddenColumns="{Binding $parent[Window].((vm:MainViewModel)DataContext).TagHiddenColumns, FallbackValue=''}">
+                                      HiddenColumns="{Binding $parent[Window].((vm:MainViewModel)DataContext).TagHiddenColumns, FallbackValue=''}"
+                                      DisplayOrder="{Binding $parent[Window].((vm:MainViewModel)DataContext).TagColumnOrder, FallbackValue=''}">
                             <StackPanel VerticalAlignment="Center" Classes="tagname" Classes.infolder="{Binding IsInFolder}">
                               <DockPanel>
                                 <c:Icon DockPanel.Dock="Left" Kind="history" Width="13" Height="13" Margin="0,0,6,0" Foreground="{DynamicResource App.Accent}"

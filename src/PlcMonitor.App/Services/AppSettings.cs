@@ -23,6 +23,9 @@ public sealed class AppSettings
     /// <summary>Columnas de la tabla de tags que el usuario ha ocultado (índices separados por comas; null = ninguna).</summary>
     public string? TagHiddenColumns { get; set; }
 
+    /// <summary>Orden en que se muestran las columnas de la tabla de tags (índices separados por comas; null = el de serie).</summary>
+    public string? TagColumnOrder { get; set; }
+
     /// <summary>Grupos de visualización plegados en la tabla de tags (agente/dispositivo/grupo).</summary>
     public List<string> CollapsedFolders { get; init; } = [];
 

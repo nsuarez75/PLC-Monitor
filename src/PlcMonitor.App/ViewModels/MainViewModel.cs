@@ -66,6 +66,7 @@ public sealed partial class MainViewModel : ObservableObject, IAgentContext, IAs
         RecentAgents = [.. settings.RecentAgents];
         TagColumns = ValidTagColumns(settings.TagColumns) ?? DefaultTagColumns;
         TagHiddenColumns = ValidHiddenColumns(settings.TagHiddenColumns);
+        TagColumnOrder = ValidColumnOrder(settings.TagColumnOrder);
         Browse = new BrowseViewModel(this, () => SelectedDevice);
         AddTag = new AddTagViewModel(this, () => SelectedDevice, DriverOf);
         History = new HistoryViewModel(this, () => SelectedDevice);
@@ -313,6 +314,46 @@ public sealed partial class MainViewModel : ObservableObject, IAgentContext, IAs
     /// </summary>
     [ObservableProperty]
     public partial string TagHiddenColumns { get; set; }
+
+    /// <summary>Orden de serie de las columnas de la tabla de tags.</summary>
+    public static readonly string DefaultTagColumnOrder = string.Join(",", Enumerable.Range(0, TagColumnTitles.Count));
+
+    /// <summary>
+    /// Orden en que se muestran las columnas de la tabla de tags (formato de <see cref="Controls.TableRow.DisplayOrder"/>);
+    /// se cambia arrastrando las cabeceras.
+    /// </summary>
+    [ObservableProperty]
+    public partial string TagColumnOrder { get; set; }
+
+    /// <summary>Columnas en el orden en que se muestran.</summary>
+    public IReadOnlyList<int> TagColumnSequence => [.. TagColumnOrder.Split(',').Select(s => int.Parse(s, System.Globalization.CultureInfo.InvariantCulture))];
+
+    /// <summary>Guarda el orden de las columnas al soltar una cabecera arrastrada.</summary>
+    [RelayCommand]
+    private void SaveTagColumnOrder()
+    {
+        TagColumnOrder = ValidColumnOrder(TagColumnOrder);
+        _settings.TagColumnOrder = TagColumnOrder == DefaultTagColumnOrder ? null : TagColumnOrder;
+        _settings.Save(_settingsPath);
+    }
+
+    [RelayCommand]
+    private void ResetTagColumnOrder()
+    {
+        TagColumnOrder = DefaultTagColumnOrder;
+        SaveTagColumnOrder();
+    }
+
+    // Una permutación de las columnas; lo que no lo sea (otra versión, fichero editado) se completa o se descarta.
+    private static string ValidColumnOrder(string? order)
+    {
+        var count = TagColumnTitles.Count;
+        var sequence = (order ?? "").Split(',', StringSplitOptions.TrimEntries | StringSplitOptions.RemoveEmptyEntries)
+            .Select(s => int.TryParse(s, System.Globalization.NumberStyles.Integer, System.Globalization.CultureInfo.InvariantCulture, out var i) ? i : -1)
+            .Where(i => i >= 0 && i < count).Distinct().ToList();
+        sequence.AddRange(Enumerable.Range(0, count).Except(sequence));
+        return string.Join(",", sequence);
+    }
 
     /// <summary>La columna <paramref name="index"/> de la tabla de tags está oculta por el usuario.</summary>
     public bool IsTagColumnHidden(int index) => HiddenIndices(TagHiddenColumns).Contains(index);
