@@ -8,5 +8,15 @@ La app está hecha con Avalonia y .NET 10 para Windows y Linux. Se conecta por g
 que se instala junto al PLC y sigue leyendo y guardando datos aunque la app esté cerrada. El repositorio
 incluye además la CLI `plcmon` para diagnóstico y administración.
 
-**Documentación:** [Manual de usuario](docs/manual/README.md): instalación, configuración, OPC UA, seguridad,
-mantenimiento y resolución de problemas.
+Desktop app and agent for monitoring and troubleshooting PLCs. It reads variables over S7 and Modbus,
+displays them live, records them to SQLite, and supports trends, panels, and transformations. It also
+publishes data over OPC UA and allows setpoint writes with per-device, per-tag, and per-server permissions.
+
+The app is built with Avalonia and .NET 10 for Windows and Linux. It connects over gRPC to the agent, a
+service installed next to the PLC that keeps reading and storing data even when the app is closed. The
+repository also includes the `plcmon` CLI for diagnostics and administration.
+
+**Documentación / Documentation**
+
+- [Manual de usuario (Español)](docs/manual/README.md)
+- [User manual (English)](docs/manual/en/README.md)

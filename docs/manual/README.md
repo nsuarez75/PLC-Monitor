@@ -2,6 +2,8 @@
 
 **Versión 1.16.0**
 
+**Idioma:** [Español](README.md) · [English](en/README.md)
+
 PLC-Monitor es una aplicación de escritorio para leer, historizar y visualizar variables de autómatas
 programables (PLC). Se compone de dos piezas:
 

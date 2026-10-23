@@ -189,7 +189,7 @@ dispositivo o el tag. Si quieres detener el servicio del agente:
 sudo systemctl stop plcmon-agent
 
 # Windows (PowerShell como administrador)
-Stop-Service PLC-MonitorAgent
+Stop-Service PLCMonitorAgent
 ```
 
 Para volver a arrancarlo, usa `start` en lugar de `stop` o `Start-Service` en PowerShell.
