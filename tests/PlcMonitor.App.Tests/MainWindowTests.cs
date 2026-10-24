@@ -469,7 +469,7 @@ public class MainWindowTests
         agents.Log.Add("Instalando: conectando por SSH con tecnico@192.168.0.20:22…");
         agents.Log.Add("Equipo: Linux x86_64 (paquete linux-x64)");
         agents.Log.Add("Subiendo plcmon-agent-1.0.0-linux-x64 (49 MB)…");
-        agents.Log.Add("Agente en marcha: https://192.168.0.20:5311");
+        agents.Log.Add("Colector en marcha: https://192.168.0.20:5311");
         agents.Log.Add("Token de solo lectura (cópialo ahora: la app no lo guarda):");
         agents.Log.Add("q8Zt0VbS3nKp1xWm7RcY2uLf9HdA4gJe6TsN5oBiEkM");
         agents.Log.Add("✔ Hecho");

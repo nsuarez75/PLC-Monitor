@@ -20,11 +20,11 @@ public static class AgentErrors
     public static string Describe(Exception exception, string url) => exception switch
     {
         _ when IsCertificateMismatch(exception) =>
-            $"El certificado del agente en {url} no es el esperado (¿otro equipo o agente reinstalado?). Revisa el perfil del agente.",
-        RpcException { StatusCode: StatusCode.Unauthenticated } => $"El agente en {url} rechaza el token de acceso. Revisa el perfil del agente.",
-        RpcException { StatusCode: StatusCode.Unavailable } => $"No se puede conectar con el agente en {url}. ¿Está arrancado?",
-        RpcException { StatusCode: StatusCode.DeadlineExceeded } => $"El agente en {url} no responde a tiempo.",
-        RpcException { StatusCode: StatusCode.Unimplemented } => $"{url} no es un agente de PLC-Monitor (o es de otra versión).",
+            $"El certificado del colector en {url} no es el esperado (¿otro equipo o colector reinstalado?). Revisa el perfil del colector.",
+        RpcException { StatusCode: StatusCode.Unauthenticated } => $"El colector en {url} rechaza el token de acceso. Revisa el perfil del colector.",
+        RpcException { StatusCode: StatusCode.Unavailable } => $"No se puede conectar con el colector en {url}. ¿Está arrancado?",
+        RpcException { StatusCode: StatusCode.DeadlineExceeded } => $"El colector en {url} no responde a tiempo.",
+        RpcException { StatusCode: StatusCode.Unimplemented } => $"{url} no es un colector de PLC-Monitor (o es de otra versión).",
         RpcException rpc => string.IsNullOrEmpty(rpc.Status.Detail) ? rpc.StatusCode.ToString() : rpc.Status.Detail,
         UriFormatException or InvalidOperationException => $"URL no válida: {url}",
         _ => exception.Message,

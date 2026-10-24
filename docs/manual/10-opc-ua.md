@@ -1,20 +1,20 @@
 # 10. OPC UA
 
-El agente puede publicar sus tags por OPC UA para que otros sistemas los lean: Ignition, UaExpert, un
+El colector puede publicar sus tags por OPC UA para que otros sistemas los lean: Ignition, UaExpert, un
 historiador, un MES o cualquier cliente OPC UA. El servidor se configura desde la pestaña **OPC UA** y
-funciona en el agente, no en la app.
+funciona en el colector, no en la app.
 
 ![Configuración del servidor OPC UA](img/10-opc-ua.png)
 
 ## 10.1. Activar el servidor
 
-1. Conecta con el agente.
+1. Conecta con el colector.
 2. Abre **OPC UA**.
 3. Marca **Servidor OPC UA activo**.
 4. Revisa el **Puerto**. El estándar es `4840`; el instalador lo abre en el firewall si puede.
 5. Deja **Permitir escribir en los PLC por OPC UA** desmarcado hasta que lo necesites.
 6. Añade al menos un usuario.
-7. Pulsa **Guardar en el agente**.
+7. Pulsa **Guardar en el colector**.
 
 La cabecera **ESTADO** muestra:
 
@@ -33,7 +33,7 @@ Para que un tag aparezca en OPC UA deben cumplirse dos llaves:
 2. **Publicar en OPC UA (2.ª llave)** en el tag. Está activada por defecto.
 
 Un dispositivo o un tag desactivado no se publica. Si cambias una llave, el árbol de OPC UA se actualiza sin
-reiniciar el agente.
+reiniciar el colector.
 
 ### Árbol de nodos
 
@@ -75,7 +75,7 @@ En **USUARIOS**:
 2. Escribe el **Usuario**.
 3. Escribe la **Contraseña**.
 4. Marca **Puede escribir** si el usuario debe poder escribir en los PLC.
-5. Pulsa **Guardar en el agente**.
+5. Pulsa **Guardar en el colector**.
 
 - **Sin permiso de escritura**: el usuario puede leer, explorar, suscribirse y leer el histórico. No puede
   escribir.
@@ -119,7 +119,7 @@ Compara la huella antes de aceptar.
 5. Explora `Objects > PLC-Monitor > <dispositivo>`.
 6. Lee o suscribe los tags que necesites.
 
-La URL que muestra la app usa el nombre del equipo del agente. Si el cliente no resuelve ese nombre, usa la
+La URL que muestra la app usa el nombre del equipo del colector. Si el cliente no resuelve ese nombre, usa la
 dirección que corresponda, pero ten en cuenta que el certificado se ha emitido para el nombre del servidor:
 una dirección distinta puede provocar un error de validación. Lo más estable es usar el mismo nombre de
 equipo o una entrada DNS local.
@@ -141,7 +141,7 @@ lectura y el cliente recibe un error de acceso.
 La variable `EscrituraPermitida` de `_Estado` indica si el dispositivo y el servidor permiten escribir; no
 tiene en cuenta el permiso del usuario ni la llave del tag.
 
-Cada escritura queda en la auditoría del agente con el usuario de OPC UA y el valor. El agente valida el
+Cada escritura queda en la auditoría del colector con el usuario de OPC UA y el valor. El colector valida el
 tipo y el rango antes de enviarlo al PLC. Si el PLC rechaza la escritura, el cliente recibe un error.
 
 **Precaución**: habilitar la escritura por OPC UA amplía la superficie de riesgo. Actívala solo si un
@@ -153,12 +153,12 @@ auditoría.
 - Si desmarcas **Servidor OPC UA activo** y guardas, el servidor se detiene y libera el puerto.
 - Si cambias el puerto, el servidor se reinicia en el nuevo puerto.
 - Si el puerto está ocupado, el estado pasa a **Error** y el detalle indica el motivo.
-- Al desinstalar el agente se borra la carpeta `opcua/`, incluidos los certificados aceptados. Si quieres
+- Al desinstalar el colector se borra la carpeta `opcua/`, incluidos los certificados aceptados. Si quieres
   conservarlos, copia esa carpeta antes; al reinstalar, los clientes que ya confiaban pueden seguir
   conectando si restauras la misma PKI y el certificado del servidor sigue siendo válido.
 
-El servidor OPC UA no arranca si el agente no está en marcha. Si la pestaña muestra **Parado** y el servidor
-debería estar activo, revisa primero el estado del agente.
+El servidor OPC UA no arranca si el colector no está en marcha. Si la pestaña muestra **Parado** y el servidor
+debería estar activo, revisa primero el estado del colector.
 
 ## 10.8. Buenas prácticas
 
@@ -173,4 +173,4 @@ debería estar activo, revisa primero el estado del agente.
 
 ## Siguiente paso
 
-Para administrar el agente desde la terminal o integrarlo en scripts, sigue con [CLI](11-cli.md).
+Para administrar el colector desde la terminal o integrarlo en scripts, sigue con [CLI](11-cli.md).

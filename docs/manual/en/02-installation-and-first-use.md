@@ -1,7 +1,7 @@
 # 2. Installation and first use
 
 This chapter takes you from the downloaded file to a PLC reading values on the screen. If you already have
-an agent installed and only want to add a device, you can go directly to the
+a collector installed and only want to add a device, you can go directly to the
 [Devices and drivers](04-devices-and-drivers.md) chapter.
 
 ## 2.1. Run the app
@@ -50,45 +50,45 @@ app is open.
 
 ## 2.2. First startup
 
-When you open the app with no agent configured, you will see the main window with the **Sin conexión**
+When you open the app with no collector configured, you will see the main window with the **Sin conexión**
 (Not connected) status.
 
-![First startup, with no agent connected](../img/02-primer-arranque.png)
+![First startup, with no collector connected](../img/02-primer-arranque.png)
 
 The top bar has three areas:
 
-- **Perfil de agente** (Agent profile): the drop-down with the known agents. The first time it may be empty
+- **Perfil de colector** (Collector profile): the drop-down with the known collectors. The first time it may be empty
   or have a local profile.
 - **Conectar / Desconectar**: changes depending on the status.
-- **Tabs**: **Dispositivos**, **Tendencias**, **Transformaciones**, **OPC UA**, and **Agentes**.
+- **Tabs**: **Dispositivos**, **Tendencias**, **Transformaciones**, **OPC UA**, and **Colectores**.
 
-You do not need to connect to create a profile, but you do need to connect to read or configure an agent.
+You do not need to connect to create a profile, but you do need to connect to read or configure a collector.
 
-## 2.3. Install the agent
+## 2.3. Install the collector
 
-The agent is an independent service. The app can install it on this same computer or on another one over
+The collector is an independent service. The app can install it on this same computer or on another one over
 SSH. The installation creates a token, a TLS certificate, and the system service.
 
 ### On this computer
 
-1. Open the **Agentes** tab.
+1. Open the **Colectores** tab.
 2. Click **+** to create a profile.
 3. Type a **Nombre** (Name), for example `Planta demo`.
 4. Check the **Este equipo (sin SSH)** checkbox; it means this computer, without SSH.
-5. Leave the **Puerto del agente** (Agent port) at `5311` unless it is already in use.
+5. Leave the **Puerto del colector** (Collector port) at `5311` unless it is already in use.
 6. Click **Instalar / actualizar** (Install / update). The system will ask for administrator permissions
    (`sudo`, `pkexec`, or UAC).
 7. When it finishes, the app fills in the **URL**, the **Token**, and the **Huella del certificado**
    (Certificate thumbprint). Click **Guardar** (Save).
 8. Select the profile in the top bar and click **Conectar** (Connect).
 
-The local installation copies the agent bundled with the app, creates the service user, and registers the
+The local installation copies the collector bundled with the app, creates the service user, and registers the
 service. You do not need to download anything else.
 
 ### On another computer over SSH
 
-1. Create a new profile in **Agentes**.
-2. Type the **Nombre** and the **Puerto del agente**.
+1. Create a new profile in **Colectores**.
+2. Type the **Nombre** and the **Puerto del colector**.
 3. In **Equipo** (Computer), type the host or IP of the PLC computer and the SSH port (usually `22`).
 4. Type the SSH **Usuario** (User).
 5. Specify a **Clave privada** (Private key) or leave the field empty to use the password.
@@ -109,7 +109,7 @@ service.
 | Linux | `/opt/plc-monitor/agent` | `plcmon-agent` |
 | Windows | `%ProgramFiles%\PLC-Monitor\agent` | `PLCMonitorAgent` |
 
-Inside the agent folder:
+Inside the collector folder:
 
 - `plcmon-agent` or `plcmon-agent.exe`: the executable.
 - `agent.json`: devices, tags, transformations, and historian.
@@ -120,21 +120,21 @@ Inside the agent folder:
 - `opcua/`: OPC UA server certificates and configuration.
 - `logs/`: logs on Windows and, if configured, on Linux.
 
-Do not copy `agent.key` or `agent.pfx` to a computer other than the agent's. They are secrets.
+Do not copy `agent.key` or `agent.pfx` to a computer other than the collector's. They are secrets.
 
 ## 2.4. Connect and check the status
 
 Select the profile and click **Conectar**. The top bar changes to **Conectado** (Connected) and shows the
-agent name, the platform, and the version. The device list is populated with whatever the agent has
+collector name, the platform, and the version. The device list is populated with whatever the collector has
 configured.
 
 If the connection fails:
 
 - check that the service is active;
 - check that the URL ends in the correct port (`5311` with TLS);
-- confirm that the token is the agent's and not that of another profile;
-- review the certificate thumbprint if the agent was reinstalled;
-- check the firewall between the app and the agent.
+- confirm that the token is the collector's and not that of another profile;
+- review the certificate thumbprint if the collector was reinstalled;
+- check the firewall between the app and the collector.
 
 The [Troubleshooting](14-troubleshooting.md) chapter has a more complete list.
 
@@ -178,15 +178,15 @@ the recommended way when you do not know the exact name.
 - **Dispositivos**: live tags, history, and browser for the selected PLC.
 - **Tendencias**: saved charts and panels. They can be created without having a device selected.
 - **Transformaciones**: tables of integer values to text.
-- **OPC UA**: status and configuration of the agent's OPC UA server.
-- **Agentes**: profiles, installation, credentials, status, and logs.
+- **OPC UA**: status and configuration of the collector's OPC UA server.
+- **Colectores**: profiles, installation, credentials, status, and logs.
 
 The theme button in the top bar switches between light and dark. The preference is saved in `app.json`.
 
-## 2.8. Close the app and the agent
+## 2.8. Close the app and the collector
 
-Closing the app does not stop the agent or the history. If you want to stop reading a PLC, disable the
-device or the tag. If you want to stop the agent service:
+Closing the app does not stop the collector or the history. If you want to stop reading a PLC, disable the
+device or the tag. If you want to stop the collector service:
 
 ```bash
 # Linux
@@ -204,5 +204,5 @@ samples unsaved.
 
 ## Next step
 
-With an agent and a device connected, the next chapter explains how to manage several profiles, install
-remotely, and renew credentials: [Agents and profiles](03-agents-and-profiles.md).
+With a collector and a device connected, the next chapter explains how to manage several profiles, install
+remotely, and renew credentials: [Collectors and profiles](03-collectors-and-profiles.md).

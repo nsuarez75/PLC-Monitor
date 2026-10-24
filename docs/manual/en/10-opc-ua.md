@@ -1,20 +1,20 @@
 # 10. OPC UA
 
-The agent can publish its tags over OPC UA so that other systems can read them: Ignition, UaExpert, a
+The collector can publish its tags over OPC UA so that other systems can read them: Ignition, UaExpert, a
 historian, an MES, or any OPC UA client. The server is configured from the **OPC UA** tab and
-runs in the agent, not in the app.
+runs in the collector, not in the app.
 
 ![OPC UA server configuration](../img/10-opc-ua.png)
 
 ## 10.1. Enable the server
 
-1. Connect to the agent.
+1. Connect to the collector.
 2. Open **OPC UA**.
 3. Check **Servidor OPC UA activo** (OPC UA server active).
 4. Check the **Puerto** (Port). The standard is `4840`; the installer opens it in the firewall if it can.
 5. Leave **Permitir escribir en los PLC por OPC UA** (Allow writing to PLCs over OPC UA) unchecked until you need it.
 6. Add at least one user.
-7. Click **Guardar en el agente** (Save to agent).
+7. Click **Guardar en el colector** (Save to collector).
 
 The **ESTADO** (STATUS) header shows:
 
@@ -33,7 +33,7 @@ For a tag to appear in OPC UA, two keys must be enabled:
 2. **Publicar en OPC UA (2.ª llave)** (Publish to OPC UA (2nd key)) on the tag. It is enabled by default.
 
 A disabled device or tag is not published. If you change a key, the OPC UA tree updates without
-restarting the agent.
+restarting the collector.
 
 ### Node tree
 
@@ -75,7 +75,7 @@ In **USUARIOS** (USERS):
 2. Enter the **Usuario** (Username).
 3. Enter the **Contraseña** (Password).
 4. Check **Puede escribir** (Can write) if the user should be able to write to the PLCs.
-5. Click **Guardar en el agente**.
+5. Click **Guardar en el colector**.
 
 - **Sin permiso de escritura** (No write permission): the user can read, browse, subscribe, and read history. The user cannot
   write.
@@ -118,7 +118,7 @@ Compare the thumbprint before accepting.
 5. Browse `Objects > PLC-Monitor > <device>`.
 6. Read or subscribe to the tags you need.
 
-The URL shown by the app uses the agent computer's name. If the client cannot resolve that name, use the
+The URL shown by the app uses the collector computer's name. If the client cannot resolve that name, use the
 appropriate address, but keep in mind that the certificate was issued for the server name: a different
 address can cause a validation error. The most stable approach is to use the same computer
 name or a local DNS entry.
@@ -140,7 +140,7 @@ and the client receives an access error.
 The `EscrituraPermitida` variable in `_Estado` indicates whether the device and the server allow writing; it
 does not consider the user's permission or the tag key.
 
-Each write is recorded in the agent audit with the OPC UA user and the value. The agent validates the
+Each write is recorded in the collector audit with the OPC UA user and the value. The collector validates the
 type and range before sending it to the PLC. If the PLC rejects the write, the client receives an error.
 
 **Caution**: enabling writing over OPC UA expands the risk surface. Enable it only if an
@@ -152,12 +152,12 @@ audit.
 - If you uncheck **Servidor OPC UA activo** and save, the server stops and releases the port.
 - If you change the port, the server restarts on the new port.
 - If the port is in use, the status changes to **Error** and the detail indicates the reason.
-- Uninstalling the agent deletes the `opcua/` folder, including the accepted certificates. If you want to
+- Uninstalling the collector deletes the `opcua/` folder, including the accepted certificates. If you want to
   keep them, copy that folder beforehand; when reinstalling, clients that already trusted it can continue
   to connect if you restore the same PKI and the server certificate is still valid.
 
-The OPC UA server does not start if the agent is not running. If the tab shows **Parado** and the server
-should be active, check the agent status first.
+The OPC UA server does not start if the collector is not running. If the tab shows **Parado** and the server
+should be active, check the collector status first.
 
 ## 10.8. Best practices
 
@@ -172,4 +172,4 @@ should be active, check the agent status first.
 
 ## Next step
 
-To administer the agent from the terminal or integrate it into scripts, continue with [CLI](11-cli.md).
+To administer the collector from the terminal or integrate it into scripts, continue with [CLI](11-cli.md).

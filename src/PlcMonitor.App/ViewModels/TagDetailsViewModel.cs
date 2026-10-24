@@ -246,7 +246,7 @@ public sealed partial class TagDetailsViewModel : LocalizedObservableObject
         ? Loc.T("Las transformaciones se crean en «Transformaciones», en la barra superior.")
         : _context.FindTransform(SelectedTransform) is { } transform
             ? transform.Entries.Count == 0 ? Loc.T("La transformación no tiene valores.") : string.Join(" · ", transform.Entries.Select(e => $"{e.Value} = {e.Text}"))
-            : Loc.T("Esta transformación ya no existe en el agente.");
+            : Loc.T("Esta transformación ya no existe en el colector.");
 
     public ObservableCollection<string> DataTypes { get; }
 
@@ -432,9 +432,9 @@ public sealed partial class TagDetailsViewModel : LocalizedObservableObject
         if (stored is null)
             return;
         if (saved.Scaling is not null && stored.Scaling is null)
-            _context.Report(Loc.T("El agente no aplica el escalado: actualízalo a la versión 1.9 o posterior."), isError: true);
+            _context.Report(Loc.T("El colector no aplica el escalado: actualízalo a la versión 1.9 o posterior."), isError: true);
         else if ((saved.Unit.Length > 0 || saved.HasDecimals) && stored.Unit.Length == 0 && !stored.HasDecimals)
-            _context.Report(Loc.T("El agente no guarda la unidad ni los decimales: actualízalo a la versión 1.8 o posterior."), isError: true);
+            _context.Report(Loc.T("El colector no guarda la unidad ni los decimales: actualízalo a la versión 1.8 o posterior."), isError: true);
     }
 
     private bool CanSave() => !IsBusy && !string.IsNullOrWhiteSpace(Name) && !string.IsNullOrWhiteSpace(Address);

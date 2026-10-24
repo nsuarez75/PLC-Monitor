@@ -67,7 +67,7 @@ public sealed class ChartKindChoice(ChartKind value, string text, string @short,
         new(ChartKind.Gauges, "Indicadores de panel", "Indicadores",
             "El valor actual de cada tag en grande, como en un panel de operador: con aguja, barra de nivel o solo el número, y en rojo si sale de los límites. Los booleanos se ven como una luz."),
         new(ChartKind.Bars, "Barras por periodo (histórico)", "Barras",
-            "Un grupo de barras por hora, turno o día con el máximo, la media, el mínimo o lo que ha subido un contador, sacado del histórico del agente (los tags tienen que historizarse). No es en vivo: se actualiza con un botón."),
+            "Un grupo de barras por hora, turno o día con el máximo, la media, el mínimo o lo que ha subido un contador, sacado del histórico del colector (los tags tienen que historizarse). No es en vivo: se actualiza con un botón."),
     ];
 
     public static ChartKindChoice For(ChartKind kind) => All.FirstOrDefault(k => k.Value == kind) ?? All[0];
@@ -123,7 +123,7 @@ public sealed partial class TrendsViewModel : LocalizedObservableObject, IDispos
     public string HeaderTitle => SelectedPanel?.Name ?? Selected?.Name ?? Loc.T("Tendencias");
 
     public string HeaderHint => Loc.T(SelectedPanel is null
-        ? "Tags del agente o de un CSV en una gráfica: en vivo, del histórico o del fichero."
+        ? "Tags del colector o de un CSV en una gráfica: en vivo, del histórico o del fichero."
         : "Varias vistas guardadas en una rejilla, cada una con sus datos y su tipo de gráfica.");
 
     /// <summary>Gráfica abierta (null = configurando la vista).</summary>
@@ -185,7 +185,7 @@ public sealed partial class TrendsViewModel : LocalizedObservableObject, IDispos
     public static IReadOnlyList<Choice<TrendDataSource>> DataSources { get; } =
     [
         new("En vivo (lo que llega, última hora)", TrendDataSource.Live),
-        new("Histórico del agente", TrendDataSource.History),
+        new("Histórico del colector", TrendDataSource.History),
         new("Fichero CSV exportado", TrendDataSource.Csv),
     ];
 
@@ -202,7 +202,7 @@ public sealed partial class TrendsViewModel : LocalizedObservableObject, IDispos
     /// <summary>Se elige el periodo del histórico (las barras tienen el suyo).</summary>
     public bool ShowHistoryRange => UsesHistory && Kind.Value != ChartKind.Bars;
 
-    public string AvailableCaption => Loc.T(UsesCsv ? "TAGS DEL CSV" : "TAGS DEL AGENTE");
+    public string AvailableCaption => Loc.T(UsesCsv ? "TAGS DEL CSV" : "TAGS DEL COLECTOR");
 
     /// <summary>Fichero CSV de la vista.</summary>
     [ObservableProperty]
@@ -503,7 +503,7 @@ public sealed partial class TrendsViewModel : LocalizedObservableObject, IDispos
             Available.Add(choice);
         }
         Note = UsesCsv ? (_csv is null ? Loc.T("Elige un fichero CSV exportado del histórico para ver sus tags.") : "")
-            : _main.IsConnected ? "" : Loc.T("Conéctate al agente para ver sus tags y añadirlos.");
+            : _main.IsConnected ? "" : Loc.T("Conéctate al colector para ver sus tags y añadirlos.");
     }
 
     /// <summary>Añade una vista ya hecha (p. ej. desde la pestaña Histórico de un dispositivo), la selecciona y la abre.</summary>
@@ -675,7 +675,7 @@ public sealed partial class TrendsViewModel : LocalizedObservableObject, IDispos
     private async Task<OpenedView> BuildHistoryAsync(TrendView view)
     {
         if (_main.Client is not { } client)
-            return new OpenedView(null, null, Loc.T("Conéctate al agente para leer su histórico."));
+            return new OpenedView(null, null, Loc.T("Conéctate al colector para leer su histórico."));
         var (from, to) = TrendHistory.Window(view, DateTimeOffset.UtcNow);
         var trigger = view.Trigger;
         var refs = view.Tags.Concat(trigger is null ? [] : [trigger.Ref])

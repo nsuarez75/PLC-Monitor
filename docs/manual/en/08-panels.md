@@ -68,13 +68,13 @@ The panel bar has:
 The PNG is useful for attaching a screenshot to a report or an incident. The image is generated with the
 size of the open grid; if you want more detail, enlarge the window before exporting.
 
-## 8.6. Panels and agent profiles
+## 8.6. Panels and collector profiles
 
-Panels are saved per agent. A panel created with the `Planta demo` profile does not appear when you connect
-to another agent, even if the views have the same names. CSV views are the exception: they can be used in
-any profile because they do not depend on an agent.
+Panels are saved per collector. A panel created with the `Planta demo` profile does not appear when you connect
+to another collector, even if the views have the same names. CSV views are the exception: they can be used in
+any profile because they do not depend on a collector.
 
-If you connect to another agent and do not see your panels, check the profile selected in the top bar.
+If you connect to another collector and do not see your panels, check the profile selected in the top bar.
 
 ## 8.7. Panel examples
 

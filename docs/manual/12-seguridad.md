@@ -8,31 +8,31 @@ revisar antes de dejar el sistema en producción.
 
 | Activo | Riesgo | Protección principal |
 |---|---|---|
-| La API del agente | Cualquiera en la red podría leer o escribir. | Token + TLS + firewall. |
+| La API del colector | Cualquiera en la red podría leer o escribir. | Token + TLS + firewall. |
 | Las credenciales del PLC | Robo de contraseñas S7. | Cifradas con `agent.key`. |
 | El histórico | Fuga de datos de producción. | Permisos del sistema y token. |
 | El servidor OPC UA | Lectura o escritura no autorizada. | Usuarios, certificados y tres llaves. |
 | Las escrituras | Movimiento no deseado de una máquina. | Tres llaves y auditoría. |
-| Los perfiles de la app | Robo del token de un agente. | DPAPI o permisos de usuario. |
+| Los perfiles de la app | Robo del token de un colector. | DPAPI o permisos de usuario. |
 
 No hay autenticación multiusuario dentro de la app. Quien tiene el perfil con token completo puede hacer todo
 lo que permita ese token. La separación real se hace con tokens, cuentas del sistema operativo y red.
 
-## 12.2. La API del agente
+## 12.2. La API del colector
 
 ### Token
 
-El agente exige un token en cada llamada si está configurado. Hay dos:
+El colector exige un token en cada llamada si está configurado. Hay dos:
 
 - **Token completo**: leer, escribir, configurar, historizar, borrar y administrar OPC UA.
 - **Token de solo lectura**: leer, explorar, suscribirse y consultar el histórico. No puede escribir ni
   cambiar configuración.
 
-El agente no guarda el token en claro. Guarda su hash SHA-256. La app envía el token como
-`Authorization: Bearer ...` y el agente compara el hash.
+El colector no guarda el token en claro. Guarda su hash SHA-256. La app envía el token como
+`Authorization: Bearer ...` y el colector compara el hash.
 
-Sin token, el agente solo puede escuchar en `127.0.0.1`, `::1` o `localhost`. Si intentas abrirlo a la red
-sin token, el agente no arranca. Es una protección deliberada: una API sin autenticación en la red permite
+Sin token, el colector solo puede escuchar en `127.0.0.1`, `::1` o `localhost`. Si intentas abrirlo a la red
+sin token, el colector no arranca. Es una protección deliberada: una API sin autenticación en la red permite
 escribir en el PLC a cualquiera que llegue al puerto.
 
 ### TLS
@@ -57,7 +57,7 @@ renueva y revisa los logs.
 
 ## 12.3. SSH
 
-La instalación remota usa SSH para copiar el agente y crear el servicio.
+La instalación remota usa SSH para copiar el colector y crear el servicio.
 
 - La primera conexión muestra la huella del servidor SSH. Compruébala antes de aceptarla. La app la fija en
   el perfil.
@@ -112,7 +112,7 @@ El servidor OPC UA:
 
 La huella que muestra la pestaña **OPC UA** es la del certificado del servidor, normalmente SHA-1, que es la
 que muestran clientes como UaExpert o Ignition. No la confundas con la huella SHA-256 del certificado TLS
-del agente que usa la app.
+del colector que usa la app.
 
 Buenas prácticas:
 
@@ -137,7 +137,7 @@ Las vistas y paneles no contienen secretos, pero sí nombres de dispositivos y t
 
 ## 12.8. Auditoría y logs
 
-El agente escribe en el logger `PlcMonitor.Audit`:
+El colector escribe en el logger `PlcMonitor.Audit`:
 
 - escrituras;
 - activación y desactivación de dispositivos;
@@ -152,7 +152,7 @@ credencial. El usuario declarado no se puede verificar; lo que sí se verifica e
 Dónde verlos:
 
 - **Linux**: `journalctl -u plcmon-agent`. La app puede mostrar las últimas líneas con **Ver log**.
-- **Windows**: carpeta `logs\` del agente, un fichero por día. La retención por defecto es de 7 días.
+- **Windows**: carpeta `logs\` del colector, un fichero por día. La retención por defecto es de 7 días.
 - **App**: mensajes de la barra inferior y errores de la operación.
 
 Los logs no deben incluir tokens ni contraseñas. Si vas a enviar un log a soporte, revisa que no contenga
@@ -160,28 +160,28 @@ nombres de planta, IPs o datos que no quieras compartir.
 
 ## 12.9. Red
 
-- Instala el agente en una red industrial segmentada, no en la red de oficina sin control.
+- Instala el colector en una red industrial segmentada, no en la red de oficina sin control.
 - Abre solo los puertos necesarios: `5311/tcp` para la app y `4840/tcp` para OPC UA.
 - No expongas `5310/tcp`, `5311/tcp` ni `4840/tcp` a Internet.
 - Si necesitas acceso remoto, usa VPN o un salto controlado.
 - Limita la app y los clientes OPC UA por firewall a los equipos que realmente los necesitan.
 - Separa la red de PLC de la red de gestión cuando sea posible.
-- Revisa qué equipos pueden alcanzar el PLC; el agente no es el único camino.
+- Revisa qué equipos pueden alcanzar el PLC; el colector no es el único camino.
 
 ## 12.10. Lista de comprobación
 
 Antes de dejar una instalación en producción:
 
-- [ ] El agente está instalado con TLS y token, no con la configuración local sin token.
+- [ ] El colector está instalado con TLS y token, no con la configuración local sin token.
 - [ ] El token completo está guardado en un gestor de secretos, no en un correo ni en un chat.
 - [ ] Existe un token de solo lectura para quien solo consulta.
-- [ ] La huella del certificado del agente está fijada en el perfil.
+- [ ] La huella del certificado del colector está fijada en el perfil.
 - [ ] La huella del servidor SSH se comprobó al instalar.
 - [ ] `agent.key`, `agent.json`, `agent.settings.json` y `agent.pfx` tienen permisos restringidos.
 - [ ] Las escrituras están deshabilitadas por defecto y solo se activan donde se necesitan.
 - [ ] OPC UA no permite anónimos y los clientes aceptados están revisados.
 - [ ] El firewall solo abre los puertos necesarios.
-- [ ] El reloj del agente y del PLC está sincronizado.
+- [ ] El reloj del colector y del PLC está sincronizado.
 - [ ] Hay una copia de seguridad de la configuración y del histórico.
 - [ ] Sabes cómo renovar credenciales y dónde están los logs.
 
@@ -189,12 +189,12 @@ Antes de dejar una instalación en producción:
 
 1. Deshabilita las escrituras en el dispositivo y en OPC UA.
 2. Detén el servidor OPC UA si no es necesario.
-3. Renueva el token y el certificado del agente.
+3. Renueva el token y el certificado del colector.
 4. Cambia las contraseñas de OPC UA y las credenciales del PLC que estuvieran guardadas.
 5. Revisa los clientes OPC UA aceptados y elimina los desconocidos.
 6. Revisa la auditoría y los logs del sistema.
 7. Comprueba la configuración de los dispositivos y los tags: alguien con token completo pudo cambiarla.
-8. Si el equipo del agente está comprometido, no confíes en sus ficheros: reinstala y restaura solo lo que
+8. Si el equipo del colector está comprometido, no confíes en sus ficheros: reinstala y restaura solo lo que
    hayas verificado.
 
 ## Siguiente paso

@@ -233,7 +233,7 @@ public sealed partial class MainViewModel : LocalizedObservableObject, IAgentCon
     /// <summary>Agente al que pertenecen las vistas de tendencia: el id de su perfil o, sin perfil, su URL.</summary>
     public string AgentKey => SelectedProfile?.Id ?? AgentUrl.Trim();
 
-    public string AgentTitle => Loc.F("Agente {0}", SelectedProfile is { Name.Length: > 0 } profile ? profile.Name : AgentUrl.Trim());
+    public string AgentTitle => Loc.F("Colector {0}", SelectedProfile is { Name.Length: > 0 } profile ? profile.Name : AgentUrl.Trim());
 
     /// <summary>Han cambiado los tags del agente (foto nueva, dispositivo reconfigurado o quitado).</summary>
     public event EventHandler? TagsChanged;
@@ -451,15 +451,15 @@ public sealed partial class MainViewModel : LocalizedObservableObject, IAgentCon
         return exception switch
         {
             _ when AgentErrors.IsCertificateMismatch(exception) =>
-                Loc.F("El certificado del agente en {0} no es el esperado (¿otro equipo o agente reinstalado?). Revisa el perfil del agente.", target),
+                Loc.F("El certificado del colector en {0} no es el esperado (¿otro equipo o colector reinstalado?). Revisa el perfil del colector.", target),
             RpcException { StatusCode: StatusCode.Unauthenticated } =>
-                Loc.F("El agente en {0} rechaza el token de acceso. Revisa el perfil del agente.", target),
+                Loc.F("El colector en {0} rechaza el token de acceso. Revisa el perfil del colector.", target),
             RpcException { StatusCode: StatusCode.Unavailable } =>
-                Loc.F("No se puede conectar con el agente en {0}. ¿Está arrancado?", target),
+                Loc.F("No se puede conectar con el colector en {0}. ¿Está arrancado?", target),
             RpcException { StatusCode: StatusCode.DeadlineExceeded } =>
-                Loc.F("El agente en {0} no responde a tiempo.", target),
+                Loc.F("El colector en {0} no responde a tiempo.", target),
             RpcException { StatusCode: StatusCode.Unimplemented } =>
-                Loc.F("{0} no es un agente de PLC-Monitor (o es de otra versión).", target),
+                Loc.F("{0} no es un colector de PLC-Monitor (o es de otra versión).", target),
             UriFormatException or InvalidOperationException =>
                 Loc.F("URL no válida: {0}", target),
             _ => AgentErrors.Describe(exception, target),
@@ -704,7 +704,7 @@ public sealed partial class MainViewModel : LocalizedObservableObject, IAgentCon
     {
         if (Client is not { } client || SelectedDevice is not { } device)
             return;
-        if (!await Dialogs.ConfirmAsync(Loc.T("Eliminar dispositivo"), Loc.F("¿Dar de baja {0} y sus {1} tags?\nSe guarda en la configuración del agente.", device.Name, device.Tags.Count)))
+        if (!await Dialogs.ConfirmAsync(Loc.T("Eliminar dispositivo"), Loc.F("¿Dar de baja {0} y sus {1} tags?\nSe guarda en la configuración del colector.", device.Name, device.Tags.Count)))
             return;
         try
         {
@@ -758,7 +758,7 @@ public sealed partial class MainViewModel : LocalizedObservableObject, IAgentCon
             catch (RpcException ex)
             {
                 _ui.Post(() => IsLive = false);
-                Report(Loc.F("Conexión con el agente perdida: {0}. Reintentando…", Describe(ex)), isError: true);
+                Report(Loc.F("Conexión con el colector perdida: {0}. Reintentando…", Describe(ex)), isError: true);
             }
             try
             {
@@ -963,7 +963,7 @@ public sealed partial class MainViewModel : LocalizedObservableObject, IAgentCon
         }
         catch (RpcException ex) when (ex.StatusCode == StatusCode.Unimplemented)
         {
-            Report(Loc.T("Este agente no permite reordenar dispositivos: actualízalo."), isError: true);
+            Report(Loc.T("Este colector no permite reordenar dispositivos: actualízalo."), isError: true);
         }
         catch (RpcException ex)
         {

@@ -558,7 +558,7 @@ public sealed class AgentCommandsTests : IDisposable
 
         (await RunAsync("agent", "devices", "-a", "http://127.0.0.1:1")).ShouldBe(1);
 
-        Output.ShouldContain("No se puede conectar con el agente en http://127.0.0.1:1");
+        Output.ShouldContain("No se puede conectar con el colector en http://127.0.0.1:1");
     }
 
     [Fact]

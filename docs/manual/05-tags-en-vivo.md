@@ -14,7 +14,7 @@ Cada fila muestra:
 | **Nombre** | Nombre del tag. Debajo, el grupo de escaneo y su intervalo. |
 | **Dirección** | Dirección tal como la entiende el driver. |
 | **Valor** | Último valor, con la transformación, los decimales y la unidad configurados. |
-| **Tipo** | Tipo detectado por el agente: `Bool`, `Int16`, `Real`, `String`... |
+| **Tipo** | Tipo detectado por el colector: `Bool`, `Int16`, `Real`, `String`... |
 | **Calidad** | `Good`, `Uncertain` o el error (`Bad...`). |
 | **Hora** | Hora local de la última actualización. |
 | **Escritura** | Campo o botones para escribir, solo si el tag es escribible. |
@@ -135,7 +135,7 @@ En **Configuración** puedes cambiar:
 
 ### Escalado
 
-El escalado se aplica en el agente antes de historizar y de publicar. Sirve para convertir, por ejemplo,
+El escalado se aplica en el colector antes de historizar y de publicar. Sirve para convertir, por ejemplo,
 `0..27648` en `0..100 %` o `0..10000` en `0..10 bar`.
 
 1. Marca **Convertir el valor bruto a unidades de ingeniería**.
@@ -160,7 +160,7 @@ En la sección **HISTÓRICO**:
 - **Solo mientras otro tag cumpla una condición (disparo)**: historiza solo durante los tramos en que se
   cumple la condición, más un tiempo extra.
 
-Si el historiador del agente está desactivado, la configuración se guarda pero no se registra nada. La app
+Si el historiador del colector está desactivado, la configuración se guarda pero no se registra nada. La app
 lo avisa en la ventana.
 
 ## 5.6. Escribir en el PLC
@@ -179,8 +179,8 @@ En la tabla:
   escribe el cambio.
 
 Antes de escribir, la app pide confirmación y muestra el valor actual. Si la escritura falla, el mensaje
-indica la calidad o el error devuelto por el agente. Cada escritura queda registrada en la auditoría del
-agente.
+indica la calidad o el error devuelto por el colector. Cada escritura queda registrada en la auditoría del
+colector.
 
 **Precaución**: una escritura puede mover una máquina. Comprueba la dirección, el tipo y el valor antes de
 confirmar. No escribas en tags de seguridad, enclavamientos o consignas críticas sin el procedimiento de la

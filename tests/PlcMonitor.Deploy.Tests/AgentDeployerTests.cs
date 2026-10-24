@@ -97,7 +97,7 @@ public sealed class AgentDeployerTests : IDisposable
         json.RootElement.GetProperty("Kestrel").GetProperty("Endpoints").GetProperty("Grpc").GetProperty("Url").GetString().ShouldBe("https://0.0.0.0:5311");
         Decode(script, "agent.pfx").ShouldNotBeEmpty();
         _progress.ShouldContain("Equipo: Linux x86_64 (paquete linux-x64)");
-        _progress.ShouldContain("Agente en marcha: https://192.168.0.20:5311");
+        _progress.ShouldContain("Colector en marcha: https://192.168.0.20:5311");
     }
 
     [Fact]
@@ -188,10 +188,10 @@ public sealed class AgentDeployerTests : IDisposable
             .On("uname -sm", Ok("Linux x86_64\n"))
             .On("hostname", Ok("pc\n"))
             .On("id -u", Ok("0\n"))
-            .On(c => c.EndsWith("bash -s", StringComparison.Ordinal), (_, _) => Fail("El agente no está instalado en este equipo"));
+            .On(c => c.EndsWith("bash -s", StringComparison.Ordinal), (_, _) => Fail("El colector no está instalado en este equipo"));
 
         (await Should.ThrowAsync<DeployException>(() => Deployer(ssh).RenewCredentialsAsync("pc", new RenewOptions(), null, Ct)))
-            .Message.ShouldContain("El agente no está instalado");
+            .Message.ShouldContain("El colector no está instalado");
     }
 
     [Fact]
@@ -332,7 +332,7 @@ public sealed class AgentDeployerTests : IDisposable
         script.ShouldContain("WaitForExit(30000)");
         script.ShouldContain("Stop-Process -Id $_.Id -Force");
         script.ShouldContain("Start-Sleep -Milliseconds 500");
-        script.ShouldContain("Se ha vuelto a arrancar el agente anterior");
+        script.ShouldContain("Se ha vuelto a arrancar el colector anterior");
         // La espera va antes de tocar los ficheros.
         script.IndexOf("WaitForExit(30000)", StringComparison.Ordinal).ShouldBeLessThan(script.IndexOf("Remove-Item", StringComparison.Ordinal));
         AgentScripts.WindowsUninstall(false).ShouldContain("WaitForExit(30000)");
@@ -400,7 +400,7 @@ public sealed class AgentDeployerTests : IDisposable
         script.ShouldContain("agent.json.backup");
         script.ShouldContain("agent.key.backup");
         script.ShouldContain("rm -rf \"$D\"");
-        _progress.ShouldContain("Agente desinstalado");
+        _progress.ShouldContain("Colector desinstalado");
     }
 
     /// <summary>

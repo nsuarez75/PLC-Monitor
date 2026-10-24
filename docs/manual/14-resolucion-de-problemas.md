@@ -1,6 +1,6 @@
 # 14. Resolución de problemas
 
-Los fallos en PLC-Monitor suelen estar en una de estas capas: la app, la conexión con el agente, el
+Los fallos en PLC-Monitor suelen estar en una de estas capas: la app, la conexión con el colector, el
 dispositivo, un tag concreto, el histórico o el servidor OPC UA. Antes de cambiar cosas al azar, identifica
 la capa y mira el mensaje exacto.
 
@@ -8,30 +8,30 @@ la capa y mira el mensaje exacto.
 
 1. Anota la hora del fallo y el texto exacto del error.
 2. Comprueba si afecta a un tag, a un dispositivo, a toda la app o solo a OPC UA.
-3. No reinicies el agente ni el PLC sin necesidad: un reinicio borra pistas y puede interrumpir producción.
+3. No reinicies el colector ni el PLC sin necesidad: un reinicio borra pistas y puede interrumpir producción.
 4. No borres el histórico ni la configuración para “probar”.
 5. Si el fallo empezó tras un cambio, piensa qué cambió: red, contraseña, firmware, dirección, actualización.
 
 La barra inferior de la app muestra el resultado de la última operación. Si el mensaje es rojo, la operación
 no se completó.
 
-## 14.2. La app no conecta con el agente
+## 14.2. La app no conecta con el colector
 
 La app necesita una URL correcta, red, token y, si el perfil lo tiene, la huella del certificado.
 
 | Mensaje | Causa habitual | Qué hacer |
 |---|---|---|
-| **El certificado del agente en … no es el esperado** | El agente se reinstaló, cambió de equipo o cambió el certificado. | Actualiza la huella en el perfil o vuelve a instalar/renovar. |
-| **El agente en … rechaza el token de acceso** | Token rotado, mal copiado o de otro agente. | Copia el token actual o renueva credenciales. |
-| **No se puede conectar con el agente en …** | Servicio parado, URL/puerto incorrecto, firewall o red. | Comprueba servicio, URL y puerto. |
-| **El agente en … no responde a tiempo** | Red lenta, equipo saturado o bloqueado. | Comprueba el equipo y la red; reintenta. |
-| **… no es un agente de PLC-Monitor (o es de otra versión)** | La URL apunta a otro servicio o el agente es antiguo. | Revisa la URL y actualiza el agente. |
+| **El certificado del colector en … no es el esperado** | El colector se reinstaló, cambió de equipo o cambió el certificado. | Actualiza la huella en el perfil o vuelve a instalar/renovar. |
+| **El colector en … rechaza el token de acceso** | Token rotado, mal copiado o de otro colector. | Copia el token actual o renueva credenciales. |
+| **No se puede conectar con el colector en …** | Servicio parado, URL/puerto incorrecto, firewall o red. | Comprueba servicio, URL y puerto. |
+| **El colector en … no responde a tiempo** | Red lenta, equipo saturado o bloqueado. | Comprueba el equipo y la red; reintenta. |
+| **… no es un colector de PLC-Monitor (o es de otra versión)** | La URL apunta a otro servicio o el colector es antiguo. | Revisa la URL y actualiza el colector. |
 | **URL no válida: …** | Falta el esquema o el puerto está mal. | Usa `https://equipo:5311` o la URL del perfil. |
 
 Pasos:
 
-1. Comprueba que el agente está en marcha. En **Agentes**, pulsa **Estado**.
-2. Comprueba la URL del perfil. Debe incluir `https://` si el agente se instaló con TLS.
+1. Comprueba que el colector está en marcha. En **Colectores**, pulsa **Estado**.
+2. Comprueba la URL del perfil. Debe incluir `https://` si el colector se instaló con TLS.
 3. Desde el equipo de la app, prueba el puerto:
 
    ```bash
@@ -45,16 +45,16 @@ Pasos:
    ```
 
 4. Si no responde, revisa firewall, VLAN, rutas y VPN. El instalador abre el puerto en el firewall del
-   agente, pero no puede abrir un firewall de red intermedio.
-5. Si el agente está en el mismo equipo, prueba `https://127.0.0.1:5311` con el perfil correcto. No mezcles
-   un perfil con huella fijada con otro agente.
+   colector, pero no puede abrir un firewall de red intermedio.
+5. Si el colector está en el mismo equipo, prueba `https://127.0.0.1:5311` con el perfil correcto. No mezcles
+   un perfil con huella fijada con otro colector.
 6. Si la cabecera indica **solo lectura**, la conexión funciona: el token no permite cambiar nada. Es
    intencionado.
 
-Cuando se pierde una conexión ya establecida, la app muestra “Conexión con el agente perdida… Reintentando”.
-No hace falta cerrar la app; si no vuelve, revisa el agente y la red.
+Cuando se pierde una conexión ya establecida, la app muestra “Conexión con el colector perdida… Reintentando”.
+No hace falta cerrar la app; si no vuelve, revisa el colector y la red.
 
-## 14.3. El agente no arranca o no aparece
+## 14.3. El colector no arranca o no aparece
 
 ### Linux
 
@@ -75,29 +75,29 @@ Y revisa `%ProgramFiles%\PLC-Monitor\agent\logs\`.
 
 Causas frecuentes:
 
-- **Sin token y escucha en red**: el agente no arranca. El log lo dice: “El agente escucha en … sin token
+- **Sin token y escucha en red**: el colector no arranca. El log lo dice: “El colector escucha en … sin token
   de acceso”. Instálalo desde la app o configura un token.
-- **Puerto ocupado**: cambia el puerto del agente o libera el que lo usa.
+- **Puerto ocupado**: cambia el puerto del colector o libera el que lo usa.
 
   ```bash
   ss -ltnp | grep 5311
   ```
 
-- **`agent.json` inválido**: el agente no puede cargar la configuración. Restaura la copia anterior.
+- **`agent.json` inválido**: el colector no puede cargar la configuración. Restaura la copia anterior.
 - **Contraseñas que no se descifran**: falta `agent.key` o es de otro equipo. Vuelve a introducir las
   contraseñas de los dispositivos que indique el log.
 - **Permisos**: en Linux, el servicio corre como `plcmon` y solo escribe en su carpeta. Un fichero de otro
   propietario o una ruta de histórico fuera de la carpeta puede impedir el arranque o el registro.
-- **Disco lleno**: el agente y SQLite necesitan espacio. Libera espacio o reduce la retención.
+- **Disco lleno**: el colector y SQLite necesitan espacio. Libera espacio o reduce la retención.
 - **Ejecutable bloqueado en Windows**: antivirus o indexador. Revisa la exclusión y vuelve a actualizar.
 
 Si el servicio está activo pero la app no conecta, comprueba la dirección de escucha y el firewall. El
-agente puede estar escuchando solo en `127.0.0.1` si se arrancó sin la configuración instalada.
+colector puede estar escuchando solo en `127.0.0.1` si se arrancó sin la configuración instalada.
 
 ## 14.4. El dispositivo no conecta o está en fallo
 
-El estado **En fallo** significa que el agente no pudo abrir o mantener la conexión. El detalle bajo el
-nombre del dispositivo suele indicar la causa. El agente reintenta solo, con espera creciente; no hace
+El estado **En fallo** significa que el colector no pudo abrir o mantener la conexión. El detalle bajo el
+nombre del dispositivo suele indicar la causa. El colector reintenta solo, con espera creciente; no hace
 falta reiniciarlo para cada intento. Si el dispositivo está **Desactivado**, actívalo: no es un fallo.
 
 Comprueba primero:
@@ -106,7 +106,7 @@ Comprueba primero:
 2. Que la IP o el nombre del dispositivo es correcto.
 3. Que el puerto no está bloqueado por firewall o por un switch con ACL.
 4. Que no hay otra máquina usando la misma IP.
-5. Que el PLC acepta conexiones desde el equipo del agente, no solo desde tu PC.
+5. Que el PLC acepta conexiones desde el equipo del colector, no solo desde tu PC.
 
 ### S7 absoluto (PUT/GET)
 
@@ -205,7 +205,7 @@ El histórico solo guarda tags activos, historizados y conectados. Revisa en ord
 5. **¿La frecuencia y la banda muerta son las adecuadas?** Un intervalo mínimo alto, una banda muerta grande
    o un disparo que nunca se cumple pueden dejar el histórico casi vacío.
 6. **¿La consulta incluye el periodo?** Revisa la hora de inicio y fin y la zona horaria. La app muestra la
-   hora local; el agente guarda UTC.
+   hora local; el colector guarda UTC.
 7. **¿La retención borró los datos?** Si la política es de 30 días, no hay nada de hace tres meses.
 8. **¿Hay espacio en disco?** Un disco lleno impide volcar. Mira el log y el espacio libre.
 9. **¿Se renombró el tag o el dispositivo?** Si no aceptaste el traslado del histórico, las muestras
@@ -224,8 +224,8 @@ de disco. No borres los ficheros `history-*.db` sin copiarlos antes.
   ventana en vivo solo conserva lo recibido desde que la app empezó a leer ese tag, como máximo una hora.
 - **Un panel muestra un error en una celda**: esa vista no se pudo cargar; las demás siguen. Corrige la vista
   o vuelve a añadirla.
-- **Un panel no muestra datos de otro agente**: las vistas y los paneles guardados pertenecen a un agente
-  concreto. Al cambiar de agente, los del anterior no aparecen; no se han perdido.
+- **Un panel no muestra datos de otro colector**: las vistas y los paneles guardados pertenecen a un colector
+  concreto. Al cambiar de colector, los del anterior no aparecen; no se han perdido.
 - **El zoom se mueve en todos los paneles**: **Sincronizar zoom** está activo. Desactívalo si quieres moverlos
   por separado.
 - **Cambios que no se ven**: pulsa **Guardar** en la vista o el panel. Cambiar el título o el rango no guarda
@@ -239,10 +239,10 @@ En la pestaña **OPC UA**, el estado y el detalle indican el motivo.
 
 - **Desactivado**: activa **Servidor OPC UA** y guarda.
 - **El puerto está ocupado**: otro programa usa `4840`. Cambia el puerto y abre el nuevo en el firewall.
-- **Error de certificado o de permisos**: revisa `opcua/` y los permisos de la carpeta del agente.
+- **Error de certificado o de permisos**: revisa `opcua/` y los permisos de la carpeta del colector.
 - **Error al crear la PKI**: en Linux, el servicio necesita escribir en `opcua/`; en Windows, revisa las ACL.
 
-El servidor OPC UA puede estar en **Error** sin tumbar al agente: la app y los PLC siguen funcionando.
+El servidor OPC UA puede estar en **Error** sin tumbar al colector: la app y los PLC siguen funcionando.
 
 ### El cliente no conecta
 
@@ -299,34 +299,34 @@ La CLI no forma parte de la release de escritorio actual; si la usas, compílala
 
 - **`command not found`**: no está en el `PATH` o no la has compilado.
 - **`Unauthenticated`**: falta `--token` o el token es antiguo.
-- **`Unavailable`**: URL, puerto o agente parado.
+- **`Unavailable`**: URL, puerto o colector parado.
 - **`PermissionDenied`**: estás usando el token de solo lectura para una orden que cambia algo.
-- **`Unimplemented`**: el agente es antiguo y no tiene esa orden. Actualízalo.
+- **`Unimplemented`**: el colector es antiguo y no tiene esa orden. Actualízalo.
 - **Código de salida 1**: error de conexión, lectura con calidad mala o escritura fallida. El mensaje de la
   CLI indica cuál.
 - **Código de salida 2**: argumentos inválidos o una confirmación cancelada.
 - **Código de salida 3**: escritura cancelada por el usuario.
 
-Para aislar un problema de driver, usa una orden directa contra el PLC (sin agente) y compárala con la orden
-a través del agente. Si la directa funciona y la del agente no, el problema está en la configuración del
-agente o en la red entre agente y PLC.
+Para aislar un problema de driver, usa una orden directa contra el PLC (sin colector) y compárala con la orden
+a través del colector. Si la directa funciona y la del colector no, el problema está en la configuración del
+colector o en la red entre colector y PLC.
 
 ## 14.10. Checklist de diagnóstico
 
-1. ¿La app está conectada al agente? Mira la barra superior y **Agentes > Estado**.
-2. ¿El agente es la versión esperada? **Estado** o `plcmon agent info`.
+1. ¿La app está conectada al colector? Mira la barra superior y **Colectores > Estado**.
+2. ¿El colector es la versión esperada? **Estado** o `plcmon agent info`.
 3. ¿El dispositivo está **Conectado**? Mira el detalle bajo el nombre.
 4. ¿El fallo es de un tag o de todos? Compara varios tags del mismo dispositivo.
 5. ¿La dirección pasa **Probar**? Si no, revisa sintaxis, tipo y permisos.
-6. ¿El log del agente muestra el mismo error? **Agentes > Ver log**.
-7. ¿La red permite el puerto? PLC `102`/`502`, agente `5311`, OPC UA `4840`.
+6. ¿El log del colector muestra el mismo error? **Colectores > Ver log**.
+7. ¿La red permite el puerto? PLC `102`/`502`, colector `5311`, OPC UA `4840`.
 8. ¿Cambió algo justo antes? IP, contraseña, firmware, configuración del PLC, actualización o firewall.
 9. ¿El problema es de escritura? Revisa las llaves y el valor.
 10. ¿El problema es del histórico? Revisa historización, conexión, periodo y retención.
 
 ## 14.11. Reiniciar, actualizar y reinstalar
 
-### Reiniciar el agente
+### Reiniciar el colector
 
 Linux:
 
@@ -342,12 +342,12 @@ Restart-Service PLCMonitorAgent
 Get-Service PLCMonitorAgent
 ```
 
-El agente vuelca el histórico al parar. Evita reiniciarlo en mitad de un turno si puedes esperar.
+El colector vuelca el histórico al parar. Evita reiniciarlo en mitad de un turno si puedes esperar.
 
 ### Actualizar
 
-Usa **Instalar / actualizar** en **Agentes**. Conserva configuración, histórico y, salvo que marques
-**Regenerar token y certificado**, las credenciales. Si el agente es muy antiguo y la app avisa de que no
+Usa **Instalar / actualizar** en **Colectores**. Conserva configuración, histórico y, salvo que marques
+**Regenerar token y certificado**, las credenciales. Si el colector es muy antiguo y la app avisa de que no
 admite una operación, actualízalo.
 
 ### Reinstalar sin perder datos
@@ -370,12 +370,12 @@ token. No borres `trends.json` ni `panels.json` si quieres conservar las vistas.
 
 Incluye:
 
-- versión de la app y del agente;
-- sistema operativo del agente y de la app;
+- versión de la app y del colector;
+- sistema operativo del colector y de la app;
 - driver y configuración del dispositivo, sin contraseñas;
 - nombre y dirección del tag, sin datos confidenciales;
 - texto exacto del error y hora aproximada;
-- últimas líneas del log del agente;
+- últimas líneas del log del colector;
 - qué cambió antes del fallo.
 
 **Nunca envíes** tokens, contraseñas, `agent.key`, `agent.pfx` ni copias de `agent.settings.json`. Si el log

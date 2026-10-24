@@ -12,7 +12,7 @@ dispositivo para abrir una vista.
 2. Pulsa **+** en **TENDENCIAS**.
 3. Escribe un **Nombre**.
 4. Elige el **Tipo de gráfica**.
-5. Elige los **Datos**: en vivo, histórico del agente o fichero CSV.
+5. Elige los **Datos**: en vivo, histórico del colector o fichero CSV.
 6. Ajusta las opciones del tipo: ventana, periodo, límites, barras, etc.
 7. Añade tags desde la lista de la derecha. Puedes buscar por dispositivo o tag y usar **Añadir todos**.
 8. Configura el **Disparo** si quieres ver solo ciertos tramos.
@@ -22,7 +22,7 @@ dispositivo para abrir una vista.
 La lista de la izquierda tiene dos secciones:
 
 - **PANELES**: rejillas con varias vistas. Se explican en [Paneles](08-paneles.md).
-- **TENDENCIAS**: vistas guardadas de este agente y vistas de CSV, que se pueden abrir sin conexión.
+- **TENDENCIAS**: vistas guardadas de este colector y vistas de CSV, que se pueden abrir sin conexión.
 
 Las vistas se guardan en `trends.json`, en la carpeta de datos de la app. Los paneles se guardan en
 `panels.json`, junto a ese fichero.
@@ -31,20 +31,20 @@ Las vistas se guardan en `trends.json`, en la carpeta de datos de la app. Los pa
 
 | Fuente | Qué muestra | Requisitos |
 |---|---|---|
-| **En vivo (lo que llega, última hora)** | Los valores que la app ha recibido desde que está abierta. | Agente conectado. |
-| **Histórico del agente** | Los valores guardados por el agente en el periodo elegido. | Tags historizados. |
+| **En vivo (lo que llega, última hora)** | Los valores que la app ha recibido desde que está abierta. | Colector conectado. |
+| **Histórico del colector** | Los valores guardados por el colector en el periodo elegido. | Tags historizados. |
 | **Fichero CSV exportado** | Los valores de un CSV del histórico. | Ninguno; se puede ver sin conexión. |
 
 La fuente **En vivo** no consulta el histórico. Si abres la app y creas la vista, empiezas a ver datos desde
 ese momento. La app guarda hasta una hora de valores por tag en memoria, así que una vista abierta después
 de un rato puede mostrar los últimos minutos, pero no lo anterior a abrir la app.
 
-La fuente **Histórico** consulta el agente al abrir la vista. La ventana es fija: los datos no cambian
+La fuente **Histórico** consulta el colector al abrir la vista. La ventana es fija: los datos no cambian
 mientras la miras. El botón **Actualizar** vuelve a consultar. Si un tag no se historiza, aparece en el
 aviso de tags que faltan.
 
 La fuente **CSV** lee un fichero exportado desde la pestaña Histórico. Sus tags son los del fichero, no los
-del agente. Los tags de texto se ignoran; las calidades malas dejan un hueco.
+del colector. Los tags de texto se ignoran; las calidades malas dejan un hueco.
 
 ## 7.3. La gráfica en vivo
 
@@ -67,7 +67,7 @@ Al abrir una vista en vivo:
   al portapapeles.
 
 La cabecera muestra el periodo del histórico o la ventana en vivo, cuántos puntos hay y cuándo se consultó.
-Si el agente ha recortado la respuesta, lo indica.
+Si el colector ha recortado la respuesta, lo indica.
 
 ## 7.4. Tipos de gráfica
 
@@ -183,7 +183,7 @@ deben estar historizados; si alguno no lo está, la app lo avisa y dibuja los de
 El disparo limita lo que se ve a los tramos en que otro tag cumple una condición.
 
 1. Marca **Mostrar solo mientras un tag cumpla una condición**.
-2. Elige el **Tag de disparo**. Puede ser cualquiera del agente, esté o no en la vista.
+2. Elige el **Tag de disparo**. Puede ser cualquiera del colector, esté o no en la vista.
 3. Si es booleano, elige **true** o **false**. Si no, elige la condición y escribe el **valor**.
 4. Indica **Antes del disparo**: segundos que se muestran antes de que se cumpla.
 5. Indica **Después**: segundos que se muestran tras dejar de cumplirse.
@@ -211,7 +211,7 @@ pone en rojo el valor.
 - **Borrar** elimina la vista. Si la vista está en un panel, sale del panel; el panel no se borra.
 - **Editar vista** vuelve del modo gráfico al formulario.
 
-Si cambias el nombre de un tag o lo quitas del agente, la vista conserva la referencia. Al abrirla, la app
+Si cambias el nombre de un tag o lo quitas del colector, la vista conserva la referencia. Al abrirla, la app
 avisa de que el tag no está disponible y dibuja los demás. Puedes editarla para sustituirlo.
 
 ## 7.8. Vistas de CSV
@@ -222,8 +222,8 @@ avisa de que el tag no está disponible y dibuja los demás. Puedes editarla par
 4. La lista de tags se llena con los tags del fichero.
 5. Elige los que quieras y abre la vista.
 
-Las vistas de CSV se pueden abrir sin estar conectado al agente. Se guardan en `trends.json` y aparecen en
-la lista de todos los perfiles, porque no dependen de un agente concreto. La fuente CSV no está disponible
+Las vistas de CSV se pueden abrir sin estar conectado al colector. Se guardan en `trends.json` y aparecen en
+la lista de todos los perfiles, porque no dependen de un colector concreto. La fuente CSV no está disponible
 para indicadores.
 
 ## 7.9. Buenas prácticas

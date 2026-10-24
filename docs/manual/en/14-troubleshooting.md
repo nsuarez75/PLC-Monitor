@@ -1,6 +1,6 @@
 # 14. Troubleshooting
 
-Failures in PLC-Monitor are usually in one of these layers: the app, the connection to the agent, the
+Failures in PLC-Monitor are usually in one of these layers: the app, the connection to the collector, the
 device, a specific tag, history, or the OPC UA server. Before changing things at random, identify
 the layer and look at the exact message.
 
@@ -8,30 +8,30 @@ the layer and look at the exact message.
 
 1. Note the time of the failure and the exact error text.
 2. Check whether it affects one tag, one device, the whole app, or only OPC UA.
-3. Do not restart the agent or the PLC without need: a restart erases clues and may interrupt production.
+3. Do not restart the collector or the PLC without need: a restart erases clues and may interrupt production.
 4. Do not delete history or the configuration “to test”.
 5. If the failure started after a change, think about what changed: network, password, firmware, address, update.
 
 The bottom bar of the app shows the result of the last operation. If the message is red, the operation
 was not completed.
 
-## 14.2. The app does not connect to the agent
+## 14.2. The app does not connect to the collector
 
 The app needs a correct URL, network, token, and, if the profile has one, the certificate thumbprint.
 
 | Message | Usual cause | What to do |
 |---|---|---|
-| **El certificado del agente en … no es el esperado** | The agent was reinstalled, changed computers, or its certificate changed. | Update the thumbprint in the profile or reinstall/renew. |
-| **El agente en … rechaza el token de acceso** | Token rotated, copied incorrectly, or from another agent. | Copy the current token or renew credentials. |
-| **No se puede conectar con el agente en …** | Service stopped, incorrect URL/port, firewall, or network. | Check the service, URL, and port. |
-| **El agente en … no responde a tiempo** | Slow network, computer overloaded or locked up. | Check the computer and the network; retry. |
-| **… no es un agente de PLC-Monitor (o es de otra versión)** | The URL points to another service or the agent is old. | Check the URL and update the agent. |
+| **El certificado del colector en … no es el esperado** | The collector was reinstalled, changed computers, or its certificate changed. | Update the thumbprint in the profile or reinstall/renew. |
+| **El colector en … rechaza el token de acceso** | Token rotated, copied incorrectly, or from another collector. | Copy the current token or renew credentials. |
+| **No se puede conectar con el colector en …** | Service stopped, incorrect URL/port, firewall, or network. | Check the service, URL, and port. |
+| **El colector en … no responde a tiempo** | Slow network, computer overloaded or locked up. | Check the computer and the network; retry. |
+| **… no es un colector de PLC-Monitor (o es de otra versión)** | The URL points to another service or the collector is old. | Check the URL and update the collector. |
 | **URL no válida: …** | The scheme is missing or the port is wrong. | Use `https://host:5311` or the profile URL. |
 
 Steps:
 
-1. Check that the agent is running. In **Agentes** (Agents), click **Estado** (Status).
-2. Check the profile URL. It must include `https://` if the agent was installed with TLS.
+1. Check that the collector is running. In **Colectores** (Collectors), click **Estado** (Status).
+2. Check the profile URL. It must include `https://` if the collector was installed with TLS.
 3. From the app computer, test the port:
 
    ```bash
@@ -45,16 +45,16 @@ Steps:
    ```
 
 4. If it does not respond, check the firewall, VLAN, routes, and VPN. The installer opens the port in the
-   agent firewall, but it cannot open an intermediate network firewall.
-5. If the agent is on the same computer, try `https://127.0.0.1:5311` with the correct profile. Do not mix
-   a profile with a pinned thumbprint with another agent.
+   collector firewall, but it cannot open an intermediate network firewall.
+5. If the collector is on the same computer, try `https://127.0.0.1:5311` with the correct profile. Do not mix
+   a profile with a pinned thumbprint with another collector.
 6. If the header shows **solo lectura** (read-only), the connection works: the token does not allow changing
    anything. This is intentional.
 
-When an already established connection is lost, the app shows “Conexión con el agente perdida… Reintentando”.
-You do not need to close the app; if it does not come back, check the agent and the network.
+When an already established connection is lost, the app shows “Conexión con el colector perdida… Reintentando”.
+You do not need to close the app; if it does not come back, check the collector and the network.
 
-## 14.3. The agent does not start or does not appear
+## 14.3. The collector does not start or does not appear
 
 ### Linux
 
@@ -75,29 +75,29 @@ And check `%ProgramFiles%\PLC-Monitor\agent\logs\`.
 
 Frequent causes:
 
-- **No token and listening on the network**: the agent does not start. The log says: “El agente escucha
+- **No token and listening on the network**: the collector does not start. The log says: “El colector escucha
   en … sin token de acceso”. Install it from the app or configure a token.
-- **Port in use**: change the agent port or free the one using it.
+- **Port in use**: change the collector port or free the one using it.
 
   ```bash
   ss -ltnp | grep 5311
   ```
 
-- **Invalid `agent.json`**: the agent cannot load the configuration. Restore the previous copy.
+- **Invalid `agent.json`**: the collector cannot load the configuration. Restore the previous copy.
 - **Passwords that do not decrypt**: `agent.key` is missing or is from another computer. Re-enter the
   passwords of the devices indicated by the log.
 - **Permissions**: on Linux, the service runs as `plcmon` and only writes to its folder. A file owned by
   another user or a history path outside the folder can prevent startup or logging.
-- **Disk full**: the agent and SQLite need space. Free up space or reduce retention.
+- **Disk full**: the collector and SQLite need space. Free up space or reduce retention.
 - **Executable blocked on Windows**: antivirus or indexer. Check the exclusion and update again.
 
 If the service is active but the app does not connect, check the listening address and the firewall. The
-agent may be listening only on `127.0.0.1` if it was started without the installed configuration.
+collector may be listening only on `127.0.0.1` if it was started without the installed configuration.
 
 ## 14.4. The device does not connect or is in the failure state
 
-The **En fallo** (Failed) status means that the agent could not open or maintain the connection. The
-detail under the device name usually indicates the cause. The agent retries on its own, with increasing
+The **En fallo** (Failed) status means that the collector could not open or maintain the connection. The
+detail under the device name usually indicates the cause. The collector retries on its own, with increasing
 wait; you do not need to restart it for each attempt. If the device is **Desactivado** (Disabled), enable
 it: it is not a failure.
 
@@ -107,7 +107,7 @@ Check first:
 2. That the IP or device name is correct.
 3. That the port is not blocked by a firewall or by a switch with an ACL.
 4. That no other machine is using the same IP.
-5. That the PLC accepts connections from the agent computer, not only from your PC.
+5. That the PLC accepts connections from the collector computer, not only from your PC.
 
 ### Absolute S7 (PUT/GET)
 
@@ -198,7 +198,7 @@ History only stores tags that are active, recorded to history, and connected. Ch
 1. **Is the historian active?** In the app, the tag details warn if it is disabled. In the CLI:
 
    ```bash
-   plcmon agent info
+   plcmon collector info
    ```
 
 2. **Is the tag recorded to history?** The history icon must appear in the row and **Histórico** (History)
@@ -208,7 +208,7 @@ History only stores tags that are active, recorded to history, and connected. Ch
 5. **Are the frequency and deadband adequate?** A high minimum interval, a large deadband, or a trigger
    that is never met can leave history almost empty.
 6. **Does the query include the period?** Check the start and end time and the time zone. The app shows
-   local time; the agent stores UTC.
+   local time; the collector stores UTC.
 7. **Did retention delete the data?** If the policy is 30 days, there is nothing from three months ago.
 8. **Is there disk space?** A full disk prevents flushing. Look at the log and the free space.
 9. **Was the tag or device renamed?** If you did not accept the history transfer, old samples remain under
@@ -227,8 +227,8 @@ If history was working and stopped after a cut, check the log for SQLite or disk
   window only keeps what was received since the app started reading that tag, at most one hour.
 - **A panel shows an error in one cell**: that view could not be loaded; the others continue. Fix the view
   or add it again.
-- **A panel does not show data from another agent**: the saved views and panels belong to a specific agent.
-  When you switch agents, the previous ones do not appear; they have not been lost.
+- **A panel does not show data from another collector**: the saved views and panels belong to a specific collector.
+  When you switch collectors, the previous ones do not appear; they have not been lost.
 - **Zoom moves in all panels**: **Sincronizar zoom** (Synchronize zoom) is active. Disable it if you want to
   move them separately.
 - **Changes that are not visible**: click **Guardar** (Save) in the view or panel. Changing the title or
@@ -244,11 +244,11 @@ In the **OPC UA** tab, the status and the details indicate the reason.
 - **El puerto está ocupado** (The port is in use): another program uses `4840`. Change the port and open the
   new one in the firewall.
 - **Error de certificado o de permisos** (Certificate or permission error): check `opcua/` and the
-  permissions of the agent folder.
+  permissions of the collector folder.
 - **Error al crear la PKI** (Error creating the PKI): on Linux, the service needs to write to `opcua/`; on
   Windows, check the ACLs.
 
-The OPC UA server can be in **Error** without taking down the agent: the app and the PLCs keep working.
+The OPC UA server can be in **Error** without taking down the collector: the app and the PLCs keep working.
 
 ### The client does not connect
 
@@ -305,34 +305,34 @@ The CLI is not part of the current desktop release; if you use it, build it as e
 
 - **`command not found`**: it is not in the `PATH` or you have not built it.
 - **`Unauthenticated`**: `--token` is missing or the token is old.
-- **`Unavailable`**: URL, port, or agent stopped.
+- **`Unavailable`**: URL, port, or collector stopped.
 - **`PermissionDenied`**: you are using the read-only token for a command that changes something.
-- **`Unimplemented`**: the agent is old and does not have that command. Update it.
+- **`Unimplemented`**: the collector is old and does not have that command. Update it.
 - **Exit code 1**: connection error, read with bad quality, or failed write. The CLI message indicates
   which.
 - **Exit code 2**: invalid arguments or a canceled confirmation.
 - **Exit code 3**: write canceled by the user.
 
-To isolate a driver problem, use a direct command against the PLC (without an agent) and compare it with
-the command through the agent. If the direct one works and the agent one does not, the problem is in the
-agent configuration or in the network between agent and PLC.
+To isolate a driver problem, use a direct command against the PLC (without a collector) and compare it with
+the command through the collector. If the direct one works and the collector one does not, the problem is in the
+collector configuration or in the network between collector and PLC.
 
 ## 14.10. Diagnostics checklist
 
-1. Is the app connected to the agent? Look at the top bar and **Agentes > Estado**.
-2. Is the agent the expected version? **Estado** or `plcmon agent info`.
+1. Is the app connected to the collector? Look at the top bar and **Colectores > Estado**.
+2. Is the collector the expected version? **Estado** or `plcmon agent info`.
 3. Is the device **Conectado** (Connected)? Look at the detail under the name.
 4. Is the failure on one tag or on all? Compare several tags on the same device.
 5. Does the address pass **Probar** (Test)? If not, check syntax, type, and permissions.
-6. Does the agent log show the same error? **Agentes > Ver log** (View log).
-7. Does the network allow the port? PLC `102`/`502`, agent `5311`, OPC UA `4840`.
+6. Does the collector log show the same error? **Colectores > Ver log** (View log).
+7. Does the network allow the port? PLC `102`/`502`, collector `5311`, OPC UA `4840`.
 8. Did something change just before? IP, password, firmware, PLC configuration, update, or firewall.
 9. Is the problem with writing? Check the keys and the value.
 10. Is the problem with history? Check history recording, connection, period, and retention.
 
 ## 14.11. Restart, update, and reinstall
 
-### Restart the agent
+### Restart the collector
 
 Linux:
 
@@ -348,13 +348,13 @@ Restart-Service PLCMonitorAgent
 Get-Service PLCMonitorAgent
 ```
 
-The agent flushes history when it stops. Avoid restarting it in the middle of a shift if you can wait.
+The collector flushes history when it stops. Avoid restarting it in the middle of a shift if you can wait.
 
 ### Update
 
-Use **Instalar / actualizar** (Install / update) in **Agentes**. It preserves the configuration, history,
+Use **Instalar / actualizar** (Install / update) in **Colectores**. It preserves the configuration, history,
 and, unless you check **Regenerar token y certificado** (Regenerate token and certificate), the
-credentials. If the agent is very old and the app warns that it does not support an operation, update it.
+credentials. If the collector is very old and the app warns that it does not support an operation, update it.
 
 ### Reinstall without losing data
 
@@ -376,12 +376,12 @@ in the profiles, also rename `agents.json`, but you will have to re-enter the UR
 
 Include:
 
-- app and agent version;
-- agent and app operating system;
+- app and collector version;
+- collector and app operating system;
 - device driver and configuration, without passwords;
 - tag name and address, without confidential data;
 - exact error text and approximate time;
-- last lines of the agent log;
+- last lines of the collector log;
 - what changed before the failure.
 
 **Never send** tokens, passwords, `agent.key`, `agent.pfx`, or copies of `agent.settings.json`. If the log

@@ -295,7 +295,7 @@ public sealed partial class HistoryViewModel(IAgentContext context, Func<DeviceV
         }
         catch (RpcException ex) when (ex.StatusCode == StatusCode.Unimplemented)
         {
-            context.Report(Loc.T("Este agente no sabe borrar histórico: actualízalo desde «Agentes» (Instalar / actualizar)."), isError: true);
+            context.Report(Loc.T("Este colector no sabe borrar histórico: actualízalo desde «Colectores» (Instalar / actualizar)."), isError: true);
             return;
         }
         catch (RpcException ex)

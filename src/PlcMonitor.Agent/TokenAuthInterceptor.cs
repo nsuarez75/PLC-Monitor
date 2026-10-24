@@ -62,7 +62,7 @@ public sealed class TokenAuthInterceptor(IOptions<AgentSecurityOptions> options,
         if (caller is null)
         {
             logger.LogWarning("Llamada rechazada sin token válido desde {Peer} ({Method})", context.Peer, context.Method);
-            throw new RpcException(new Status(StatusCode.Unauthenticated, "Token de acceso al agente ausente o incorrecto."));
+            throw new RpcException(new Status(StatusCode.Unauthenticated, "Token de acceso al colector ausente o incorrecto."));
         }
         context.UserState[AgentCaller.Key] = caller;
         var method = context.Method[(context.Method.LastIndexOf('/') + 1)..];

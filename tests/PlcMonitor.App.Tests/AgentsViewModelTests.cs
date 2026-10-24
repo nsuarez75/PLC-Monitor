@@ -106,10 +106,10 @@ public sealed class AgentsViewModelTests : IDisposable
         profile.InstalledAt.ShouldNotBeNull();
         agents.SshPassword.ShouldBeEmpty();
         agents.Log.ShouldContain(l => l.StartsWith("Huella SSH del equipo", StringComparison.Ordinal));
-        agents.Log.ShouldContain("Agente en marcha: https://192.168.0.20:5311");
+        agents.Log.ShouldContain("Colector en marcha: https://192.168.0.20:5311");
         agents.Log.Last().ShouldBe("✔ Hecho");
         _targets.ShouldHaveSingleItem().ShouldBe(new SshTarget("192.168.0.20", 22, "tecnico", "clave"));
-        main.Message.ShouldContain("Agente instalado en 192.168.0.20");
+        main.Message.ShouldContain("Colector instalado en 192.168.0.20");
 
         var reloaded = AgentProfileStore.Load(ProfilesPath).Single(p => p.Id == profile.Id);
         reloaded.Token.ShouldBe(profile.Token);
@@ -119,7 +119,7 @@ public sealed class AgentsViewModelTests : IDisposable
         agents.SshPassword = "clave";
         await agents.StatusCommand.ExecuteAsync(null);
         _targets[1].ExpectedHostKey.ShouldBe("huella-ssh");
-        agents.Log.ShouldContain("El agente está en marcha desde hoy.");
+        agents.Log.ShouldContain("El colector está en marcha desde hoy.");
     }
 
     [Fact]
@@ -145,7 +145,7 @@ public sealed class AgentsViewModelTests : IDisposable
         agents.Log[0].ShouldBe("Instalando: en este equipo (sin SSH)…");
         agents.Log.ShouldContain("Pidiendo permiso de administrador (ventana del sistema)…");
         agents.Log.Last().ShouldBe("✔ Hecho");
-        main.Message.ShouldContain("Agente instalado en este equipo");
+        main.Message.ShouldContain("Colector instalado en este equipo");
         agents.Info.ShouldStartWith("Este equipo");
         AgentProfileStore.Load(ProfilesPath).Single(p => p.Id == profile.Id).LocalMachine.ShouldBeTrue();
     }
@@ -269,7 +269,7 @@ public sealed class AgentsViewModelTests : IDisposable
         await agents.UninstallCommand.ExecuteAsync(null);
         agents.Selected!.Token.ShouldBeNull();
         agents.Selected.InstalledAt.ShouldBeNull();
-        agents.Log.ShouldContain("Agente desinstalado");
+        agents.Log.ShouldContain("Colector desinstalado");
     }
 
     [Fact]
@@ -423,7 +423,7 @@ public sealed class AgentsViewModelTests : IDisposable
         main.Agents!.Selected = main.Profiles.Single(p => p.Name == "Contenedor");
         main.Agents.SshPassword = Env("PLCMON_IT_SSH_PASSWORD") ?? "";
         await main.Agents.UninstallCommand.ExecuteAsync(null);
-        main.Agents.Log.ShouldContain("Agente desinstalado");
+        main.Agents.Log.ShouldContain("Colector desinstalado");
     }
 
     public void Dispose() => Directory.Delete(_dir, recursive: true);

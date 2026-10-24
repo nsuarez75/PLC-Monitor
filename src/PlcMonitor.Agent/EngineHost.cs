@@ -55,7 +55,7 @@ public sealed class EngineHost(IOptions<AgentOptions> options, DriverRegistry re
         else
         {
             configuration = new AgentConfiguration();
-            logger.LogWarning("No existe {Path}: el agente arranca sin dispositivos", ConfigPath);
+            logger.LogWarning("No existe {Path}: el colector arranca sin dispositivos", ConfigPath);
         }
 
         _engine = new TagEngine(configuration, registry, loggerFactory);

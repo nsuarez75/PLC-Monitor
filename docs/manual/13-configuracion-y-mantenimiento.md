@@ -14,7 +14,7 @@ La app guarda sus datos en la carpeta de configuración del usuario:
 | Fichero | Contenido |
 |---|---|
 | `app.json` | Tema, última conexión y preferencias. |
-| `agents.json` | Perfiles de agente, URL y token protegido. |
+| `agents.json` | Perfiles de colector, URL y token protegido. |
 | `trends.json` | Vistas de tendencia guardadas. |
 | `panels.json` | Paneles y distribución de vistas. |
 
@@ -25,7 +25,7 @@ En Windows el token se protege con DPAPI del usuario. Una copia restaurada con o
 podrá descifrarlo: vuelve a introducir el token. En Linux el fichero tiene permisos `600`, pero el token no
 va cifrado con una clave del sistema; protege la copia.
 
-## 13.2. Ficheros del agente
+## 13.2. Ficheros del colector
 
 Rutas por defecto:
 
@@ -49,7 +49,7 @@ tener modo `600`; en Windows solo el servicio y los administradores deben poder 
 
 El servicio Linux se ejecuta con `ProtectSystem=strict`, `ProtectHome=true` y solo puede escribir dentro de
 `/opt/plc-monitor/agent`. Si configuras un `historian.path` absoluto fuera de esa carpeta, el historiador no
-podrá escribir. Usa una ruta relativa o dentro de la carpeta del agente.
+podrá escribir. Usa una ruta relativa o dentro de la carpeta del colector.
 
 ## 13.3. agent.json
 
@@ -81,7 +81,7 @@ Los nombres que escribe la app son camelCase. El fichero admite comentarios y co
 
 - `enabled`: activa o desactiva el registro. Si está desactivado, los tags conservan su configuración pero
   no se guarda nada.
-- `path`: carpeta de los ficheros, relativa a la carpeta del agente salvo que sea absoluta.
+- `path`: carpeta de los ficheros, relativa a la carpeta del colector salvo que sea absoluta.
 - `retentionDays`: días que se conservan las muestras. `0` significa sin límite.
 - `flushIntervalMs`: cada cuánto se vuelcan las muestras acumuladas. Un valor bajo protege mejor frente a
   un corte, pero escribe más en disco.
@@ -93,7 +93,7 @@ servicio parado.
 
 ### Editar a mano
 
-Hazlo con el agente parado o reinícialo justo después. Si la app guarda un cambio mientras tienes el fichero
+Hazlo con el colector parado o reinícialo justo después. Si la app guarda un cambio mientras tienes el fichero
 abierto, puede sobrescribir tu edición. Antes de editar:
 
 ```bash
@@ -108,7 +108,7 @@ Stop-Service PLCMonitorAgent
 Copy-Item "$env:ProgramFiles\PLC-Monitor\agent\agent.json" "$env:ProgramFiles\PLC-Monitor\agent\agent.json.bak"
 ```
 
-Después valida el JSON, arranca el servicio y comprueba que aparece en la app. Si el agente no arranca,
+Después valida el JSON, arranca el servicio y comprueba que aparece en la app. Si el colector no arranca,
 restaura la copia.
 
 No edites `agent.key` ni cambies las contraseñas cifradas a mano. Si necesitas cambiar una contraseña,
@@ -174,7 +174,7 @@ Y, si quieres conservar la configuración de la app, `app.json`, `agents.json`, 
 **Importante**: `Conservar agent.json al desinstalar` guarda solo `agent.json` y `agent.key`. No guarda el
 histórico, el certificado ni los clientes OPC UA. Si quieres conservarlos, haz una copia completa antes.
 
-### Cómo copiar el agente
+### Cómo copiar el colector
 
 Para que SQLite y el historiador estén consistentes, para el servicio antes de copiar.
 
@@ -197,7 +197,7 @@ Start-Service PLCMonitorAgent
 ```
 
 Comprueba que la copia contiene `agent.json`, `agent.key`, `agent.settings.json`, `agent.pfx` y la carpeta
-`history/`. Si el agente estaba en marcha, puede haber ficheros `-wal` y `-shm`: inclúyelos; forman parte de
+`history/`. Si el colector estaba en marcha, puede haber ficheros `-wal` y `-shm`: inclúyelos; forman parte de
 la base de datos.
 
 ### Restaurar
@@ -223,7 +223,7 @@ sudo systemctl start plcmon-agent
 Windows: restaura la carpeta con el servicio parado y vuelve a aplicarle las ACL restringidas a
 `agent.settings.json` y `agent.pfx`.
 
-La copia contiene secretos. Guárdala cifrada, con acceso limitado y fuera del equipo del agente. No la
+La copia contiene secretos. Guárdala cifrada, con acceso limitado y fuera del equipo del colector. No la
 subas a un repositorio ni a un almacenamiento público.
 
 ### Copia de la app
@@ -235,7 +235,7 @@ Cierra la app y copia la carpeta completa. Para restaurar en otro equipo:
 
 ## 13.6. Actualizaciones
 
-**Instalar / actualizar** en la pestaña **Agentes** sustituye el ejecutable y conserva, por defecto:
+**Instalar / actualizar** en la pestaña **Colectores** sustituye el ejecutable y conserva, por defecto:
 
 - `agent.json` y `agent.key`;
 - `agent.settings.json` y `agent.pfx`, si no marcas **Regenerar token y certificado**;
@@ -257,7 +257,7 @@ Cualquier script o cliente que usara el token anterior fallará. Actualízalo.
 
 Después de actualizar:
 
-- comprueba que el agente está **Conectado**;
+- comprueba que el colector está **Conectado**;
 - revisa que los dispositivos están **Conectados**;
 - abre el histórico y una tendencia;
 - si usas OPC UA, comprueba que el servidor está activo y que los clientes conectan;
@@ -300,7 +300,7 @@ Los ficheros se llaman `plcmon-agent-AAAAMMDD.log`.
 
 ### Windows
 
-El agente escribe en `%ProgramFiles%\PLC-Monitor\agent\logs\`, un fichero por día, con retención de 7 días
+El colector escribe en `%ProgramFiles%\PLC-Monitor\agent\logs\`, un fichero por día, con retención de 7 días
 por defecto. El Visor de eventos solo recibe avisos y errores. La app puede mostrar las últimas líneas con
 **Ver log**.
 
@@ -317,7 +317,7 @@ por defecto. El Visor de eventos solo recibe avisos y errores. La app puede most
 
 ### Cada día
 
-- Comprueba que el agente y los dispositivos están conectados.
+- Comprueba que el colector y los dispositivos están conectados.
 - Revisa si hay tags en **Bad** o dispositivos en **En fallo**.
 - Mira que el histórico reciente tiene datos.
 
@@ -334,7 +334,7 @@ por defecto. El Visor de eventos solo recibe avisos y errores. La app puede most
 - Revisa la retención del histórico y el espacio que ocupa.
 - Revisa usuarios y certificados OPC UA; elimina los que ya no se usen.
 - Comprueba actualizaciones disponibles.
-- Revisa que el reloj del agente y del PLC está sincronizado.
+- Revisa que el reloj del colector y del PLC está sincronizado.
 
 ### Cada año o ante un cambio
 
@@ -344,10 +344,10 @@ por defecto. El Visor de eventos solo recibe avisos y errores. La app puede most
   cambio de nombre obliga a renovarlo.
 - Revisa el procedimiento de respuesta a incidentes.
 
-## 13.9. Mover el agente a otro equipo
+## 13.9. Mover el colector a otro equipo
 
-1. Para el agente antiguo y haz una copia completa.
-2. Instala el agente en el equipo nuevo desde la app. Se generan token y certificado nuevos.
+1. Para el colector antiguo y haz una copia completa.
+2. Instala el colector en el equipo nuevo desde la app. Se generan token y certificado nuevos.
 3. Para el servicio nuevo.
 4. Copia `agent.json`, `agent.key` y `history/`. Ajusta propietario y permisos.
 5. Arranca el servicio.
@@ -360,8 +360,8 @@ Si cambia el nombre del host, el certificado puede no validar.
 
 ## 13.10. Desinstalar
 
-Desde **Agentes**, **Desinstalar** detiene el servicio, elimina las reglas de firewall y borra la carpeta del
-agente.
+Desde **Colectores**, **Desinstalar** detiene el servicio, elimina las reglas de firewall y borra la carpeta del
+colector.
 
 Si marcas **Conservar agent.json al desinstalar**, se guardan copias de `agent.json` y `agent.key` en:
 

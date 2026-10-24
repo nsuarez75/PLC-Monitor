@@ -368,7 +368,7 @@ public sealed class ChartKindsTests : IDisposable
         // Sin conexión no se puede leer el histórico.
         await trends.OpenCommand.ExecuteAsync(null);
         trends.Live.ShouldBeNull();
-        trends.KindError.ShouldBe("Conéctate al agente para leer su histórico.");
+        trends.KindError.ShouldBe("Conéctate al colector para leer su histórico.");
 
         // Los indicadores son el valor actual: siempre en vivo.
         trends.Kind = ChartKindChoice.For(ChartKind.Gauges);

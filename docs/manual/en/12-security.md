@@ -8,32 +8,32 @@ what you should review before leaving the system in production.
 
 | Asset | Risk | Main protection |
 |---|---|---|
-| The agent API | Anyone on the network could read or write. | Token + TLS + firewall. |
+| The collector API | Anyone on the network could read or write. | Token + TLS + firewall. |
 | PLC credentials | Theft of S7 passwords. | Encrypted with `agent.key`. |
 | History | Leak of production data. | System permissions and token. |
 | The OPC UA server | Unauthorized read or write. | Users, certificates, and three keys. |
 | Writes | Unwanted movement of a machine. | Three keys and audit. |
-| App profiles | Theft of an agent token. | DPAPI or user permissions. |
+| App profiles | Theft of a collector token. | DPAPI or user permissions. |
 
 There is no multiuser authentication inside the app. Anyone who has the profile with the full token can do
 everything that token allows. Real separation is achieved with tokens, operating system accounts, and the
 network.
 
-## 12.2. The agent API
+## 12.2. The collector API
 
 ### Token
 
-The agent requires a token on every call if one is configured. There are two:
+The collector requires a token on every call if one is configured. There are two:
 
 - **Full token**: read, write, configure, record to history, delete, and administer OPC UA.
 - **Read-only token**: read, browse, subscribe, and query history. It cannot write or change
   configuration.
 
-The agent does not store the token in plaintext. It stores its SHA-256 hash. The app sends the token as
-`Authorization: Bearer ...` and the agent compares the hash.
+The collector does not store the token in plaintext. It stores its SHA-256 hash. The app sends the token as
+`Authorization: Bearer ...` and the collector compares the hash.
 
-Without a token, the agent can only listen on `127.0.0.1`, `::1`, or `localhost`. If you try to expose it to
-the network without a token, the agent does not start. This is a deliberate protection: an unauthenticated
+Without a token, the collector can only listen on `127.0.0.1`, `::1`, or `localhost`. If you try to expose it to
+the network without a token, the collector does not start. This is a deliberate protection: an unauthenticated
 API on the network lets anyone who reaches the port write to the PLC.
 
 ### TLS
@@ -59,7 +59,7 @@ leaked, renew it and review the logs.
 
 ## 12.3. SSH
 
-Remote installation uses SSH to copy the agent and create the service.
+Remote installation uses SSH to copy the collector and create the service.
 
 - The first connection shows the SSH server thumbprint. Verify it before accepting it. The app pins it in
   the profile.
@@ -113,7 +113,7 @@ The OPC UA server:
 - applies the three write keys.
 
 The thumbprint shown on the **OPC UA** tab is that of the server certificate, normally SHA-1, which is what
-clients such as UaExpert or Ignition show. Do not confuse it with the SHA-256 thumbprint of the agent TLS
+clients such as UaExpert or Ignition show. Do not confuse it with the SHA-256 thumbprint of the collector TLS
 certificate that the app uses.
 
 Best practices:
@@ -139,7 +139,7 @@ Views and panels do not contain secrets, but they do contain device and tag name
 
 ## 12.8. Audit and logs
 
-The agent writes to the `PlcMonitor.Audit` logger:
+The collector writes to the `PlcMonitor.Audit` logger:
 
 - writes;
 - enabling and disabling devices;
@@ -154,7 +154,7 @@ The declared user cannot be verified; what is verified is the token.
 Where to find them:
 
 - **Linux**: `journalctl -u plcmon-agent`. The app can show the last lines with **Ver log** (View log).
-- **Windows**: agent `logs\` folder, one file per day. The default retention is 7 days.
+- **Windows**: collector `logs\` folder, one file per day. The default retention is 7 days.
 - **App**: bottom bar messages and operation errors.
 
 Logs must not include tokens or passwords. If you are going to send a log to support, check that it does not
@@ -162,28 +162,28 @@ contain plant names, IPs, or data you do not want to share.
 
 ## 12.9. Network
 
-- Install the agent on a segmented industrial network, not on the office network without controls.
+- Install the collector on a segmented industrial network, not on the office network without controls.
 - Open only the necessary ports: `5311/tcp` for the app and `4840/tcp` for OPC UA.
 - Do not expose `5310/tcp`, `5311/tcp`, or `4840/tcp` to the Internet.
 - If you need remote access, use a VPN or a controlled jump host.
 - Limit the app and OPC UA clients by firewall to the computers that really need them.
 - Separate the PLC network from the management network when possible.
-- Review which computers can reach the PLC; the agent is not the only path.
+- Review which computers can reach the PLC; the collector is not the only path.
 
 ## 12.10. Checklist
 
 Before leaving an installation in production:
 
-- [ ] The agent is installed with TLS and a token, not with the local configuration without a token.
+- [ ] The collector is installed with TLS and a token, not with the local configuration without a token.
 - [ ] The full token is stored in a secret manager, not in an email or a chat.
 - [ ] There is a read-only token for those who only query.
-- [ ] The agent certificate thumbprint is pinned in the profile.
+- [ ] The collector certificate thumbprint is pinned in the profile.
 - [ ] The SSH server thumbprint was verified during installation.
 - [ ] `agent.key`, `agent.json`, `agent.settings.json`, and `agent.pfx` have restricted permissions.
 - [ ] Writes are disabled by default and are only enabled where needed.
 - [ ] OPC UA does not allow anonymous access and accepted clients have been reviewed.
 - [ ] The firewall only opens the necessary ports.
-- [ ] The agent and PLC clocks are synchronized.
+- [ ] The collector and PLC clocks are synchronized.
 - [ ] There is a backup of the configuration and history.
 - [ ] You know how to renew credentials and where the logs are.
 
@@ -191,12 +191,12 @@ Before leaving an installation in production:
 
 1. Disable writes on the device and in OPC UA.
 2. Stop the OPC UA server if it is not needed.
-3. Renew the agent token and certificate.
+3. Renew the collector token and certificate.
 4. Change the OPC UA passwords and any stored PLC credentials.
 5. Review the accepted OPC UA clients and remove unknown ones.
 6. Review the audit and the system logs.
 7. Check the configuration of devices and tags: someone with the full token may have changed it.
-8. If the agent computer is compromised, do not trust its files: reinstall and restore only what you have
+8. If the collector computer is compromised, do not trust its files: reinstall and restore only what you have
    verified.
 
 ## Next step

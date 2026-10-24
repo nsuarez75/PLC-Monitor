@@ -111,10 +111,10 @@ public sealed partial class AgentsViewModel : LocalizedObservableObject
     public bool ShowSudoPassword => !LocalMachine || !OperatingSystem.IsWindows();
 
     public string MachineHelp => !LocalMachine
-        ? Loc.T("Para instalar, actualizar o desinstalar el agente. Linux (con sudo) o Windows con OpenSSH (usuario administrador).")
+        ? Loc.T("Para instalar, actualizar o desinstalar el colector. Linux (con sudo) o Windows con OpenSSH (usuario administrador).")
         : OperatingSystem.IsWindows()
-            ? Loc.T("El agente se instala en este equipo como servicio de Windows. Windows pedirá permiso de administrador (UAC).")
-            : Loc.T("El agente se instala en este equipo como servicio systemd. Si no indicas la contraseña de sudo, se pedirá con la ventana del sistema.");
+            ? Loc.T("El colector se instala en este equipo como servicio de Windows. Windows pedirá permiso de administrador (UAC).")
+            : Loc.T("El colector se instala en este equipo como servicio systemd. Si no indicas la contraseña de sudo, se pedirá con la ventana del sistema.");
 
     public string SudoPlaceholder => Loc.T(LocalMachine ? "vacía: la pide el sistema" : "solo si es distinta");
 
@@ -152,7 +152,7 @@ public sealed partial class AgentsViewModel : LocalizedObservableObject
     [RelayCommand]
     private void New()
     {
-        var profile = new AgentProfile { Name = Loc.T("Nuevo agente"), Url = "", SshUser = Environment.UserName };
+        var profile = new AgentProfile { Name = Loc.T("Nuevo colector"), Url = "", SshUser = Environment.UserName };
         Profiles.Add(profile);
         Selected = profile;
     }
@@ -167,7 +167,7 @@ public sealed partial class AgentsViewModel : LocalizedObservableObject
         Apply(profile);
         _main.SaveProfiles();
         RefreshSelected();
-        _main.Report(Loc.F("Agente «{0}» guardado", profile.Name));
+        _main.Report(Loc.F("Colector «{0}» guardado", profile.Name));
     }
 
     [RelayCommand]
@@ -175,7 +175,7 @@ public sealed partial class AgentsViewModel : LocalizedObservableObject
     {
         if (Selected is not { } profile)
             return;
-        if (!await _main.Dialogs.ConfirmAsync(Loc.T("Quitar agente"), Loc.F("¿Quitar «{0}» de la lista?\nNo se desinstala nada del equipo.", profile.Name)))
+        if (!await _main.Dialogs.ConfirmAsync(Loc.T("Quitar colector"), Loc.F("¿Quitar «{0}» de la lista?\nNo se desinstala nada del equipo.", profile.Name)))
             return;
         Profiles.Remove(profile);
         if (_main.SelectedProfile == profile)
@@ -210,7 +210,7 @@ public sealed partial class AgentsViewModel : LocalizedObservableObject
         profile.InstalledAt = DateTimeOffset.Now;
         RegenerateCredentials = false;
         ShowReadOnlyToken(result.ReadOnlyToken);
-        _main.Report(Loc.F("Agente instalado en {0} ({1})", TargetName, result.Url));
+        _main.Report(Loc.F("Colector instalado en {0} ({1})", TargetName, result.Url));
     });
 
     /// <summary>
@@ -221,7 +221,7 @@ public sealed partial class AgentsViewModel : LocalizedObservableObject
     private async Task RenewCredentialsAsync()
     {
         if (!await _main.Dialogs.ConfirmAsync(Loc.T("Renovar credenciales"),
-                Loc.F("¿Renovar el token y el certificado del agente de {0}?\nLos anteriores dejan de valer: los demás equipos y la CLI que los usen perderán el acceso.", TargetName)
+                Loc.F("¿Renovar el token y el certificado del colector de {0}?\nLos anteriores dejan de valer: los demás equipos y la CLI que los usen perderán el acceso.", TargetName)
                 + (CreateReadOnlyToken ? Loc.T("\nSe crea un token de solo lectura nuevo.") : Loc.T("\nSi había token de solo lectura, también deja de valer."))))
             return;
         await RunSshAsync(Loc.T("Renovando credenciales"), async (deployer, profile, ct) =>
@@ -236,7 +236,7 @@ public sealed partial class AgentsViewModel : LocalizedObservableObject
             profile.CertificateThumbprint = result.CertificateThumbprint;
             ShowReadOnlyToken(result.ReadOnlyToken);
             CreateReadOnlyToken = false;
-            _main.Report(Loc.F("Credenciales del agente de {0} renovadas", TargetName));
+            _main.Report(Loc.F("Credenciales del colector de {0} renovadas", TargetName));
         });
     }
 
@@ -254,9 +254,9 @@ public sealed partial class AgentsViewModel : LocalizedObservableObject
     {
         var status = await deployer.GetStatusAsync(ct);
         profile.Platform = status.Platform.Description;
-        AddLog(!status.Installed ? Loc.T("El agente no está instalado en este equipo.")
-            : status.Running ? Loc.F("El agente está en marcha{0}.", status.Since is null ? "" : Loc.F(" desde {0}", status.Since))
-            : Loc.F("El agente está instalado pero no en marcha (estado: {0}).", status.ServiceState));
+        AddLog(!status.Installed ? Loc.T("El colector no está instalado en este equipo.")
+            : status.Running ? Loc.F("El colector está en marcha{0}.", status.Since is null ? "" : Loc.F(" desde {0}", status.Since))
+            : Loc.F("El colector está instalado pero no en marcha (estado: {0}).", status.ServiceState));
     });
 
     [RelayCommand(CanExecute = nameof(CanUseSsh))]
@@ -270,8 +270,8 @@ public sealed partial class AgentsViewModel : LocalizedObservableObject
     [RelayCommand(CanExecute = nameof(CanUseSsh))]
     private async Task UninstallAsync()
     {
-        if (!await _main.Dialogs.ConfirmAsync(Loc.T("Desinstalar agente"),
-                Loc.F("¿Desinstalar el agente de {0}?\nSe para el servicio y se borran sus ficheros{1}.", TargetName, KeepConfiguration ? Loc.T(" (se guarda una copia de agent.json)") : "")))
+        if (!await _main.Dialogs.ConfirmAsync(Loc.T("Desinstalar colector"),
+                Loc.F("¿Desinstalar el colector de {0}?\nSe para el servicio y se borran sus ficheros{1}.", TargetName, KeepConfiguration ? Loc.T(" (se guarda una copia de agent.json)") : "")))
             return;
         await RunSshAsync(Loc.T("Desinstalando"), async (deployer, profile, ct) =>
         {
@@ -279,7 +279,7 @@ public sealed partial class AgentsViewModel : LocalizedObservableObject
             profile.InstalledAt = null;
             profile.Token = null;
             profile.CertificateThumbprint = null;
-            _main.Report(Loc.F("Agente desinstalado de {0}", TargetName));
+            _main.Report(Loc.F("Colector desinstalado de {0}", TargetName));
         });
     }
 

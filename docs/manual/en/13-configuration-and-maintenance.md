@@ -14,7 +14,7 @@ The app stores its data in the user's configuration folder:
 | File | Content |
 |---|---|
 | `app.json` | Theme, last connection, and preferences. |
-| `agents.json` | Agent profiles, URL, and protected token. |
+| `agents.json` | Collector profiles, URL, and protected token. |
 | `trends.json` | Saved trend views. |
 | `panels.json` | Panels and view layout. |
 
@@ -25,7 +25,7 @@ On Windows the token is protected with the user's DPAPI. A backup restored under
 not be able to decrypt it: enter the token again. On Linux the file has `600` permissions, but the token is
 not encrypted with a system key; protect the backup.
 
-## 13.2. Agent files
+## 13.2. Collector files
 
 Default paths:
 
@@ -49,7 +49,7 @@ The first four files are secrets or contain secrets. On Linux they must belong t
 
 The Linux service runs with `ProtectSystem=strict`, `ProtectHome=true`, and can only write inside
 `/opt/plc-monitor/agent`. If you configure an absolute `historian.path` outside that folder, the historian
-will not be able to write. Use a relative path or one inside the agent folder.
+will not be able to write. Use a relative path or one inside the collector folder.
 
 ## 13.3. agent.json
 
@@ -81,7 +81,7 @@ The names the app writes are camelCase. The file accepts comments and trailing c
 
 - `enabled`: enables or disables recording. If it is disabled, tags keep their configuration but nothing is
   stored.
-- `path`: folder for the files, relative to the agent folder unless absolute.
+- `path`: folder for the files, relative to the collector folder unless absolute.
 - `retentionDays`: number of days samples are kept. `0` means no limit.
 - `flushIntervalMs`: how often accumulated samples are flushed. A low value protects better against an
   interruption, but writes more to disk.
@@ -93,7 +93,7 @@ service stopped.
 
 ### Editing by hand
 
-Do it with the agent stopped or restart it right afterward. If the app saves a change while you have the
+Do it with the collector stopped or restart it right afterward. If the app saves a change while you have the
 file open, it may overwrite your edit. Before editing:
 
 ```bash
@@ -108,7 +108,7 @@ Stop-Service PLCMonitorAgent
 Copy-Item "$env:ProgramFiles\PLC-Monitor\agent\agent.json" "$env:ProgramFiles\PLC-Monitor\agent\agent.json.bak"
 ```
 
-Then validate the JSON, start the service, and check that it appears in the app. If the agent does not
+Then validate the JSON, start the service, and check that it appears in the app. If the collector does not
 start, restore the backup.
 
 Do not edit `agent.key` or change encrypted passwords by hand. If you need to change a password, do it from
@@ -175,7 +175,7 @@ And, if you want to preserve the app configuration, `app.json`, `agents.json`, `
 save history, the certificate, or the OPC UA clients. If you want to preserve them, make a full backup
 first.
 
-### How to back up the agent
+### How to back up the collector
 
 So that SQLite and the historian are consistent, stop the service before copying.
 
@@ -198,7 +198,7 @@ Start-Service PLCMonitorAgent
 ```
 
 Check that the backup contains `agent.json`, `agent.key`, `agent.settings.json`, `agent.pfx`, and the
-`history/` folder. If the agent was running, there may be `-wal` and `-shm` files: include them; they are
+`history/` folder. If the collector was running, there may be `-wal` and `-shm` files: include them; they are
 part of the database.
 
 ### Restore
@@ -224,7 +224,7 @@ sudo systemctl start plcmon-agent
 Windows: restore the folder with the service stopped and reapply the restricted ACLs to
 `agent.settings.json` and `agent.pfx`.
 
-The backup contains secrets. Store it encrypted, with limited access, and outside the agent computer. Do
+The backup contains secrets. Store it encrypted, with limited access, and outside the collector computer. Do
 not upload it to a repository or public storage.
 
 ### App backup
@@ -236,7 +236,7 @@ Close the app and copy the entire folder. To restore on another computer:
 
 ## 13.6. Updates
 
-**Instalar / actualizar** (Install / update) on the **Agentes** tab (Agents) replaces the executable and
+**Instalar / actualizar** (Install / update) on the **Colectores** tab (Collectors) replaces the executable and
 preserves, by default:
 
 - `agent.json` and `agent.key`;
@@ -260,7 +260,7 @@ profile. Any script or client that used the previous token will fail. Update it.
 
 After updating:
 
-- check that the agent is **Conectado** (Connected);
+- check that the collector is **Conectado** (Connected);
 - check that the devices are **Conectados** (Connected);
 - open history and a trend;
 - if you use OPC UA, check that the server is active and that clients connect;
@@ -303,7 +303,7 @@ The files are named `plcmon-agent-YYYYMMDD.log`.
 
 ### Windows
 
-The agent writes to `%ProgramFiles%\PLC-Monitor\agent\logs\`, one file per day, with a default retention of
+The collector writes to `%ProgramFiles%\PLC-Monitor\agent\logs\`, one file per day, with a default retention of
 7 days. Event Viewer receives only notices and errors. The app can show the last lines with **Ver log**
 (View log).
 
@@ -320,7 +320,7 @@ The agent writes to `%ProgramFiles%\PLC-Monitor\agent\logs\`, one file per day, 
 
 ### Every day
 
-- Check that the agent and devices are connected.
+- Check that the collector and devices are connected.
 - Check whether there are tags in **Bad** or devices in **En fallo** (Failed).
 - Make sure recent history has data.
 
@@ -337,7 +337,7 @@ The agent writes to `%ProgramFiles%\PLC-Monitor\agent\logs\`, one file per day, 
 - Review history retention and the space it occupies.
 - Review OPC UA users and certificates; remove those that are no longer used.
 - Check for available updates.
-- Check that the agent and PLC clocks are synchronized.
+- Check that the collector and PLC clocks are synchronized.
 
 ### Every year or when something changes
 
@@ -347,10 +347,10 @@ The agent writes to `%ProgramFiles%\PLC-Monitor\agent\logs\`, one file per day, 
   name change requires renewing it.
 - Review the incident response procedure.
 
-## 13.9. Moving the agent to another computer
+## 13.9. Moving the collector to another computer
 
-1. Stop the old agent and make a full backup.
-2. Install the agent on the new computer from the app. New token and certificate are generated.
+1. Stop the old collector and make a full backup.
+2. Install the collector on the new computer from the app. New token and certificate are generated.
 3. Stop the new service.
 4. Copy `agent.json`, `agent.key`, and `history/`. Adjust owner and permissions.
 5. Start the service.
@@ -363,8 +363,8 @@ certificate. If the host name changes, the certificate may not validate.
 
 ## 13.10. Uninstall
 
-From **Agentes** (Agents), **Desinstalar** (Uninstall) stops the service, removes the firewall rules, and
-deletes the agent folder.
+From **Colectores** (Collectors), **Desinstalar** (Uninstall) stops the service, removes the firewall rules, and
+deletes the collector folder.
 
 If you check **Conservar agent.json al desinstalar** (Keep agent.json on uninstall), copies of `agent.json`
 and `agent.key` are saved in:

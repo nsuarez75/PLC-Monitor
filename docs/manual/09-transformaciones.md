@@ -8,7 +8,7 @@ Una **transformación** convierte un valor entero en un texto. Por ejemplo:
 2 = Avería
 ```
 
-La transformación se guarda en el agente y se asigna a un tag. El valor que se lee, se historiza y se
+La transformación se guarda en el colector y se asigna a un tag. El valor que se lee, se historiza y se
 publica por OPC UA sigue siendo el número; lo que cambia es cómo se muestra en la app.
 
 ![Editor de transformaciones con una tabla de estados](img/09-transformaciones.png)
@@ -20,10 +20,10 @@ publica por OPC UA sigue siendo el número; lo que cambia es cómo se muestra en
 3. Escribe el **Nombre**, por ejemplo `Estado del motor`.
 4. En la tabla **VALOR / SE MUESTRA COMO**, escribe el número y su texto.
 5. Pulsa **Añadir valor** para crear más filas.
-6. Pulsa **Guardar en el agente**.
+6. Pulsa **Guardar en el colector**.
 
 La app crea una transformación nueva con los valores `0` y `1` para que puedas empezar. Los cambios no se
-aplican hasta que pulsas **Guardar en el agente**. Si cambias de idea, pulsa **Descartar**.
+aplican hasta que pulsas **Guardar en el colector**. Si cambias de idea, pulsa **Descartar**.
 
 ### Reglas de validación
 
@@ -33,7 +33,7 @@ aplican hasta que pulsas **Guardar en el agente**. Si cambias de idea, pulsa **D
 - Las filas sin texto no se guardan. Sirven para dejar un hueco mientras editas.
 - Los valores se ordenan de menor a mayor al guardar.
 
-Si algo no cumple, la app muestra el error y no envía los cambios al agente.
+Si algo no cumple, la app muestra el error y no envía los cambios al colector.
 
 ## 9.2. Asignar una transformación a un tag
 
@@ -82,7 +82,7 @@ la app pide guardar los cambios por separado.
 - **Descartar** recarga lo guardado y pierde los cambios sin guardar.
 
 Los cambios se envían todos juntos. Si otro equipo modifica las transformaciones mientras tienes cambios
-sin guardar, la app no recarga la lista para no pisar tu edición. Al guardar, el agente valida el conjunto.
+sin guardar, la app no recarga la lista para no pisar tu edición. Al guardar, el colector valida el conjunto.
 
 ## 9.5. Dónde se aplica
 

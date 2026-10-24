@@ -68,13 +68,13 @@ La barra del panel tiene:
 El PNG es útil para adjuntar una captura a un informe o a una incidencia. La imagen se genera con el tamaño
 de la rejilla abierta; si quieres más detalle, amplía la ventana antes de exportar.
 
-## 8.6. Paneles y perfiles de agente
+## 8.6. Paneles y perfiles de colector
 
-Los paneles se guardan por agente. Un panel creado con el perfil `Planta demo` no aparece al conectar con
-otro agente, aunque las vistas tengan los mismos nombres. Las vistas de CSV son la excepción: se pueden
-usar en cualquier perfil porque no dependen de un agente.
+Los paneles se guardan por colector. Un panel creado con el perfil `Planta demo` no aparece al conectar con
+otro colector, aunque las vistas tengan los mismos nombres. Las vistas de CSV son la excepción: se pueden
+usar en cualquier perfil porque no dependen de un colector.
 
-Si conectas con otro agente y no ves tus paneles, comprueba el perfil seleccionado en la barra superior.
+Si conectas con otro colector y no ves tus paneles, comprueba el perfil seleccionado en la barra superior.
 
 ## 8.7. Ejemplos de paneles
 

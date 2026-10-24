@@ -13,8 +13,8 @@
     <Border Classes="card" Padding="12">
       <DockPanel>
         <Grid DockPanel.Dock="Top" ColumnDefinitions="*,Auto" Margin="4,0,0,10">
-          <TextBlock Text="{loc:T 'AGENTES'}" Classes="caption" VerticalAlignment="Center" />
-          <Button Grid.Column="1" Classes="ghost" Command="{Binding NewCommand}" ToolTip.Tip="{loc:T 'Nuevo agente'}">
+          <TextBlock Text="{loc:T 'COLECTORES'}" Classes="caption" VerticalAlignment="Center" />
+          <Button Grid.Column="1" Classes="ghost" Command="{Binding NewCommand}" ToolTip.Tip="{loc:T 'Nuevo colector'}">
             <c:Icon Kind="plus" />
           </Button>
         </Grid>
@@ -78,7 +78,7 @@
               <TextBox Grid.Row="2" Grid.Column="1" Text="{Binding SshKeyFile}" Classes="mono" PlaceholderText="{loc:T '(opcional) por defecto ~/.ssh/id_ed25519, id_ecdsa o id_rsa'}" />
             </Grid>
             <Grid ColumnDefinitions="170,*" ColumnSpacing="16">
-              <TextBlock Text="{loc:T 'Puerto del agente'}" VerticalAlignment="Center" FontWeight="Medium" />
+              <TextBlock Text="{loc:T 'Puerto del colector'}" VerticalAlignment="Center" FontWeight="Medium" />
               <NumericUpDown Grid.Column="1" Value="{Binding AgentPort}" Minimum="1" Maximum="65535" FormatString="0" Width="140" HorizontalAlignment="Left" />
             </Grid>
 
@@ -90,8 +90,8 @@
                   <TextBox Grid.Column="1" Text="{Binding SshPassword}" PasswordChar="•" Width="260" HorizontalAlignment="Left" PlaceholderText="{loc:T 'vacía si entras con clave'}" IsVisible="{Binding IsSsh}" />
                   <TextBlock Grid.Row="1" Text="{loc:T 'Contraseña de sudo'}" VerticalAlignment="Center" IsVisible="{Binding ShowSudoPassword}" />
                   <TextBox Grid.Row="1" Grid.Column="1" Text="{Binding SudoPassword}" PasswordChar="•" Width="260" HorizontalAlignment="Left" PlaceholderText="{Binding SudoPlaceholder}" IsVisible="{Binding ShowSudoPassword}" />
-                  <TextBlock Grid.Row="2" Text="{loc:T 'Carpeta del agente'}" VerticalAlignment="Center" />
-                  <TextBox Grid.Row="2" Grid.Column="1" Text="{Binding PackageFolder}" Classes="mono" PlaceholderText="{loc:T '(por defecto el agente incluido en la app)'}" />
+                  <TextBlock Grid.Row="2" Text="{loc:T 'Carpeta del colector'}" VerticalAlignment="Center" />
+                  <TextBox Grid.Row="2" Grid.Column="1" Text="{Binding PackageFolder}" Classes="mono" PlaceholderText="{loc:T '(por defecto el colector incluido en la app)'}" />
                 </Grid>
                 <WrapPanel Orientation="Horizontal">
                   <CheckBox Content="{loc:T 'Regenerar token y certificado'}" IsChecked="{Binding RegenerateCredentials}" Margin="0,0,20,4" />

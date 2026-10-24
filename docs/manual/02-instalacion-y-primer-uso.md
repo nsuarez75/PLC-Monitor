@@ -1,7 +1,7 @@
 # 2. Instalación y primer uso
 
 Este capítulo te lleva desde el archivo descargado hasta un PLC leyendo valores en la pantalla. Si ya tienes
-un agente instalado y solo quieres añadir un dispositivo, puedes ir directamente al capítulo
+un colector instalado y solo quieres añadir un dispositivo, puedes ir directamente al capítulo
 [Dispositivos y drivers](04-dispositivos-y-drivers.md).
 
 ## 2.1. Ejecutar la app
@@ -50,42 +50,42 @@ abierta.
 
 ## 2.2. El primer arranque
 
-Al abrir la app sin ningún agente configurado verás la ventana principal con el estado **Sin conexión**.
+Al abrir la app sin ningún colector configurado verás la ventana principal con el estado **Sin conexión**.
 
-![Primer arranque, sin agente conectado](img/02-primer-arranque.png)
+![Primer arranque, sin colector conectado](img/02-primer-arranque.png)
 
 La barra superior tiene tres zonas:
 
-- **Perfil de agente**: el desplegable con los agentes conocidos. La primera vez puede estar vacío o tener
+- **Perfil de colector**: el desplegable con los colectores conocidos. La primera vez puede estar vacío o tener
   un perfil local.
 - **Conectar / Desconectar**: cambia según el estado.
-- **Pestañas**: **Dispositivos**, **Tendencias**, **Transformaciones**, **OPC UA** y **Agentes**.
+- **Pestañas**: **Dispositivos**, **Tendencias**, **Transformaciones**, **OPC UA** y **Colectores**.
 
-No hace falta conectar para crear un perfil, pero sí para leer o configurar un agente.
+No hace falta conectar para crear un perfil, pero sí para leer o configurar un colector.
 
-## 2.3. Instalar el agente
+## 2.3. Instalar el colector
 
-El agente es un servicio independiente. La app puede instalarlo en este mismo equipo o en otro por SSH.
+El colector es un servicio independiente. La app puede instalarlo en este mismo equipo o en otro por SSH.
 La instalación crea un token, un certificado TLS y el servicio del sistema.
 
 ### En este equipo
 
-1. Abre la pestaña **Agentes**.
+1. Abre la pestaña **Colectores**.
 2. Pulsa **+** para crear un perfil.
 3. Escribe un **Nombre**, por ejemplo `Planta demo`.
 4. Marca **Este equipo (sin SSH)**.
-5. Deja el **Puerto del agente** en `5311` salvo que ya esté ocupado.
+5. Deja el **Puerto del colector** en `5311` salvo que ya esté ocupado.
 6. Pulsa **Instalar / actualizar**. El sistema pedirá permisos de administrador (`sudo`, `pkexec` o UAC).
 7. Al terminar, la app rellena la **URL**, el **Token** y la **Huella del certificado**. Pulsa **Guardar**.
 8. Selecciona el perfil en la barra superior y pulsa **Conectar**.
 
-La instalación local copia el agente incluido en la app, crea el usuario de servicio y registra el servicio.
+La instalación local copia el colector incluido en la app, crea el usuario de servicio y registra el servicio.
 No necesitas descargar nada más.
 
 ### En otro equipo por SSH
 
-1. Crea un perfil nuevo en **Agentes**.
-2. Escribe el **Nombre** y el **Puerto del agente**.
+1. Crea un perfil nuevo en **Colectores**.
+2. Escribe el **Nombre** y el **Puerto del colector**.
 3. En **Equipo**, escribe el host o la IP del equipo del PLC y el puerto SSH (normalmente `22`).
 4. Escribe el **Usuario** SSH.
 5. Indica una **Clave privada** o deja el campo vacío para usar la contraseña.
@@ -105,7 +105,7 @@ En Linux se crea el servicio systemd `plcmon-agent`; en Windows, el servicio `PL
 | Linux | `/opt/plc-monitor/agent` | `plcmon-agent` |
 | Windows | `%ProgramFiles%\PLC-Monitor\agent` | `PLCMonitorAgent` |
 
-Dentro de la carpeta del agente:
+Dentro de la carpeta del colector:
 
 - `plcmon-agent` o `plcmon-agent.exe`: el ejecutable.
 - `agent.json`: dispositivos, tags, transformaciones e historizador.
@@ -116,21 +116,21 @@ Dentro de la carpeta del agente:
 - `opcua/`: certificados y configuración del servidor OPC UA.
 - `logs/`: logs en Windows y, si se configura, en Linux.
 
-No copies `agent.key` ni `agent.pfx` a un equipo que no sea el del agente. Son secretos.
+No copies `agent.key` ni `agent.pfx` a un equipo que no sea el del colector. Son secretos.
 
 ## 2.4. Conectar y comprobar el estado
 
 Selecciona el perfil y pulsa **Conectar**. La barra superior cambia a **Conectado** y aparece el nombre del
-agente, la plataforma y la versión. La lista de dispositivos se rellena con lo que tenga configurado el
-agente.
+colector, la plataforma y la versión. La lista de dispositivos se rellena con lo que tenga configurado el
+colector.
 
 Si la conexión falla:
 
 - comprueba que el servicio está activo;
 - comprueba que la URL termina en el puerto correcto (`5311` con TLS);
-- confirma que el token es el del agente y no el de otro perfil;
-- revisa la huella del certificado si el agente se reinstaló;
-- revisa el firewall entre la app y el agente.
+- confirma que el token es el del colector y no el de otro perfil;
+- revisa la huella del certificado si el colector se reinstaló;
+- revisa el firewall entre la app y el colector.
 
 El capítulo [Resolución de problemas](14-resolucion-de-problemas.md) tiene una lista más completa.
 
@@ -174,15 +174,15 @@ botón. Es la vía recomendada cuando no conoces el nombre exacto.
 - **Dispositivos**: tags en vivo, histórico y explorador del PLC seleccionado.
 - **Tendencias**: gráficas guardadas y paneles. Se pueden crear sin tener un dispositivo seleccionado.
 - **Transformaciones**: tablas de valores enteros a texto.
-- **OPC UA**: estado y configuración del servidor OPC UA del agente.
-- **Agentes**: perfiles, instalación, credenciales, estado y logs.
+- **OPC UA**: estado y configuración del servidor OPC UA del colector.
+- **Colectores**: perfiles, instalación, credenciales, estado y logs.
 
 El botón de tema de la barra superior cambia entre claro y oscuro. La preferencia se guarda en `app.json`.
 
-## 2.8. Cerrar la app y el agente
+## 2.8. Cerrar la app y el colector
 
-Cerrar la app no detiene el agente ni el histórico. Si quieres dejar de leer un PLC, desactiva el
-dispositivo o el tag. Si quieres detener el servicio del agente:
+Cerrar la app no detiene el colector ni el histórico. Si quieres dejar de leer un PLC, desactiva el
+dispositivo o el tag. Si quieres detener el servicio del colector:
 
 ```bash
 # Linux
@@ -200,5 +200,5 @@ forzada puede dejar las últimas muestras sin guardar.
 
 ## Siguiente paso
 
-Con un agente y un dispositivo conectados, el siguiente capítulo explica cómo gestionar varios perfiles,
-instalar en remoto y renovar credenciales: [Agentes y perfiles](03-agentes-y-perfiles.md).
+Con un colector y un dispositivo conectados, el siguiente capítulo explica cómo gestionar varios perfiles,
+instalar en remoto y renovar credenciales: [Colectores y perfiles](03-colectores-y-perfiles.md).

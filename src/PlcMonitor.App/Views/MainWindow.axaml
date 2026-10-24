@@ -27,7 +27,7 @@
 
         <Grid Grid.Column="1" ColumnDefinitions="*,Auto" ColumnSpacing="8" HorizontalAlignment="Center" VerticalAlignment="Center">
           <ComboBox ItemsSource="{Binding Profiles}" SelectedItem="{Binding SelectedProfile}" MaxWidth="320" MinWidth="120" HorizontalAlignment="Stretch"
-                    IsEnabled="{Binding !IsConnected}" PlaceholderText="{loc:T 'Elige un agente'}">
+                    IsEnabled="{Binding !IsConnected}" PlaceholderText="{loc:T 'Elige un colector'}">
             <ComboBox.ItemTemplate>
               <DataTemplate x:DataType="svc:AgentProfile">
                 <DockPanel>
@@ -80,16 +80,16 @@
             <TextBlock Text="{loc:T 'Transformaciones'}" Classes="barlabel" />
           </StackPanel>
         </Button>
-        <Button Classes="ghost tab" Classes.on="{Binding IsOpcUaPage}" Command="{Binding OpenOpcUaCommand}" ToolTip.Tip="{loc:T 'Servidor OPC UA del agente: publicar los tags para Ignition, UaExpert…'}">
+        <Button Classes="ghost tab" Classes.on="{Binding IsOpcUaPage}" Command="{Binding OpenOpcUaCommand}" ToolTip.Tip="{loc:T 'Servidor OPC UA del colector: publicar los tags para Ignition, UaExpert…'}">
           <StackPanel Orientation="Horizontal" Spacing="6">
             <c:Icon Kind="link" Width="16" Height="16" />
             <TextBlock Text="OPC UA" Classes="barlabel" />
           </StackPanel>
         </Button>
-        <Button Classes="ghost tab" Classes.on="{Binding IsAgentsPage}" Command="{Binding OpenAgentsCommand}" ToolTip.Tip="{loc:T 'Gestionar agentes (instalar en equipos por SSH)'}">
+        <Button Classes="ghost tab" Classes.on="{Binding IsAgentsPage}" Command="{Binding OpenAgentsCommand}" ToolTip.Tip="{loc:T 'Gestionar colectores (instalar en equipos por SSH)'}">
           <StackPanel Orientation="Horizontal" Spacing="6">
             <c:Icon Kind="server" Width="16" Height="16" />
-            <TextBlock Text="{loc:T 'Agentes'}" Classes="barlabel" />
+            <TextBlock Text="{loc:T 'Colectores'}" Classes="barlabel" />
           </StackPanel>
         </Button>
         <Button Classes="ghost" Command="{Binding ToggleLanguageCommand}" ToolTip.Tip="{Binding LanguageTooltip}" Margin="6,0,0,0">
@@ -127,7 +127,7 @@
             </Button>
           </Grid>
           <TextBlock DockPanel.Dock="Top" Classes="muted" TextWrapping="Wrap" Margin="4,8" FontSize="12"
-                     IsVisible="{Binding !IsConnected}" Text="{loc:T 'Conecta con un agente para ver sus PLC.'}" />
+                     IsVisible="{Binding !IsConnected}" Text="{loc:T 'Conecta con un colector para ver sus PLC.'}" />
           <ListBox x:Name="DevicesList" Classes="devices" ItemsSource="{Binding Devices}" SelectedItem="{Binding SelectedDevice}" DragDrop.AllowDrop="True"
                    ToolTip.Tip="{loc:T 'Arrastra un dispositivo para cambiar el orden'}">
             <ListBox.ItemTemplate>
@@ -161,7 +161,7 @@
           </Border>
           <TextBlock Text="{loc:T 'Ningún dispositivo seleccionado'}" FontSize="15" FontWeight="SemiBold" HorizontalAlignment="Center" />
           <TextBlock Classes="muted" HorizontalAlignment="Center" TextAlignment="Center" TextWrapping="Wrap" MaxWidth="360"
-                     Text="{loc:T 'Conecta con un agente y elige un PLC, o da de alta uno nuevo con el botón +.'}" />
+                     Text="{loc:T 'Conecta con un colector y elige un PLC, o da de alta uno nuevo con el botón +.'}" />
         </StackPanel>
 
         <!-- Dispositivo seleccionado -->
@@ -179,7 +179,7 @@
                 <Border Classes="pill accent" IsVisible="{Binding WritesEnabled}">
                   <TextBlock Text="{loc:T 'Escritura habilitada'}" />
                 </Border>
-                <Border Classes="pill accent" IsVisible="{Binding OpcUaPublished}" ToolTip.Tip="{loc:T 'Publicado en el servidor OPC UA del agente'}">
+                <Border Classes="pill accent" IsVisible="{Binding OpcUaPublished}" ToolTip.Tip="{loc:T 'Publicado en el servidor OPC UA del colector'}">
                   <TextBlock Text="OPC UA" />
                 </Border>
               </StackPanel>
@@ -590,7 +590,7 @@
               <StackPanel Spacing="16" DataContext="{Binding Editor}" x:DataType="vm:DeviceEditorViewModel">
                 <StackPanel Spacing="2">
                   <TextBlock Text="{Binding Title}" Classes="title" />
-                  <TextBlock Text="{loc:T 'Los cambios se guardan en la configuración del agente.'}" Classes="muted" />
+                  <TextBlock Text="{loc:T 'Los cambios se guardan en la configuración del colector.'}" Classes="muted" />
                 </StackPanel>
                 <Grid ColumnDefinitions="170,*" RowDefinitions="Auto,Auto,Auto,Auto,Auto" RowSpacing="14" ColumnSpacing="16">
                   <TextBlock Text="{loc:T 'Nombre'}" VerticalAlignment="Center" FontWeight="Medium" />
@@ -630,7 +630,7 @@
                     <CheckBox Content="{loc:T 'Activo'}" IsChecked="{Binding Enabled}" />
                     <CheckBox Content="{loc:T 'Escrituras habilitadas (1.ª llave)'}" IsChecked="{Binding WritesEnabled}" />
                     <CheckBox Content="{loc:T 'Publicar en OPC UA (1.ª llave)'}" IsChecked="{Binding OpcUaPublished}"
-                              ToolTip.Tip="{loc:T 'El dispositivo aparece en el servidor OPC UA del agente con los tags que tengan la 2.ª llave (activada por defecto)'}" />
+                              ToolTip.Tip="{loc:T 'El dispositivo aparece en el servidor OPC UA del colector con los tags que tengan la 2.ª llave (activada por defecto)'}" />
                   </StackPanel>
                   <StackPanel Grid.Row="4" Spacing="2">
                     <TextBlock Text="{loc:T 'Reconexión'}" FontWeight="Medium" />

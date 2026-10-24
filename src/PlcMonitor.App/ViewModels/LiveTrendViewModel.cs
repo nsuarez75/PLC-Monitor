@@ -212,7 +212,7 @@ public sealed partial class LiveTrendViewModel : LocalizedObservableObject, IDis
         if (_trigger is not null && _triggerSource is null)
             missing.Add(Loc.F("{0} (disparo)", _trigger.Ref));
         Missing = missing.Count == 0 ? ""
-            : Loc.F("{0}: {1}", MissingText ?? Loc.T(IsLive ? "No disponibles en el agente" : "Sin histórico en el agente"), string.Join(", ", missing));
+            : Loc.F("{0}: {1}", MissingText ?? Loc.T(IsLive ? "No disponibles en el colector" : "Sin histórico en el colector"), string.Join(", ", missing));
         Refresh(now);
     }
 

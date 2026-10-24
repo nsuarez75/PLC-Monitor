@@ -20,15 +20,15 @@ public class AgentSettings : CommandSettings
     public const string CertEnvironmentVariable = "PLCMON_AGENT_CERT";
 
     [CommandOption("-a|--agent <URL>")]
-    [Description("URL del agente. Si se omite: variable PLCMON_AGENT o http://127.0.0.1:5310.")]
+    [Description("URL del colector. Si se omite: variable PLCMON_AGENT o http://127.0.0.1:5310.")]
     public string? Agent { get; set; }
 
     [CommandOption("--token <TOKEN>")]
-    [Description("Token de acceso del agente (agentes instalados con seguridad). Si se omite: variable PLCMON_AGENT_TOKEN.")]
+    [Description("Token de acceso del colector (colectores instalados con seguridad). Si se omite: variable PLCMON_AGENT_TOKEN.")]
     public string? Token { get; set; }
 
     [CommandOption("--cert <HUELLA>")]
-    [Description("Huella SHA-256 del certificado del agente (https). Si se omite: variable PLCMON_AGENT_CERT.")]
+    [Description("Huella SHA-256 del certificado del colector (https). Si se omite: variable PLCMON_AGENT_CERT.")]
     public string? CertificateThumbprint { get; set; }
 
     /// <summary>URL, token y huella efectivos.</summary>
@@ -52,7 +52,7 @@ public class AgentSettings : CommandSettings
     public override ValidationResult Validate() =>
         Uri.TryCreate(ResolveAgentUrl(), UriKind.Absolute, out var uri) && (uri.Scheme == Uri.UriSchemeHttp || uri.Scheme == Uri.UriSchemeHttps)
             ? ValidationResult.Success()
-            : ValidationResult.Error($"URL de agente no válida: '{ResolveAgentUrl()}'. Ejemplo: http://192.168.0.5:5310");
+            : ValidationResult.Error($"URL de colector no válida: '{ResolveAgentUrl()}'. Ejemplo: http://192.168.0.5:5310");
 }
 
 /// <summary>Canal gRPC y consola usados por las órdenes del agente (sustituibles en los tests).</summary>
@@ -124,7 +124,7 @@ public sealed class AgentInfoCommand : AsyncCommand<AgentSettings>
         {
             var info = await client.GetInfoAsync(new Empty(), cancellationToken: cancellationToken);
             var table = new Table().AddColumns("Propiedad", "Valor");
-            table.AddRow("Agente", Markup.Escape(settings.ResolveAgentUrl()));
+            table.AddRow("Colector", Markup.Escape(settings.ResolveAgentUrl()));
             table.AddRow("Versión", Markup.Escape(info.Version));
             table.AddRow("Máquina", Markup.Escape(info.Machine));
             table.AddRow("Sistema", Markup.Escape(info.Os));
@@ -135,7 +135,7 @@ public sealed class AgentInfoCommand : AsyncCommand<AgentSettings>
             {
                 AccessLevel.Read => "[yellow]solo lectura[/]",
                 AccessLevel.Full => "completo",
-                _ => "completo (agente anterior a los roles)",
+                _ => "completo (colector anterior a los roles)",
             });
             if (info.Historian is { } h)
             {
@@ -212,7 +212,7 @@ public sealed class AgentTagsCommand : AsyncCommand<AgentTagsSettings>
 public sealed class AgentReadSettings : AgentSettings
 {
     [CommandArgument(0, "<DISPOSITIVO>")]
-    [Description("Dispositivo configurado en el agente.")]
+    [Description("Dispositivo configurado en el colector.")]
     public string Device { get; set; } = "";
 
     [CommandArgument(1, "<DIRECCION>")]
@@ -247,7 +247,7 @@ public sealed class AgentReadCommand : AsyncCommand<AgentReadSettings>
 public sealed class AgentWriteSettings : AgentSettings
 {
     [CommandArgument(0, "<DISPOSITIVO>")]
-    [Description("Dispositivo configurado en el agente.")]
+    [Description("Dispositivo configurado en el colector.")]
     public string Device { get; set; } = "";
 
     [CommandArgument(1, "<TAG>")]
@@ -263,7 +263,7 @@ public sealed class AgentWriteSettings : AgentSettings
     public bool Yes { get; set; }
 
     [CommandOption("--user <USUARIO>")]
-    [Description("Usuario para el log de auditoría del agente. Por defecto, el usuario del sistema.")]
+    [Description("Usuario para el log de auditoría del colector. Por defecto, el usuario del sistema.")]
     public string? User { get; set; }
 }
 
@@ -302,11 +302,11 @@ public sealed class AgentWriteCommand : AsyncCommand<AgentWriteSettings>
 public sealed class AgentEnableSettings : AgentSettings
 {
     [CommandArgument(0, "<DISPOSITIVO>")]
-    [Description("Dispositivo configurado en el agente.")]
+    [Description("Dispositivo configurado en el colector.")]
     public string Device { get; set; } = "";
 
     [CommandOption("--persist")]
-    [Description("Guarda el cambio en la configuración del agente (agent.json).")]
+    [Description("Guarda el cambio en la configuración del colector (agent.json).")]
     public bool Persist { get; set; }
 }
 
@@ -320,7 +320,7 @@ public abstract class AgentSetEnabledCommand(bool enabled) : AsyncCommand<AgentE
                 new SetDeviceEnabledRequest { Device = settings.Device, Enabled = enabled, Persist = settings.Persist },
                 cancellationToken: cancellationToken);
             AgentRuntime.Console.MarkupLine(
-                $"{Markup.Escape(device.Name)}: {(device.Enabled ? "activado" : "desactivado")}{(settings.Persist ? " y guardado" : " (hasta reiniciar el agente)")} · {AgentRuntime.StateMarkup(device.State)}");
+                $"{Markup.Escape(device.Name)}: {(device.Enabled ? "activado" : "desactivado")}{(settings.Persist ? " y guardado" : " (hasta reiniciar el colector)")} · {AgentRuntime.StateMarkup(device.State)}");
             return 0;
         });
 }
@@ -353,7 +353,7 @@ public sealed class AgentWatchCommand : AsyncCommand<AgentWatchSettings>
                 {
                     await foreach (var ev in call.ResponseStream.ReadAllAsync(cancellationToken))
                         Print(console, ev, tags);
-                    console.MarkupLine("[yellow]El agente cerró la suscripción.[/]");
+                    console.MarkupLine("[yellow]El colector cerró la suscripción.[/]");
                     return 0;
                 }
                 catch (RpcException ex) when (ex.StatusCode == StatusCode.ResourceExhausted)
@@ -412,7 +412,7 @@ public sealed class AgentWatchCommand : AsyncCommand<AgentWatchSettings>
 public sealed class AgentBrowseSettings : AgentSettings
 {
     [CommandArgument(0, "<DISPOSITIVO>")]
-    [Description("Dispositivo configurado en el agente (debe estar conectado).")]
+    [Description("Dispositivo configurado en el colector (debe estar conectado).")]
     public string Device { get; set; } = "";
 
     [CommandArgument(1, "[FILTRO]")]
@@ -425,7 +425,7 @@ public sealed class AgentBrowseSettings : AgentSettings
     public int MaxResults { get; set; } = 100;
 
     [CommandOption("--refresh")]
-    [Description("Vuelve a explorar la CPU en lugar de usar la caché del agente.")]
+    [Description("Vuelve a explorar la CPU en lugar de usar la caché del colector.")]
     public bool Refresh { get; set; }
 }
 
@@ -484,7 +484,7 @@ public sealed class AgentConfigCommand : AsyncCommand<AgentTagsSettings>
 public class AgentPersistSettings : AgentSettings
 {
     [CommandOption("--no-persist")]
-    [Description("No guardar el cambio en agent.json (se pierde al reiniciar el agente).")]
+    [Description("No guardar el cambio en agent.json (se pierde al reiniciar el colector).")]
     public bool NoPersist { get; set; }
 }
 

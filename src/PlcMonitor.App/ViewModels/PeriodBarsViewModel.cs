@@ -95,13 +95,13 @@ public sealed partial class PeriodBarsViewModel : LocalizedObservableObject
         }
         if (_context!.Client is not { } client)
         {
-            Chart.EmptyText = Loc.N("Conéctate al agente para consultar su histórico");
+            Chart.EmptyText = Loc.N("Conéctate al colector para consultar su histórico");
             Chart.SetData([]);
             return;
         }
         var historized = _view.Tags.Where(t => _findTag!(t)?.Historized == true).ToList();
         var missing = _view.Tags.Except(historized).Select(t => t.ToString()).ToList();
-        Missing = missing.Count == 0 ? "" : Loc.F("Sin histórico en el agente: {0}", string.Join(", ", missing));
+        Missing = missing.Count == 0 ? "" : Loc.F("Sin histórico en el colector: {0}", string.Join(", ", missing));
         if (historized.Count == 0)
         {
             Chart.EmptyText = Loc.N("Ningún tag de la vista se historiza: actívalo en la configuración del dispositivo");

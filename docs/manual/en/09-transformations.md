@@ -8,7 +8,7 @@ A **transformation** converts an integer value into text. For example:
 2 = Avería
 ```
 
-The transformation is saved in the agent and assigned to a tag. The value that is read, recorded to history, and
+The transformation is saved in the collector and assigned to a tag. The value that is read, recorded to history, and
 published over OPC UA remains the number; what changes is how it is displayed in the app.
 
 ![Transformation editor with a table of states](../img/09-transformaciones.png)
@@ -20,10 +20,10 @@ published over OPC UA remains the number; what changes is how it is displayed in
 3. Enter the **Nombre** (Name), for example `Estado del motor`.
 4. In the **VALOR / SE MUESTRA COMO** (VALUE / DISPLAYED AS) table, enter the number and its text.
 5. Click **Añadir valor** (Add value) to create more rows.
-6. Click **Guardar en el agente** (Save to agent).
+6. Click **Guardar en el colector** (Save to collector).
 
 The app creates a new transformation with the values `0` and `1` so you can get started. Changes are not
-applied until you click **Guardar en el agente**. If you change your mind, click **Descartar** (Discard).
+applied until you click **Guardar en el colector**. If you change your mind, click **Descartar** (Discard).
 
 ### Validation rules
 
@@ -33,7 +33,7 @@ applied until you click **Guardar en el agente**. If you change your mind, click
 - Rows without text are not saved. They are useful to leave a gap while you edit.
 - Values are sorted from lowest to highest when saved.
 
-If something does not comply, the app shows the error and does not send the changes to the agent.
+If something does not comply, the app shows the error and does not send the changes to the collector.
 
 ## 9.2. Assign a transformation to a tag
 
@@ -82,7 +82,7 @@ to save the changes separately.
 - **Descartar** reloads the saved version and discards unsaved changes.
 
 Changes are sent all together. If another computer modifies the transformations while you have unsaved
-changes, the app does not reload the list so as not to overwrite your edit. When you save, the agent validates the set.
+changes, the app does not reload the list so as not to overwrite your edit. When you save, the collector validates the set.
 
 ## 9.5. Where it is applied
 

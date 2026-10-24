@@ -11,7 +11,7 @@
       <StackPanel Spacing="2">
         <TextBlock Text="{loc:T 'Servidor OPC UA'}" Classes="title" />
         <TextBlock Classes="muted" TextWrapping="Wrap"
-                   Text="{loc:T 'El agente publica los tags de todos sus dispositivos para Ignition, UaExpert u otros clientes OPC UA. Solo canales firmados y cifrados y usuarios con contraseña.'}" />
+                   Text="{loc:T 'El colector publica los tags de todos sus dispositivos para Ignition, UaExpert u otros clientes OPC UA. Solo canales firmados y cifrados y usuarios con contraseña.'}" />
       </StackPanel>
       <Button Grid.Column="1" Classes="secondary" Command="{Binding RefreshCommand}" VerticalAlignment="Top" ToolTip.Tip="{loc:T 'Volver a leer el estado y los certificados de los clientes'}">
         <StackPanel Orientation="Horizontal" Spacing="6">
@@ -36,7 +36,7 @@
         <Button Classes="accent" Command="{Binding SaveCommand}">
           <StackPanel Orientation="Horizontal" Spacing="6">
             <c:Icon Kind="save" />
-            <TextBlock Text="{loc:T 'Guardar en el agente'}" />
+            <TextBlock Text="{loc:T 'Guardar en el colector'}" />
           </StackPanel>
         </Button>
       </StackPanel>
@@ -80,7 +80,7 @@
             <StackPanel Spacing="4">
               <CheckBox Content="{loc:T 'Permitir escribir en los PLC por OPC UA'}" IsChecked="{Binding AllowWrites}" />
               <TextBlock Classes="muted" FontSize="12" TextWrapping="Wrap" Margin="28,0,0,0"
-                         Text="{loc:T 'Tercera llave: además hace falta escritura activada en el dispositivo, el tag marcado como escribible y un usuario con permiso de escritura. Cada escritura queda en la auditoría del agente.'}" />
+                         Text="{loc:T 'Tercera llave: además hace falta escritura activada en el dispositivo, el tag marcado como escribible y un usuario con permiso de escritura. Cada escritura queda en la auditoría del colector.'}" />
             </StackPanel>
           </StackPanel>
         </Border>
@@ -91,7 +91,7 @@
             <Grid ColumnDefinitions="*,Auto">
               <StackPanel Spacing="2">
                 <TextBlock Text="{loc:T 'USUARIOS'}" Classes="caption" />
-                <TextBlock Classes="muted" FontSize="12" Text="{loc:T 'Sin acceso anónimo. Las contraseñas se guardan cifradas (hash) en el agente.'}" />
+                <TextBlock Classes="muted" FontSize="12" Text="{loc:T 'Sin acceso anónimo. Las contraseñas se guardan cifradas (hash) en el colector.'}" />
               </StackPanel>
               <Button Grid.Column="1" Classes="secondary" Command="{Binding AddUserCommand}" VerticalAlignment="Top">
                 <StackPanel Orientation="Horizontal" Spacing="6">
