@@ -127,7 +127,7 @@ de un **fichero CSV** exportado.
 
 **Tipo de gráfica**:
 Cómo dibuja una vista sus datos: tendencia, ciclos superpuestos, X-Y, cronograma de estados,
-histograma con Cp/Cpk, indicadores de panel o barras por periodo.
+histograma con Cp/Cpk, indicadores o barras por periodo.
 
 **Ciclos superpuestos** (*overlaid cycles*):
 Tipo de gráfica que dibuja uno encima de otro los tramos marcados por un **disparo**, para
@@ -135,7 +135,8 @@ comparar ciclos de máquina.
 
 **Panel**:
 Rejilla con varias **vistas de tendencia** guardadas, para verlas a la vez.
-_Evitar_: dashboard, pantalla
+_Evitar_: dashboard, pantalla; «panel» para cualquier otra cosa (el tipo de gráfica es
+**indicadores**)
 
 ## OPC UA
 

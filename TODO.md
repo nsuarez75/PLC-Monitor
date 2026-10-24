@@ -26,6 +26,10 @@ Lista de lo que está abierto. Última revisión: 24/10/2026 (versión 2.0.1).
       `OpcUaServerTests.A_new_client_is_rejected_until_its_certificate_is_trusted` y
       `MainViewModelTests.History_is_configured_in_the_tag_window_and_queried_in_the_history_tab`
       (espera de 10 s bajo carga).
+- [ ] **Renombrar el tipo de gráfica «Indicadores de panel» a «Indicadores»** (en inglés,
+      *Gauges*), para que «panel» quede solo para la rejilla de vistas (ver `GLOSSARY.md`). Afecta
+      a la interfaz ES/EN y al manual; las vistas guardadas no cambian si el identificador interno se
+      mantiene.
 
 ## Ideas sin decidir
 
