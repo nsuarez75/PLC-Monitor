@@ -1,8 +1,8 @@
 # 6. History
 
-The history stores tag samples on the agent's disk so you can answer questions such as "what pressure was
+The history stores tag samples on the collector's disk so you can answer questions such as "what pressure was
 there when it failed?" or "how much has the counter increased during the shift?". The app does not need to
-be open: the agent continues recording to history even if you close the window or the network disconnects.
+be open: the collector continues recording to history even if you close the window or the network disconnects.
 
 ## 6.1. Enable history recording
 
@@ -15,7 +15,7 @@ History recording is configured per tag, in its details:
    **Tiempo máximo** (maximum time).
 5. Click **Guardar** (Save).
 
-The first time a tag is recorded to history, the agent starts saving from that moment. It does not recover
+The first time a tag is recorded to history, the collector starts saving from that moment. It does not recover
 earlier values that were not saved.
 
 ### Minimum interval
@@ -35,7 +35,7 @@ change.
 
 ### Maximum time
 
-If the value does not change, the agent saves a sample at regular intervals. This serves to prove that the
+If the value does not change, the collector saves a sample at regular intervals. This serves to prove that the
 tag was still communicating even though its value was constant. `0` disables this guarantee.
 
 ### Trigger
@@ -53,7 +53,7 @@ while `Marcha` is `true`, or the temperature only when `Estado` is greater than 
 When the condition is met, the current value is saved and, while it lasts, the frequency, the deadband, and
 the maximum time are applied. At the end, a final point is saved. Quality changes are always saved.
 
-### Agent historian
+### Collector historian
 
 The historian can be disabled globally in `agent.json` (`historian.enabled`). If it is disabled, the tag
 configuration is saved but nothing is recorded. The details window warns about it.
@@ -87,7 +87,7 @@ The chart has one series per tag. You can:
 
 The summary indicates how many points have been received, from how many tags, the period, and the
 aggregate. If **hay más puntos: usa un agregado o un periodo más corto** (there are more points: use an
-aggregate or a shorter period) appears, the query has been truncated. The agent limits the result to 20,000
+aggregate or a shorter period) appears, the query has been truncated. The collector limits the result to 20,000
 points per query.
 
 ### Raw vs. aggregate
@@ -140,7 +140,7 @@ UTF-8 without BOM.
 
 The CSV can be opened in a spreadsheet or loaded again in **Tendencias > Datos > Fichero CSV exportado**
 (Trends > Data > Exported CSV file). It is a way to preserve a data capture or share it without giving
-access to the agent.
+access to the collector.
 
 ## 6.5. Open in Trends
 
@@ -165,16 +165,16 @@ each type.
    querying.
 4. Click **Borrar** (Delete) and confirm.
 
-Deleting removes the samples of those tags in that interval. It cannot be undone. If the agent is old and
-does not support the operation, the app will ask you to update it from **Agentes > Instalar / actualizar**
-(Agents > Install / update).
+Deleting removes the samples of those tags in that interval. It cannot be undone. If the collector is old and
+does not support the operation, the app will ask you to update it from **Colectores > Instalar / actualizar**
+(Collectors > Install / update).
 
 **Caution**: before deleting, export the interval to CSV if it may be needed for an investigation.
 Deleting does not affect the tag's configuration or its future history recording.
 
 ## 6.7. Where it is stored
 
-The agent stores history in SQLite, in the `history/` folder of its installation. It creates one file per
+The collector stores history in SQLite, in the `history/` folder of its installation. It creates one file per
 month:
 
 ```text
@@ -206,8 +206,8 @@ Configuration and backup details are in
 - For a specific event, enable the trigger instead of saving all day.
 - Review retention before you need old data. If the policy is 30 days, you will not be able to query
   a failure from three months ago.
-- Export to CSV the periods you must keep outside the agent.
-- Synchronize the clock of the agent and the PLC. An incorrect time makes data appear in the wrong
+- Export to CSV the periods you must keep outside the collector.
+- Synchronize the clock of the collector and the PLC. An incorrect time makes data appear in the wrong
   period.
 
 ## Next step

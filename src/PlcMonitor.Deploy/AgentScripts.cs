@@ -46,7 +46,7 @@ internal static class AgentScripts
         for G in dialout uucp; do getent group $G >/dev/null && { usermod -aG $G plcmon; break; }; done
         systemctl stop {{LinuxService}} 2>/dev/null || true
         mkdir -p "$D"
-        [ -s "$A" ] || { echo "No llegó el ejecutable del agente" >&2; exit 3; }
+        [ -s "$A" ] || { echo "No llegó el ejecutable del colector" >&2; exit 3; }
         # Se conserva la configuración del equipo (agent.json, la clave de sus contraseñas y la seguridad), el histórico y la
         # PKI de OPC UA (certificado del servidor y clientes aceptados); lo demás (incluidos los ficheros de las versiones
         # en varios ficheros) se sustituye por el ejecutable único.
@@ -61,7 +61,7 @@ internal static class AgentScripts
         chmod 600 "$D"/agent.json "$D"/agent.key "$D"/agent.settings.json "$D"/agent.pfx 2>/dev/null || true
         cat > /etc/systemd/system/{{LinuxService}}.service <<'UNIT'
         [Unit]
-        Description=PLC-Monitor Agent
+        Description=PLC-Monitor Collector
         Wants=network-online.target
         After=network-online.target
 
@@ -102,7 +102,7 @@ internal static class AgentScripts
     public static string LinuxRenew(AgentSecurityFiles security) => $$"""
         set -e
         D={{LinuxDir}}
-        [ -x "$D/plcmon-agent" ] || { echo "El agente no está instalado en este equipo" >&2; exit 3; }
+        [ -x "$D/plcmon-agent" ] || { echo "El colector no está instalado en este equipo" >&2; exit 3; }
         echo '{{Convert.ToBase64String(Encoding.UTF8.GetBytes(security.SettingsJson))}}' | base64 -d > "$D/agent.settings.json"
         echo '{{Convert.ToBase64String(security.Pfx)}}' | base64 -d > "$D/agent.pfx"
         chown plcmon:plcmon "$D/agent.settings.json" "$D/agent.pfx"
@@ -171,7 +171,7 @@ internal static class AgentScripts
         if ($svc -and $svc.Status -ne 'Stopped') { Stop-Service -Name {{WindowsService}} -Force; $svc.WaitForStatus('Stopped', '00:00:30') }
         {{WindowsWaitForExit}}
         New-Item -ItemType Directory -Force -Path $D | Out-Null
-        if (-not (Test-Path $A)) { throw 'No llegó el ejecutable del agente' }
+        if (-not (Test-Path $A)) { throw 'No llegó el ejecutable del colector' }
         # Se conserva la configuración del equipo, el histórico y los logs; lo demás se sustituye por el ejecutable único.
         # Un antivirus o el indexador pueden tener el ejecutable abierto un instante: se reintenta unos segundos.
         for ($i = 1; ; $i++) {
@@ -182,7 +182,7 @@ internal static class AgentScripts
           } catch {
             if ($i -lt 20) { Start-Sleep -Milliseconds 500; continue }
             # Si el agente anterior sigue ahí, se vuelve a arrancar: mejor seguir con la versión vieja que quedarse sin agente.
-            if ($svc -and (Test-Path (Join-Path $D 'plcmon-agent.exe'))) { Start-Service -Name {{WindowsService}} -ErrorAction SilentlyContinue; 'Se ha vuelto a arrancar el agente anterior' }
+            if ($svc -and (Test-Path (Join-Path $D 'plcmon-agent.exe'))) { Start-Service -Name {{WindowsService}} -ErrorAction SilentlyContinue; 'Se ha vuelto a arrancar el colector anterior' }
             throw
           }
         }
@@ -192,7 +192,7 @@ internal static class AgentScripts
         """)}}
         {{WindowsRestrictSecurity}}
         if (-not $svc) {
-          New-Service -Name {{WindowsService}} -DisplayName 'PLC-Monitor Agent' -Description 'Agente de PLC-Monitor' -BinaryPathName ('"' + (Join-Path $D 'plcmon-agent.exe') + '"') -StartupType Automatic | Out-Null
+          New-Service -Name {{WindowsService}} -DisplayName 'PLC-Monitor Collector' -Description 'Colector de PLC-Monitor' -BinaryPathName ('"' + (Join-Path $D 'plcmon-agent.exe') + '"') -StartupType Automatic | Out-Null
           sc.exe failure {{WindowsService}} reset= 86400 actions= restart/5000/restart/5000/restart/30000 | Out-Null
         }
         if (-not (Get-NetFirewallRule -DisplayName 'PLC-Monitor Agent' -ErrorAction SilentlyContinue)) {
@@ -212,7 +212,7 @@ internal static class AgentScripts
     public static string WindowsRenew(AgentSecurityFiles security) => $$"""
         $ErrorActionPreference = 'Stop'
         $D = "{{WindowsDirExpression}}"
-        if (-not (Test-Path (Join-Path $D 'plcmon-agent.exe'))) { throw 'El agente no está instalado en este equipo' }
+        if (-not (Test-Path (Join-Path $D 'plcmon-agent.exe'))) { throw 'El colector no está instalado en este equipo' }
         [IO.File]::WriteAllBytes((Join-Path $D 'agent.settings.json'), [Convert]::FromBase64String('{{Convert.ToBase64String(Encoding.UTF8.GetBytes(security.SettingsJson))}}'))
         [IO.File]::WriteAllBytes((Join-Path $D 'agent.pfx'), [Convert]::FromBase64String('{{Convert.ToBase64String(security.Pfx)}}'))
         {{WindowsRestrictSecurity}}

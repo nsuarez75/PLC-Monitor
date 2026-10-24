@@ -1,14 +1,14 @@
 # 11. CLI
 
 `plcmon` es la herramienta de línea de órdenes de PLC-Monitor. Sirve para diagnosticar un PLC sin abrir la
-app, para leer o escribir una dirección suelta y para administrar un agente desde un script.
+app, para leer o escribir una dirección suelta y para administrar un colector desde un script.
 
 La CLI tiene dos modos:
 
 - **Órdenes directas** (`read`, `watch`, `write`, `browse`, `info`): conectan directamente al PLC con los
-  datos que les pasas. No necesitan un agente.
-- **Órdenes de agente** (`plcmon agent ...`): hablan con un agente por gRPC. Necesitan la URL y el token
-  del agente.
+  datos que les pasas. No necesitan un colector.
+- **Órdenes de colector** (`plcmon agent ...`): hablan con un colector por gRPC. Necesitan la URL y el token
+  del colector.
 
 **Importante**: la CLI no forma parte de la release de escritorio actual. Se compila desde el repositorio.
 
@@ -141,7 +141,7 @@ export PLCMON_PASSWORD='...'
 plcmon read '"MiDB".Motor.Velocidad' -H 192.0.2.10
 ```
 
-## 11.4. Órdenes de agente
+## 11.4. Órdenes de colector
 
 La URL, el token y la huella del certificado se pueden pasar por opciones o por variables de entorno:
 
@@ -191,7 +191,7 @@ plcmon agent tags prensa-linea3
 
 ### `agent read`
 
-Lee direcciones cualesquiera a través del agente, aunque no estén configuradas como tags.
+Lee direcciones cualesquiera a través del colector, aunque no estén configuradas como tags.
 
 ```bash
 plcmon agent read prensa-linea3 DB10.DBW0
@@ -199,7 +199,7 @@ plcmon agent read prensa-linea3 DB10.DBW0
 
 ### `agent write`
 
-Escribe un tag configurado. Respeta las llaves del agente y pide confirmación.
+Escribe un tag configurado. Respeta las llaves del colector y pide confirmación.
 
 ```bash
 plcmon agent write prensa-linea3 marcha true
@@ -217,7 +217,7 @@ plcmon agent disable prensa-linea3
 plcmon agent enable prensa-linea3 --persist
 ```
 
-Sin `--persist`, el cambio se pierde al reiniciar el agente. Es al revés que en `tag add`, que guarda por
+Sin `--persist`, el cambio se pierde al reiniciar el colector. Es al revés que en `tag add`, que guarda por
 defecto.
 
 ### `agent browse`
@@ -331,7 +331,7 @@ Si el destino ya tiene histórico, se juntan. Pide confirmación.
 
 ### `agent watch`
 
-Se suscribe al agente y muestra los cambios de valores y de estado en directo. Ctrl+C para salir.
+Se suscribe al colector y muestra los cambios de valores y de estado en directo. Ctrl+C para salir.
 
 ```bash
 plcmon agent watch
@@ -340,7 +340,7 @@ plcmon agent watch prensa-linea3
 
 ## 11.5. Ejemplos de diagnóstico
 
-### Comprobar un PLC sin agente
+### Comprobar un PLC sin colector
 
 ```bash
 plcmon info -H 192.0.2.10
@@ -348,7 +348,7 @@ plcmon browse Motor -H 192.0.2.10 -n 20
 plcmon read '"MiDB".Motor.Velocidad' -H 192.0.2.10
 ```
 
-### Comprobar un agente
+### Comprobar un colector
 
 ```bash
 plcmon agent info
@@ -389,5 +389,5 @@ plcmon agent write prensa-linea3 consigna 8.5
 
 ## Siguiente paso
 
-Para entender cómo se protegen el agente, los tokens y las escrituras, sigue con
+Para entender cómo se protegen el colector, los tokens y las escrituras, sigue con
 [Seguridad](12-seguridad.md).

@@ -1,14 +1,14 @@
 # 11. CLI
 
 `plcmon` is the PLC-Monitor command-line tool. It is used to diagnose a PLC without opening the
-app, to read or write a single address, and to administer an agent from a script.
+app, to read or write a single address, and to administer a collector from a script.
 
 The CLI has two modes:
 
 - **Direct commands** (`read`, `watch`, `write`, `browse`, `info`): they connect directly to the PLC with the
-  data you provide. They do not need an agent.
-- **Agent commands** (`plcmon agent ...`): they communicate with an agent over gRPC. They need the URL and the token
-  of the agent.
+  data you provide. They do not need a collector.
+- **Collector commands** (`plcmon agent ...`): they communicate with a collector over gRPC. They need the URL and the token
+  of the collector.
 
 **Important**: the CLI is not part of the current desktop release. It is built from the repository.
 
@@ -141,7 +141,7 @@ export PLCMON_PASSWORD='...'
 plcmon read '"MiDB".Motor.Velocidad' -H 192.0.2.10
 ```
 
-## 11.4. Agent commands
+## 11.4. Collector commands
 
 The URL, token, and certificate thumbprint can be passed through options or environment variables:
 
@@ -191,7 +191,7 @@ plcmon agent tags prensa-linea3
 
 ### `agent read`
 
-Reads any addresses through the agent, even if they are not configured as tags.
+Reads any addresses through the collector, even if they are not configured as tags.
 
 ```bash
 plcmon agent read prensa-linea3 DB10.DBW0
@@ -199,7 +199,7 @@ plcmon agent read prensa-linea3 DB10.DBW0
 
 ### `agent write`
 
-Writes a configured tag. It respects the agent keys and asks for confirmation.
+Writes a configured tag. It respects the collector keys and asks for confirmation.
 
 ```bash
 plcmon agent write prensa-linea3 marcha true
@@ -217,7 +217,7 @@ plcmon agent disable prensa-linea3
 plcmon agent enable prensa-linea3 --persist
 ```
 
-Without `--persist`, the change is lost when the agent restarts. This is the opposite of `tag add`, which saves by
+Without `--persist`, the change is lost when the collector restarts. This is the opposite of `tag add`, which saves by
 default.
 
 ### `agent browse`
@@ -331,7 +331,7 @@ If the destination already has history, they are merged. Asks for confirmation.
 
 ### `agent watch`
 
-Subscribes to the agent and shows value and status changes live. Ctrl+C to exit.
+Subscribes to the collector and shows value and status changes live. Ctrl+C to exit.
 
 ```bash
 plcmon agent watch
@@ -340,7 +340,7 @@ plcmon agent watch prensa-linea3
 
 ## 11.5. Diagnostic examples
 
-### Check a PLC without an agent
+### Check a PLC without a collector
 
 ```bash
 plcmon info -H 192.0.2.10
@@ -348,7 +348,7 @@ plcmon browse Motor -H 192.0.2.10 -n 20
 plcmon read '"MiDB".Motor.Velocidad' -H 192.0.2.10
 ```
 
-### Check an agent
+### Check a collector
 
 ```bash
 plcmon agent info
@@ -389,5 +389,5 @@ plcmon agent write prensa-linea3 consigna 8.5
 
 ## Next step
 
-To understand how the agent, tokens, and writes are protected, continue with
+To understand how the collector, tokens, and writes are protected, continue with
 [Security](12-security.md).

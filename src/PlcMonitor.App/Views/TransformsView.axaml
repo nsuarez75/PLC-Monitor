@@ -37,7 +37,7 @@
       <StackPanel DockPanel.Dock="Top" Spacing="2" Margin="0,0,0,14">
         <TextBlock Text="{loc:T 'Transformaciones'}" Classes="title" />
         <TextBlock Classes="muted" TextWrapping="Wrap"
-                   Text="{loc:T 'Muestran valores enteros como texto (0 = Parado, 1 = Marcha…). Se guardan en el agente y se asignan a cada tag en su detalle (doble clic → «Mostrar valor como»).'}" />
+                   Text="{loc:T 'Muestran valores enteros como texto (0 = Parado, 1 = Marcha…). Se guardan en el colector y se asignan a cada tag en su detalle (doble clic → «Mostrar valor como»).'}" />
       </StackPanel>
 
       <!-- Guardar / descartar -->
@@ -54,7 +54,7 @@
           <Button Classes="accent" Command="{Binding SaveCommand}">
             <StackPanel Orientation="Horizontal" Spacing="6">
               <c:Icon Kind="save" />
-              <TextBlock Text="{loc:T 'Guardar en el agente'}" />
+              <TextBlock Text="{loc:T 'Guardar en el colector'}" />
             </StackPanel>
           </Button>
         </StackPanel>

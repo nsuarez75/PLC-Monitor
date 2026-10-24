@@ -95,7 +95,7 @@ public sealed class HistorianService : IAsyncDisposable
     {
         ArgumentNullException.ThrowIfNull(query);
         if (_store is null)
-            throw new InvalidOperationException("El historiador está desactivado en este agente.");
+            throw new InvalidOperationException("El historiador está desactivado en este colector.");
         if (query.To < query.From)
             throw new ArgumentException("El final del intervalo es anterior al inicio.", nameof(query));
         await FlushAsync(cancellationToken);
@@ -126,7 +126,7 @@ public sealed class HistorianService : IAsyncDisposable
     {
         ArgumentNullException.ThrowIfNull(renames);
         if (_store is null)
-            throw new InvalidOperationException("El historiador está desactivado en este agente.");
+            throw new InvalidOperationException("El historiador está desactivado en este colector.");
         foreach (var rename in renames)
         {
             if (string.IsNullOrWhiteSpace(rename.FromDevice) || string.IsNullOrWhiteSpace(rename.ToDevice))
@@ -156,7 +156,7 @@ public sealed class HistorianService : IAsyncDisposable
     {
         ArgumentNullException.ThrowIfNull(keys);
         if (_store is null)
-            throw new InvalidOperationException("El historiador está desactivado en este agente.");
+            throw new InvalidOperationException("El historiador está desactivado en este colector.");
         if (keys.Count == 0 || keys.Any(k => string.IsNullOrWhiteSpace(k.Device) || string.IsNullOrWhiteSpace(k.Tag)))
             throw new ArgumentException("Indica el dispositivo y al menos un tag.", nameof(keys));
         if (to < from)

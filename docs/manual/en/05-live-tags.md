@@ -14,7 +14,7 @@ Each row shows:
 | **Nombre** (Name) | Tag name. Below it, the scan group and its interval. |
 | **Dirección** (Address) | Address as understood by the driver. |
 | **Valor** (Value) | Last value, with the configured transformation, decimals and unit. |
-| **Tipo** (Type) | Type detected by the agent: `Bool`, `Int16`, `Real`, `String`... |
+| **Tipo** (Type) | Type detected by the collector: `Bool`, `Int16`, `Real`, `String`... |
 | **Calidad** (Quality) | `Good`, `Uncertain` or the error (`Bad...`). |
 | **Hora** (Time) | Local time of the last update. |
 | **Escritura** (Writing) | Field or buttons for writing, only if the tag is writable. |
@@ -135,7 +135,7 @@ In **Configuración** (Configuration) you can change:
 
 ### Scaling
 
-Scaling is applied in the agent before recording to history and publishing. It is used to convert, for example,
+Scaling is applied in the collector before recording to history and publishing. It is used to convert, for example,
 `0..27648` into `0..100 %` or `0..10000` into `0..10 bar`.
 
 1. Check **Convertir el valor bruto a unidades de ingeniería** (Convert the raw value to engineering units).
@@ -160,7 +160,7 @@ In the **HISTÓRICO** (HISTORY) section:
 - **Solo mientras otro tag cumpla una condición (disparo)** (Only while another tag meets a condition (trigger)): records to history only during the periods in which the
   condition is met, plus an extra time.
 
-If the agent historian is disabled, the configuration is saved but nothing is recorded. The app
+If the collector historian is disabled, the configuration is saved but nothing is recorded. The app
 warns about this in the window.
 
 ## 5.6. Writing to the PLC
@@ -179,7 +179,7 @@ In the table:
   writes the change.
 
 Before writing, the app asks for confirmation and shows the current value. If the write fails, the message
-indicates the quality or the error returned by the agent. Every write is recorded in the agent
+indicates the quality or the error returned by the collector. Every write is recorded in the collector
 audit.
 
 **Caution**: a write can move a machine. Check the address, the type and the value before

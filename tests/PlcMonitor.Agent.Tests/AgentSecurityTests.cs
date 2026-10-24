@@ -248,7 +248,7 @@ public class AgentSecurityTests
                     await Task.Delay(100, Ct);
                 }
             }
-            info.ShouldNotBeNull("el agente no arrancó con TLS");
+            info.ShouldNotBeNull("el colector no arrancó con TLS");
 
             using var noToken = AgentChannelFactory.Create(new AgentEndpoint(url, null, thumbprint));
             (await Should.ThrowAsync<RpcException>(async () =>

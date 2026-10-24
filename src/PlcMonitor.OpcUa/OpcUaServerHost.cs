@@ -153,7 +153,7 @@ public sealed class OpcUaServerHost : IAsyncDisposable
                 .ConfigureServerProperties(p =>
                 {
                     p.ManufacturerName = "PLC-Monitor";
-                    p.ProductName = "PLC-Monitor Agent";
+                    p.ProductName = "PLC-Monitor Collector";
                     p.SoftwareVersion = typeof(OpcUaServerHost).Assembly.GetName().Version?.ToString(3) ?? "";
                 })
                 .AddNodeManager(new NodeManagerFactory(this))

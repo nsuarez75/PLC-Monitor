@@ -23,13 +23,13 @@
       <Grid ColumnDefinitions="170,*" RowDefinitions="Auto,Auto" RowSpacing="14" ColumnSpacing="16" IsVisible="{Binding IsSerial}">
         <StackPanel Spacing="2" Margin="0,6,0,0">
           <TextBlock Text="{loc:T 'Puerto serie'}" FontWeight="Medium" />
-          <TextBlock Text="{loc:T 'del equipo del agente'}" Classes="muted" FontSize="11.5" />
+          <TextBlock Text="{loc:T 'del equipo del colector'}" Classes="muted" FontSize="11.5" />
         </StackPanel>
         <StackPanel Grid.Column="1" Spacing="4">
           <StackPanel Orientation="Horizontal" Spacing="8">
             <AutoCompleteBox Text="{Binding SerialPort}" ItemsSource="{Binding SerialPorts}" MinimumPrefixLength="0" FilterMode="Contains"
                              PlaceholderText="{loc:T 'COM3 o /dev/ttyUSB0'}" Width="360" />
-            <Button Classes="ghost" Command="{Binding RefreshPortsCommand}" ToolTip.Tip="{loc:T 'Volver a preguntar al agente por sus puertos serie'}">
+            <Button Classes="ghost" Command="{Binding RefreshPortsCommand}" ToolTip.Tip="{loc:T 'Volver a preguntar al colector por sus puertos serie'}">
               <c:Icon Kind="refresh" />
             </Button>
           </StackPanel>

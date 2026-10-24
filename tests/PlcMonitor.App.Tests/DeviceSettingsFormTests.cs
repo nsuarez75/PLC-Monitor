@@ -204,7 +204,7 @@ public sealed class DeviceSettingsFormTests : IDisposable
         await modbus.RefreshPortsAsync();
         modbus.SerialPorts.Add("/dev/ttyUSB0");
         modbus.SerialPort = "/dev/ttyUSB0";
-        modbus.PortsHint = "2 puerto(s) en el equipo del agente.";
+        modbus.PortsHint = "2 puerto(s) en el equipo del colector.";
         window.UpdateLayout();
         window.GetVisualDescendants().OfType<AutoCompleteBox>().Single().IsEffectivelyVisible.ShouldBeTrue();
         Texts(window).ShouldContain("Línea serie");

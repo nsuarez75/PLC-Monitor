@@ -117,7 +117,7 @@ public sealed class TrendsViewModelTests : IDisposable
         live.Chart.Options.Select(o => o.Name).ShouldBe(["casa1200 / peso"]);
         live.Chart.Options[0].IsSelected.ShouldBeTrue();
         (live.Chart.YMin, live.Chart.YMax).ShouldBe((5, 15));
-        live.Missing.ShouldBe("No disponibles en el agente: casa1200 / borrado");
+        live.Missing.ShouldBe("No disponibles en el colector: casa1200 / borrado");
 
         // El agente añade el tag: la gráfica abierta lo recoge.
         var configured = new DeviceConfigured { Device = new Device { Name = "casa1200", Driver = "s7-symbolic", Enabled = true } };

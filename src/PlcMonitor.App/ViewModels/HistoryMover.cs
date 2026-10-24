@@ -23,7 +23,7 @@ internal static class HistoryMover
         }
         catch (RpcException ex) when (ex.StatusCode == StatusCode.Unimplemented)
         {
-            context.Report(Loc.T("Este agente no sabe mover el histórico: actualízalo desde «Agentes» (Instalar / actualizar)."), isError: true);
+            context.Report(Loc.T("Este colector no sabe mover el histórico: actualízalo desde «Colectores» (Instalar / actualizar)."), isError: true);
         }
         catch (RpcException ex)
         {

@@ -1,12 +1,12 @@
 # 4. Dispositivos y drivers
 
-Un **dispositivo** representa un PLC, variador o pasarela dentro del agente. Cada dispositivo tiene un
+Un **dispositivo** representa un PLC, variador o pasarela dentro del colector. Cada dispositivo tiene un
 driver, unos ajustes de conexión y sus propios tags. Los tags de un dispositivo comparten la conexión y se
 organizan en grupos de escaneo.
 
 ## 4.1. Crear un dispositivo
 
-1. Conecta con el agente.
+1. Conecta con el colector.
 2. Abre **Dispositivos**.
 3. Pulsa **+** en la lista **DISPOSITIVOS**.
 4. Escribe un **Nombre**. No puede contener `/`, porque ese carácter separa el dispositivo del tag en el
@@ -37,7 +37,7 @@ preparar una máquina que todavía no está en red o para apartar un PLC averiad
 
 Es la primera de las tres llaves de escritura. La segunda está en el tag (**Escribible**) y la tercera, si
 la escritura llega por OPC UA, en el servidor (**Permitir escribir en los PLC por OPC UA**) y en el usuario
-de OPC UA. Las tres deben estar activas. Las escrituras quedan en la auditoría del agente.
+de OPC UA. Las tres deben estar activas. Las escrituras quedan en la auditoría del colector.
 
 ### Publicar en OPC UA
 
@@ -47,7 +47,7 @@ aunque sus tags tengan la segunda llave. Al activarla, los tags con **Publicar e
 
 ### Reconexión
 
-El agente reintenta la conexión con una espera exponencial:
+El colector reintenta la conexión con una espera exponencial:
 
 - **espera inicial**: tiempo antes del primer reintento;
 - **espera máxima**: límite del crecimiento;
@@ -79,7 +79,7 @@ Notas:
 - **Solo TLS** exige una CPU con comunicación PG/HMI segura. Si la CPU no la admite, la conexión falla.
 - **Sin TLS** es para proyectos antiguos o CPUs con la comunicación segura desactivada. No lo uses en una
   red no confiable.
-- La contraseña se guarda cifrada en el agente con `agent.key`.
+- La contraseña se guarda cifrada en el colector con `agent.key`.
 
 Con este driver puedes usar **Explorar** para buscar símbolos. Las direcciones son rutas del programa, por
 ejemplo `"MiDB".Motor.Velocidad` o `"Datos".Lista[3]`.
@@ -115,7 +115,7 @@ Este driver no explora símbolos. Da de alta los tags escribiendo la dirección.
 El driver `modbus` admite tres transportes:
 
 - **Modbus TCP**: conexión directa al equipo por Ethernet, puerto `502` por defecto.
-- **Modbus RTU**: puerto serie del equipo donde corre el agente (`COM3`, `/dev/ttyUSB0`...).
+- **Modbus RTU**: puerto serie del equipo donde corre el colector (`COM3`, `/dev/ttyUSB0`...).
 - **Modbus RTU sobre TCP**: tramas RTU dentro de una conexión TCP, para convertidores serie-Ethernet en
   modo transparente.
 
@@ -125,7 +125,7 @@ El driver `modbus` admite tres transportes:
 |---|---|
 | **Conexión** | TCP, RTU o RTU sobre TCP. |
 | **Equipo / puerto** | Host y puerto TCP. En RTU no se usan. |
-| **Puerto serie** | Puerto del equipo del agente. Solo RTU. |
+| **Puerto serie** | Puerto del equipo del colector. Solo RTU. |
 | **Línea serie** | Baudios, paridad y bits de parada. Deben coincidir con el equipo. |
 | **Unit id (esclavo)** | Número del esclavo. En TCP directo suele ser `1` o `255`; detrás de una pasarela, el del esclavo serie. |
 | **Direcciones** | Marca **Numerar desde 1** si el manual del equipo cuenta `HR1` como el primer registro. Las direcciones `40001`, `30001`... siempre empiezan en 1. |
@@ -148,7 +148,7 @@ formulario.
 
 ![Editor JSON de los ajustes de un dispositivo](img/04-dispositivo-json.png)
 
-**Precaución**: el JSON debe ser válido. Si guardas un JSON incorrecto, el agente rechazará el cambio y la
+**Precaución**: el JSON debe ser válido. Si guardas un JSON incorrecto, el colector rechazará el cambio y la
 app mostrará el error. La contraseña guardada se muestra como `********`; déjala así para conservarla.
 
 ## 4.7. Activar, desactivar y eliminar
@@ -164,7 +164,7 @@ antiguo.
 
 ## 4.8. Comprobar la conexión
 
-Cuando guardas un dispositivo, el agente intenta conectar. Revisa:
+Cuando guardas un dispositivo, el colector intenta conectar. Revisa:
 
 1. El estado en la lista y en la cabecera.
 2. El detalle bajo el nombre: host inalcanzable, timeout, error de autenticación, etc.
@@ -172,7 +172,7 @@ Cuando guardas un dispositivo, el agente intenta conectar. Revisa:
    permisos, no solo de conexión.
 4. **Explorar** en S7 simbólico: si explora pero no lee un tag, la conexión está bien y el problema está en
    la dirección.
-5. El log del agente en **Agentes > Ver log**.
+5. El log del colector en **Colectores > Ver log**.
 
 ## Siguiente paso
 

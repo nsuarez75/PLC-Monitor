@@ -140,7 +140,7 @@
             </StackPanel>
             <TextBlock Grid.Row="11" Text="{loc:T 'Estado'}" VerticalAlignment="Center" FontWeight="Medium" />
             <CheckBox Grid.Row="11" Grid.Column="1" Content="{loc:T 'Activo'}" IsChecked="{Binding TagEnabled}"
-                      ToolTip.Tip="{loc:T 'Desactivado, el tag sigue configurado pero el agente no lo lee, no lo historiza ni lo publica en OPC UA'}" />
+                      ToolTip.Tip="{loc:T 'Desactivado, el tag sigue configurado pero el colector no lo lee, no lo historiza ni lo publica en OPC UA'}" />
           </Grid>
         </StackPanel>
       </Border>
@@ -153,7 +153,7 @@
             <c:Icon Kind="history" Width="14" Height="14" Foreground="{DynamicResource App.Accent}" />
           </StackPanel>
           <TextBlock Classes="muted" FontSize="12" TextWrapping="Wrap" IsVisible="{Binding !HistorianEnabled}"
-                     Text="{loc:T 'El historiador está desactivado en este agente (historian.enabled en agent.json): la configuración se guarda, pero no se registrará nada.'}" />
+                     Text="{loc:T 'El historiador está desactivado en este colector (historian.enabled en agent.json): la configuración se guarda, pero no se registrará nada.'}" />
           <CheckBox Content="{loc:T 'Guardar este tag en el histórico'}" IsChecked="{Binding HistoryEnabled}" />
           <Grid ColumnDefinitions="150,*" RowDefinitions="Auto,Auto,Auto" RowSpacing="10" ColumnSpacing="16" IsEnabled="{Binding HistoryEnabled}">
             <TextBlock Text="{loc:T 'Frecuencia mínima'}" VerticalAlignment="Center" />

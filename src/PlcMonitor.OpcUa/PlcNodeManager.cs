@@ -304,10 +304,10 @@ internal sealed class PlcNodeManager : AsyncCustomNodeManager
         var state = Folder(folder, $"estado:{name}", "_Estado");
         var device = new DeviceNode(name, folder, status)
         {
-            Connected = StatusVariable(state, name, "Conectado", DataTypeIds.Boolean, "El agente está conectado al dispositivo."),
+            Connected = StatusVariable(state, name, "Conectado", DataTypeIds.Boolean, "El colector está conectado al dispositivo."),
             State = StatusVariable(state, name, "Estado", DataTypeIds.String, "Desconectado, Conectando, Conectado o Error."),
             Detail = StatusVariable(state, name, "Detalle", DataTypeIds.String, "Motivo del último error o cambio de estado."),
-            Enabled = StatusVariable(state, name, "Activo", DataTypeIds.Boolean, "El agente vigila el dispositivo."),
+            Enabled = StatusVariable(state, name, "Activo", DataTypeIds.Boolean, "El colector vigila el dispositivo."),
             WritesEnabled = StatusVariable(state, name, "EscrituraPermitida", DataTypeIds.Boolean,
                 "Escritura permitida en el dispositivo (WritesEnabled) y en el servidor OPC UA (tercera llave)."),
         };
@@ -486,7 +486,7 @@ internal sealed class PlcNodeManager : AsyncCustomNodeManager
     {
         var user = UserOf(context);
         if (!_settings().AllowWrites)
-            return Fail(StatusCodes.BadNotWritable, "El servidor OPC UA no permite escribir (tercera llave desactivada en el agente).");
+            return Fail(StatusCodes.BadNotWritable, "El servidor OPC UA no permite escribir (tercera llave desactivada en el colector).");
         if (!CanWrite(user))
             return Fail(StatusCodes.BadUserAccessDenied, $"El usuario OPC UA '{user}' no tiene permiso de escritura.");
         var key = tag.Key;

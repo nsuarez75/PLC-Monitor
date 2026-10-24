@@ -61,7 +61,7 @@ public sealed class AgentDeployer(ISshSession session, IProgress<string>? progre
         ArgumentNullException.ThrowIfNull(options);
         var platform = await DetectPlatformAsync(cancellationToken);
         var package = AgentPackages.Find(platform.Rid, options.PackageFolders)
-            ?? throw new DeployException($"No se encuentra el ejecutable del agente para {platform.Rid} ({AgentPackages.FileName(platform.Rid)}) en: {string.Join(", ", options.PackageFolders)}");
+            ?? throw new DeployException($"No se encuentra el ejecutable del colector para {platform.Rid} ({AgentPackages.FileName(platform.Rid)}) en: {string.Join(", ", options.PackageFolders)}");
 
         var hasSecurity = (await RunPlatformAsync(platform, platform.Os == RemoteOs.Linux ? AgentScripts.LinuxHasSecurity : AgentScripts.WindowsHasSecurity, password, options.SudoPassword, elevated: !session.IsLocal, cancellationToken)).Output.Trim() == "yes";
         NewCredentials? credentials = null;
@@ -83,7 +83,7 @@ public sealed class AgentDeployer(ISshSession session, IProgress<string>? progre
         if (!result.Success || !result.Output.Contains("active", StringComparison.Ordinal))
             throw new DeployException($"La instalación falló: {result.Detail}");
         var url = $"https://{host}:{options.Port}";
-        Report($"Agente en marcha: {url}");
+        Report($"Colector en marcha: {url}");
         return new InstallResult(platform, url, credentials?.Token, credentials?.Thumbprint, session.HostKeyFingerprint, credentials?.ReadOnlyToken);
     }
 
@@ -96,7 +96,7 @@ public sealed class AgentDeployer(ISshSession session, IProgress<string>? progre
         ArgumentNullException.ThrowIfNull(options);
         var platform = await DetectPlatformAsync(cancellationToken);
         var credentials = await CreateCredentialsAsync(host, options.Port, options.ReadOnlyToken, cancellationToken);
-        Report("Cambiando las credenciales y reiniciando el agente…");
+        Report("Cambiando las credenciales y reiniciando el colector…");
         var script = platform.Os == RemoteOs.Linux ? AgentScripts.LinuxRenew(credentials.Files) : AgentScripts.WindowsRenew(credentials.Files);
         var result = await RunPlatformAsync(platform, script, password, options.SudoPassword, elevated: true, cancellationToken);
         if (!result.Success || !result.Output.Contains("active", StringComparison.Ordinal))
@@ -133,7 +133,7 @@ public sealed class AgentDeployer(ISshSession session, IProgress<string>? progre
             Report(line);
         if (!result.Success || !result.Output.Contains("desinstalado", StringComparison.Ordinal))
             throw new DeployException($"La desinstalación falló: {result.Detail}");
-        Report("Agente desinstalado");
+        Report("Colector desinstalado");
     }
 
     public async Task<AgentStatus> GetStatusAsync(CancellationToken cancellationToken = default)
@@ -164,7 +164,7 @@ public sealed class AgentDeployer(ISshSession session, IProgress<string>? progre
             if (!log.Success)
                 throw new DeployException($"No se pudo leer el log: {log.Detail}");
             return log.Output.Trim() == "nolog"
-                ? "Este agente aún no ha escrito ningún log en fichero (las versiones anteriores a la 1.3.0 solo escriben avisos y errores en el Visor de eventos, origen «plcmon-agent»). Actualízalo con «Instalar / actualizar»."
+                ? "Este colector aún no ha escrito ningún log en fichero (las versiones anteriores a la 1.3.0 solo escriben avisos y errores en el Visor de eventos, origen «plcmon-agent»). Actualízalo con «Instalar / actualizar»."
                 : log.Output;
         }
         if (session.IsLocal)

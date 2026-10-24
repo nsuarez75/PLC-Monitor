@@ -208,7 +208,7 @@ public sealed partial class ModbusSettingsForm : DriverSettingsForm
     public static IReadOnlyList<SettingOption> TransportOptions { get; } =
     [
         new("Tcp", "Modbus TCP"),
-        new("Rtu", "Modbus RTU (puerto serie del equipo del agente)"),
+        new("Rtu", "Modbus RTU (puerto serie del equipo del colector)"),
         new("RtuOverTcp", "Modbus RTU sobre TCP (convertidor serie-Ethernet)"),
     ];
 
@@ -302,9 +302,9 @@ public sealed partial class ModbusSettingsForm : DriverSettingsForm
             SerialPorts.Add(port);
         PortsHint = ports switch
         {
-            null => Loc.T("No se pudo preguntar al agente por sus puertos serie: escríbelo (COM3, /dev/ttyUSB0...)."),
-            { Count: 0 } => Loc.T("El agente no encuentra puertos serie (o es anterior a la 1.15): escríbelo a mano. En Linux suele ser /dev/ttyUSB0."),
-            _ => Loc.F("{0} puerto(s) en el equipo del agente.", ports.Count),
+            null => Loc.T("No se pudo preguntar al colector por sus puertos serie: escríbelo (COM3, /dev/ttyUSB0...)."),
+            { Count: 0 } => Loc.T("El colector no encuentra puertos serie (o es anterior a la 1.15): escríbelo a mano. En Linux suele ser /dev/ttyUSB0."),
+            _ => Loc.F("{0} puerto(s) en el equipo del colector.", ports.Count),
         };
         if (string.IsNullOrWhiteSpace(SerialPort) && SerialPorts.Count > 0)
             SerialPort = SerialPorts[0];

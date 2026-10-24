@@ -1,12 +1,12 @@
 # 4. Devices and drivers
 
-A **device** represents a PLC, drive or gateway inside the agent. Each device has a
+A **device** represents a PLC, drive or gateway inside the collector. Each device has a
 driver, connection settings and its own tags. The tags of a device share the connection and are
 organized into scan groups.
 
 ## 4.1. Create a device
 
-1. Connect to the agent.
+1. Connect to the collector.
 2. Open **Dispositivos** (Devices).
 3. Click **+** in the **DISPOSITIVOS** (DEVICES) list.
 4. Enter a **Nombre** (Name). It cannot contain `/`, because that character separates the device from the tag in
@@ -37,7 +37,7 @@ prepare a machine that is not yet on the network or to set aside a faulty PLC wi
 
 **Escrituras habilitadas** (Writes enabled) is the first of the three write keys. The second is in the tag (**Escribible**, Writable) and the third, if
 the write comes through OPC UA, in the server (**Permitir escribir en los PLC por OPC UA**, Allow writing to PLCs over OPC UA) and in the OPC UA
-user. All three must be active. Writes are recorded in the agent audit.
+user. All three must be active. Writes are recorded in the collector audit.
 
 ### Publicar en OPC UA
 
@@ -47,7 +47,7 @@ server tree.
 
 ### Reconexión
 
-With **Reconexión** (Reconnection), the agent retries the connection with an exponential wait:
+With **Reconexión** (Reconnection), the collector retries the connection with an exponential wait:
 
 - **espera inicial** (initial wait): time before the first retry;
 - **espera máxima** (maximum wait): growth limit;
@@ -79,7 +79,7 @@ Notes:
 - **Solo TLS** requires a CPU with secure PG/HMI communication. If the CPU does not support it, the connection fails.
 - **Sin TLS** is for old projects or CPUs with secure communication disabled. Do not use it on an
   untrusted network.
-- The password is stored encrypted in the agent with `agent.key`.
+- The password is stored encrypted in the collector with `agent.key`.
 
 With this driver you can use **Explorar** (Browse) to search for symbols. Addresses are program paths, for
 example `"MiDB".Motor.Velocidad` or `"Datos".Lista[3]`.
@@ -115,7 +115,7 @@ This driver does not browse symbols. Create tags by typing the address.
 The `modbus` driver supports three transports:
 
 - **Modbus TCP**: direct connection to the device over Ethernet, port `502` by default.
-- **Modbus RTU**: serial port of the computer where the agent runs (`COM3`, `/dev/ttyUSB0`...).
+- **Modbus RTU**: serial port of the computer where the collector runs (`COM3`, `/dev/ttyUSB0`...).
 - **Modbus RTU over TCP**: RTU frames inside a TCP connection, for serial-to-Ethernet converters in
   transparent mode.
 
@@ -125,7 +125,7 @@ The `modbus` driver supports three transports:
 |---|---|
 | **Conexión** (Connection) | TCP, RTU or RTU over TCP. |
 | **Equipo / puerto** (Host / port) | Host and TCP port. Not used in RTU. |
-| **Puerto serie** (Serial port) | Port on the agent computer. RTU only. |
+| **Puerto serie** (Serial port) | Port on the collector computer. RTU only. |
 | **Línea serie** (Serial line) | Baud rate, parity and stop bits. They must match the device. |
 | **Unit id (esclavo)** (Slave unit ID) | Slave number. In direct TCP it is usually `1` or `255`; behind a gateway, that of the serial slave. |
 | **Direcciones** (Addresses) | Check **Numerar desde 1** (Number from 1) if the device manual counts `HR1` as the first register. Addresses `40001`, `30001`... always start at 1. |
@@ -148,7 +148,7 @@ form.
 
 ![JSON editor of a device's settings](../img/04-dispositivo-json.png)
 
-**Caution**: the JSON must be valid. If you save incorrect JSON, the agent will reject the change and the
+**Caution**: the JSON must be valid. If you save incorrect JSON, the collector will reject the change and the
 app will show the error. The saved password is shown as `********`; leave it that way to keep it.
 
 ## 4.7. Activate, deactivate and remove
@@ -164,7 +164,7 @@ name.
 
 ## 4.8. Check the connection
 
-When you save a device, the agent tries to connect. Check:
+When you save a device, the collector tries to connect. Check:
 
 1. The status in the list and in the header.
 2. The detail under the name: unreachable host, timeout, authentication error, etc.
@@ -172,7 +172,7 @@ When you save a device, the agent tries to connect. Check:
    permissions issue, not only the connection.
 4. **Explorar** in S7 symbolic: if it browses but does not read a tag, the connection is fine and the problem is in
    the address.
-5. The agent log in **Agentes > Ver log**.
+5. The collector log in **Colectores > Ver log**.
 
 ## Next step
 

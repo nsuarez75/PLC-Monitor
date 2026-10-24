@@ -206,7 +206,7 @@ public sealed class TagTableTests : IDisposable
         vm.Page.ShouldBe(AppPage.Tags);
         vm.OpenTransformsCommand.CanExecute(null).ShouldBeFalse();
         vm.OpenTrendsCommand.Execute(null);
-        vm.Trends.ShouldBeSameAs(trends, "mismo agente");
+        vm.Trends.ShouldBeSameAs(trends, "mismo colector");
     }
 
     [Fact]

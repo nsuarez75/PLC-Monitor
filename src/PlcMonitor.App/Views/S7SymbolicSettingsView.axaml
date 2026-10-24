@@ -15,7 +15,7 @@
     </StackPanel>
     <StackPanel Grid.Row="1" Grid.Column="1" Spacing="4">
       <TextBox Text="{Binding Password}" PasswordChar="•" PlaceholderText="{loc:T '(CPU sin protección)'}" Width="240" HorizontalAlignment="Left" />
-      <TextBlock Text="{loc:T 'La guardada se ve como ********; déjala así para conservarla. Se guarda cifrada en el agente.'}"
+      <TextBlock Text="{loc:T 'La guardada se ve como ********; déjala así para conservarla. Se guarda cifrada en el colector.'}"
                  Classes="muted" FontSize="11.5" TextWrapping="Wrap" />
     </StackPanel>
 

@@ -88,7 +88,7 @@ public class ManualCaptureTests
         vm.OpenAgentsCommand.Execute(null);
         vm.Agents!.Selected = profile;
         var window = MainWindow(vm);
-        window.GetVisualDescendants().OfType<TextBlock>().Select(t => t.Text).ShouldContain("AGENTES");
+        window.GetVisualDescendants().OfType<TextBlock>().Select(t => t.Text).ShouldContain("COLECTORES");
         Capture(window, "03-agentes.png");
     }
 

@@ -1,8 +1,8 @@
 # 6. Histórico
 
-El histórico guarda muestras de los tags en el disco del agente para poder responder preguntas como «¿qué
+El histórico guarda muestras de los tags en el disco del colector para poder responder preguntas como «¿qué
 presión había cuando falló?» o «¿cuánto ha subido el contador en el turno?». No es necesario que la app esté
-abierta: el agente sigue historizando aunque cierres la ventana o se desconecte la red.
+abierta: el colector sigue historizando aunque cierres la ventana o se desconecte la red.
 
 ## 6.1. Activar la historización
 
@@ -14,7 +14,7 @@ La historización se configura por tag, en su detalle:
 4. Ajusta la **Frecuencia mínima**, la **Banda muerta** y el **Tiempo máximo**.
 5. Pulsa **Guardar**.
 
-La primera vez que se historiza un tag, el agente empieza a guardar desde ese momento. No recupera valores
+La primera vez que se historiza un tag, el colector empieza a guardar desde ese momento. No recupera valores
 anteriores que no se hayan guardado.
 
 ### Frecuencia mínima
@@ -34,7 +34,7 @@ cambie.
 
 ### Tiempo máximo
 
-Si el valor no cambia, el agente guarda una muestra cada cierto tiempo. Sirve para demostrar que el tag
+Si el valor no cambia, el colector guarda una muestra cada cierto tiempo. Sirve para demostrar que el tag
 seguía comunicando aunque su valor fuera constante. `0` desactiva esta garantía.
 
 ### Disparo
@@ -52,7 +52,7 @@ solo mientras `Marcha` vale `true`, o la temperatura solo cuando `Estado` es may
 Al cumplirse la condición se guarda el valor actual y, mientras dure, se aplican la frecuencia, la banda
 muerta y el tiempo máximo. Al terminar se guarda un último punto. Los cambios de calidad se guardan siempre.
 
-### Historiador del agente
+### Historiador del colector
 
 El historiador se puede desactivar globalmente en `agent.json` (`historian.enabled`). Si está desactivado,
 la configuración de los tags se guarda pero no se registra nada. La ventana de detalle lo avisa.
@@ -84,7 +84,7 @@ La gráfica tiene una serie por tag. Puedes:
 - exportar la gráfica a PNG o copiarla al portapapeles.
 
 El resumen indica cuántos puntos se han recibido, de cuántos tags, el periodo y el agregado. Si aparece
-**hay más puntos: usa un agregado o un periodo más corto**, la consulta se ha recortado. El agente limita
+**hay más puntos: usa un agregado o un periodo más corto**, la consulta se ha recortado. El colector limita
 el resultado a 20 000 puntos por consulta.
 
 ### En bruto frente a agregado
@@ -136,7 +136,7 @@ También se pueden leer CSV antiguos sin la columna `unit`. El separador es la c
 UTF-8 sin BOM.
 
 El CSV se puede abrir en una hoja de cálculo o volver a cargar en **Tendencias > Datos > Fichero CSV
-exportado**. Es una forma de conservar una captura de datos o de compartirla sin dar acceso al agente.
+exportado**. Es una forma de conservar una captura de datos o de compartirla sin dar acceso al colector.
 
 ## 6.5. Abrir en Tendencias
 
@@ -161,15 +161,15 @@ cada tipo.
    consultando.
 4. Pulsa **Borrar** y confirma.
 
-El borrado elimina las muestras de esos tags en ese intervalo. No se puede deshacer. Si el agente es
-antiguo y no admite la operación, la app pedirá actualizarlo desde **Agentes > Instalar / actualizar**.
+El borrado elimina las muestras de esos tags en ese intervalo. No se puede deshacer. Si el colector es
+antiguo y no admite la operación, la app pedirá actualizarlo desde **Colectores > Instalar / actualizar**.
 
 **Precaución**: antes de borrar, exporta el intervalo a CSV si puede ser necesario para una investigación.
 El borrado no afecta a la configuración del tag ni a su historización futura.
 
 ## 6.7. Dónde se guarda
 
-El agente guarda el histórico en SQLite, en la carpeta `history/` de su instalación. Crea un fichero por
+El colector guarda el histórico en SQLite, en la carpeta `history/` de su instalación. Crea un fichero por
 mes:
 
 ```text
@@ -201,8 +201,8 @@ Los detalles de configuración y copia de seguridad están en
 - Para un evento concreto, activa el disparo en lugar de guardar todo el día.
 - Revisa la retención antes de necesitar datos antiguos. Si la política es de 30 días, no podrás consultar
   un fallo de hace tres meses.
-- Exporta a CSV los periodos que debas conservar fuera del agente.
-- Sincroniza el reloj del agente y del PLC. Una hora incorrecta hace que los datos aparezcan en el periodo
+- Exporta a CSV los periodos que debas conservar fuera del colector.
+- Sincroniza el reloj del colector y del PLC. Una hora incorrecta hace que los datos aparezcan en el periodo
   equivocado.
 
 ## Siguiente paso

@@ -15,19 +15,19 @@ consigna o dejar registrado el comportamiento de una máquina durante un turno.
 Es la ventana que abres en tu equipo. Desde ella:
 
 - creas y editas dispositivos y tags;
-- conectas con uno o varios agentes;
+- conectas con uno o varios colectores;
 - ves los valores en vivo y escribes consignas;
 - consultas el histórico y creas tendencias, paneles y transformaciones;
-- configuras el servidor OPC UA del agente;
-- instalas o actualizas agentes en otros equipos por SSH.
+- configuras el servidor OPC UA del colector;
+- instalas o actualizas colectores en otros equipos por SSH.
 
-La app no necesita un servidor central. Guarda sus preferencias, perfiles de agentes, vistas y paneles en tu
-carpeta de usuario. Los perfiles incluyen la URL y el token de cada agente; el token se guarda protegido por
+La app no necesita un servidor central. Guarda sus preferencias, perfiles de colectores, vistas y paneles en tu
+carpeta de usuario. Los perfiles incluyen la URL y el token de cada colector; el token se guarda protegido por
 el sistema operativo.
 
-### El agente
+### El colector
 
-El agente es un servicio que se instala en el equipo que está cerca del PLC. Se encarga de:
+El colector es un servicio que se instala en el equipo que está cerca del PLC. Se encarga de:
 
 - conectar con los PLC mediante los drivers;
 - leer los tags en los grupos de escaneo;
@@ -36,16 +36,16 @@ El agente es un servicio que se instala en el equipo que está cerca del PLC. Se
 - publicar los tags por OPC UA si lo activas;
 - atender a la app por gRPC.
 
-El agente sigue funcionando cuando cierras la app. Si la app se desconecta, el PLC se sigue leyendo y el
+El colector sigue funcionando cuando cierras la app. Si la app se desconecta, el PLC se sigue leyendo y el
 histórico continúa. Al volver a conectar, la app recibe el estado actual y los cambios nuevos.
 
 ## Conceptos que aparecen en todo el manual
 
 | Concepto | Qué es |
 |---|---|
-| **Agente** | Servicio `plcmon-agent` instalado en un equipo. Tiene una URL y un token. |
-| **Perfil de agente** | La configuración local que usa la app para conectar con un agente: nombre, URL, token, certificado y datos SSH. |
-| **Dispositivo** | Un PLC, variador o pasarela configurada dentro del agente. Tiene un driver y unos ajustes. |
+| **Colector** | Servicio `plcmon-agent` instalado en un equipo. Tiene una URL y un token. |
+| **Perfil de colector** | La configuración local que usa la app para conectar con un colector: nombre, URL, token, certificado y datos SSH. |
+| **Dispositivo** | Un PLC, variador o pasarela configurada dentro del colector. Tiene un driver y unos ajustes. |
 | **Driver** | La familia de protocolo: S7 simbólico, S7 absoluto o Modbus. |
 | **Tag** | Una variable concreta de un dispositivo, con una dirección, un tipo y un grupo de escaneo. |
 | **Grupo de escaneo** | Conjunto de tags que se leen juntos cada cierto tiempo (`intervalMs`). |
@@ -59,7 +59,7 @@ histórico continúa. Al volver a conectar, la app recibe el estado actual y los
 ## Arquitectura
 
 ```text
-App de escritorio ─── gRPC (TLS + token) ───▶ Agente ─── S7 / Modbus ───▶ PLC
+App de escritorio ─── gRPC (TLS + token) ───▶ Colector ── S7 / Modbus ───▶ PLC
        ▲                                        │
        └──────────── estados y valores ─────────┘
                                                 │
@@ -67,13 +67,13 @@ App de escritorio ─── gRPC (TLS + token) ───▶ Agente ─── S7 
                                                 └── servidor OPC UA
 ```
 
-La app puede estar en el mismo equipo que el agente o en otro. Lo habitual en una planta es tener un agente
-en la red de máquinas y la app en el puesto de mantenimiento. También puedes instalar un agente en tu propio
+La app puede estar en el mismo equipo que el colector o en otro. Lo habitual en una planta es tener un colector
+en la red de máquinas y la app en el puesto de mantenimiento. También puedes instalar un colector en tu propio
 portátil para probar con un PLC de laboratorio.
 
-El agente escucha por defecto en `http://127.0.0.1:5310` cuando se ejecuta sin instalar y solo para uso
+El colector escucha por defecto en `http://127.0.0.1:5310` cuando se ejecuta sin instalar y solo para uso
 local. El instalador crea una configuración con TLS en el puerto `5311` y un token. La app usa esa URL y ese
-token al conectar. No confundas el puerto del agente con el puerto del PLC: el PLC se configura dentro de
+token al conectar. No confundas el puerto del colector con el puerto del PLC: el PLC se configura dentro de
 cada dispositivo.
 
 ## Qué puedes hacer con cada driver
@@ -97,7 +97,7 @@ terceros.
 - La release es un ejecutable autocontenido; no hace falta instalar .NET.
 - Para compilar desde el código fuente sí necesitas el SDK de .NET 10.
 
-### Para el agente
+### Para el colector
 
 - Linux o Windows en la misma red que el PLC.
 - Permisos de administrador para instalar el servicio.
@@ -107,13 +107,13 @@ terceros.
 
 | Puerto | Uso |
 |---|---|
-| `5310/tcp` | Agente local sin TLS, solo para pruebas en el mismo equipo. |
-| `5311/tcp` | Agente instalado con TLS y token. Es el valor por defecto del instalador. |
-| `4840/tcp` | Servidor OPC UA del agente, si lo activas. |
+| `5310/tcp` | Colector local sin TLS, solo para pruebas en el mismo equipo. |
+| `5311/tcp` | Colector instalado con TLS y token. Es el valor por defecto del instalador. |
+| `4840/tcp` | Servidor OPC UA del colector, si lo activas. |
 | `102/tcp` | S7. |
 | `502/tcp` | Modbus TCP. |
 
-Abre solo los puertos necesarios y no publiques el agente en Internet. En el capítulo
+Abre solo los puertos necesarios y no publiques el colector en Internet. En el capítulo
 [Seguridad](12-seguridad.md) se explica cómo combinarlos.
 
 ## Lo que no hace
@@ -122,17 +122,17 @@ Abre solo los puertos necesarios y no publiques el agente en Internet. En el cap
 - No programa el PLC ni descarga programas.
 - No garantiza que una escritura sea segura para la máquina. La decisión de escribir y el valor deben
   validarse siempre en el proceso.
-- No sincroniza los datos entre varias apps. Cada app consulta el mismo agente, pero no comparte sus vistas
+- No sincroniza los datos entre varias apps. Cada app consulta el mismo colector, pero no comparte sus vistas
   ni sus paneles con otras personas.
-- No envía datos a la nube. Todo queda en el agente y en el equipo donde ejecutas la app, salvo que tú
+- No envía datos a la nube. Todo queda en el colector y en el equipo donde ejecutas la app, salvo que tú
   configures OPC UA u otra integración.
 
 ## Recorrido rápido por la ventana
 
-![Ventana principal con un agente conectado](img/01-window.png)
+![Ventana principal con un colector conectado](img/01-window.png)
 
-1. **Barra superior**: perfil de agente, botón **Conectar** o **Desconectar**, estado de la conexión y
-   pestañas **Dispositivos**, **Tendencias**, **Transformaciones**, **OPC UA** y **Agentes**.
+1. **Barra superior**: perfil de colector, botón **Conectar** o **Desconectar**, estado de la conexión y
+   pestañas **Dispositivos**, **Tendencias**, **Transformaciones**, **OPC UA** y **Colectores**.
 2. **Lista de dispositivos**: a la izquierda. Cada fila muestra el nombre, el estado, el driver y el número
    de tags. El botón **+** crea un dispositivo.
 3. **Zona central**: cambia según la pestaña. En **Dispositivos** tienes las pestañas **Tags**,
@@ -142,4 +142,4 @@ Abre solo los puertos necesarios y no publiques el agente en Internet. En el cap
 5. **Tema**: el icono de la derecha de la barra superior alterna entre claro y oscuro.
 
 Con eso ya puedes seguir el capítulo [Instalación y primer uso](02-instalacion-y-primer-uso.md). Si ya
-tienes un agente funcionando, salta a [Dispositivos y drivers](04-dispositivos-y-drivers.md).
+tienes un colector funcionando, salta a [Dispositivos y drivers](04-dispositivos-y-drivers.md).

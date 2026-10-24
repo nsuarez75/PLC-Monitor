@@ -11,7 +11,7 @@ created once and opened when needed. You do not need to select a device to open 
 2. Click **+** in **TENDENCIAS**.
 3. Enter a **Nombre** (Name).
 4. Choose the **Tipo de gráfica** (Chart type).
-5. Choose the **Datos** (Data): en vivo (live), histórico del agente (agent history), or fichero CSV (CSV file).
+5. Choose the **Datos** (Data): en vivo (live), histórico del colector (collector history), or fichero CSV (CSV file).
 6. Adjust the options for the type: window, period, limits, bars, etc.
 7. Add tags from the list on the right. You can search by device or tag and use **Añadir todos** (Add all).
 8. Configure the **Disparo** (Trigger) if you want to see only certain ranges.
@@ -21,7 +21,7 @@ created once and opened when needed. You do not need to select a device to open 
 The list on the left has two sections:
 
 - **PANELES** (Panels): grids with several views. They are explained in [Panels](08-panels.md).
-- **TENDENCIAS** (Trends): saved views of this agent and CSV views, which can be opened offline.
+- **TENDENCIAS** (Trends): saved views of this collector and CSV views, which can be opened offline.
 
 Views are saved in `trends.json`, in the app's data folder. Panels are saved in `panels.json`, next to that
 file.
@@ -30,20 +30,20 @@ file.
 
 | Source | What it shows | Requirements |
 |---|---|---|
-| **En vivo (lo que llega, última hora)** (Live data, last hour) | The values the app has received since it was opened. | Agent connected. |
-| **Histórico del agente** (Agent history) | The values saved by the agent in the chosen period. | Tags with history recording enabled. |
+| **En vivo (lo que llega, última hora)** (Live data, last hour) | The values the app has received since it was opened. | Collector connected. |
+| **Histórico del colector** (Collector history) | The values saved by the collector in the chosen period. | Tags with history recording enabled. |
 | **Fichero CSV exportado** (Exported CSV file) | The values from a history CSV file. | None; it can be viewed offline. |
 
 The **En vivo** (Live) source does not query history. If you open the app and create the view, you start
 seeing data from that moment. The app keeps up to one hour of values per tag in memory, so a view opened
 after a while can show the last minutes, but not anything from before the app was opened.
 
-The **Histórico** (History) source queries the agent when the view is opened. The window is fixed: the data
+The **Histórico** (History) source queries the collector when the view is opened. The window is fixed: the data
 does not change while you look at it. The **Actualizar** (Refresh) button queries again. If a tag is not
 recorded to history, it appears in the notice of missing tags.
 
 The **CSV** source reads a file exported from the History tab. Its tags are the ones in the file, not the
-agent's. Text tags are ignored; bad qualities leave a gap.
+collector's. Text tags are ignored; bad qualities leave a gap.
 
 ## 7.3. The live chart
 
@@ -66,7 +66,7 @@ When you open a live view:
   on the clipboard.
 
 The header shows the history period or the live window, how many points there are, and when it was queried.
-If the agent has truncated the response, it says so.
+If the collector has truncated the response, it says so.
 
 ## 7.4. Chart types
 
@@ -184,7 +184,7 @@ must be recorded to history; if any is not, the app warns and draws the others.
 The trigger limits what is shown to the ranges in which another tag meets a condition.
 
 1. Check **Mostrar solo mientras un tag cumpla una condición** (Show only while a tag meets a condition).
-2. Choose the **Tag de disparo** (Trigger tag). It can be any tag in the agent, whether or not it is in the view.
+2. Choose the **Tag de disparo** (Trigger tag). It can be any tag in the collector, whether or not it is in the view.
 3. If it is Boolean, choose **true** or **false**. Otherwise, choose the condition and enter the **valor** (value).
 4. Specify **Antes del disparo** (Before the trigger): seconds shown before it is met.
 5. Specify **Después** (After): seconds shown after it stops being met.
@@ -212,7 +212,7 @@ For the histogram, **Tolerancias** (Tolerances) defines LIE and LSE. For the ind
 - **Borrar** (Delete) deletes the view. If the view is in a panel, it is removed from the panel; the panel is not deleted.
 - **Editar vista** (Edit view) returns from chart mode to the form.
 
-If you change the name of a tag or remove it from the agent, the view keeps the reference. When you open
+If you change the name of a tag or remove it from the collector, the view keeps the reference. When you open
 it, the app warns that the tag is not available and draws the others. You can edit it to replace it.
 
 ## 7.8. CSV views
@@ -223,8 +223,8 @@ it, the app warns that the tag is not available and draws the others. You can ed
 4. The tag list is filled with the file's tags.
 5. Choose the ones you want and open the view.
 
-CSV views can be opened without being connected to the agent. They are saved in `trends.json` and appear in
-the list of all profiles, because they do not depend on a specific agent. The CSV source is not available
+CSV views can be opened without being connected to the collector. They are saved in `trends.json` and appear in
+the list of all profiles, because they do not depend on a specific collector. The CSV source is not available
 for indicators.
 
 ## 7.9. Best practices

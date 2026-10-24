@@ -64,7 +64,7 @@
         <!-- Sin vistas -->
         <Border Classes="card" Padding="24" VerticalAlignment="Top" IsVisible="{Binding !HasViews}">
           <StackPanel Spacing="12">
-            <TextBlock Text="{loc:T 'Aún no hay vistas de tendencia para este agente.'}" />
+            <TextBlock Text="{loc:T 'Aún no hay vistas de tendencia para este colector.'}" />
             <Button Classes="accent" Command="{Binding NewCommand}" HorizontalAlignment="Left">
               <StackPanel Orientation="Horizontal" Spacing="6">
                 <c:Icon Kind="plus" />
@@ -135,7 +135,7 @@
                     </StackPanel>
                   </WrapPanel>
                   <TextBlock Grid.Row="1" Grid.Column="1" Classes="muted" FontSize="11.5" TextWrapping="Wrap"
-                             Text="{loc:T 'Se lee del histórico del agente al abrir la vista (solo los tags que se historizan); «Actualizar» lo vuelve a leer.'}" />
+                             Text="{loc:T 'Se lee del histórico del colector al abrir la vista (solo los tags que se historizan); «Actualizar» lo vuelve a leer.'}" />
                 </Grid>
                 <Grid ColumnDefinitions="170,*" ColumnSpacing="16" IsVisible="{Binding UsesLiveWindow}">
                   <TextBlock Text="{loc:T 'Ventana'}" VerticalAlignment="Center" FontWeight="Medium" />
@@ -206,7 +206,7 @@
                 <CheckBox Content="{loc:T 'Mostrar solo mientras un tag cumpla una condición'}" IsChecked="{Binding TriggerEnabled}" />
                 <Grid ColumnDefinitions="170,*" RowDefinitions="Auto,Auto,Auto,Auto" RowSpacing="10" ColumnSpacing="16" IsVisible="{Binding TriggerEnabled}">
                   <TextBlock Text="{loc:T 'Tag de disparo'}" VerticalAlignment="Center" FontWeight="Medium" />
-                  <ComboBox Grid.Column="1" ItemsSource="{Binding TriggerChoices}" SelectedItem="{Binding TriggerTag}" MinWidth="280" PlaceholderText="{loc:T 'Elige un tag del agente'}">
+                  <ComboBox Grid.Column="1" ItemsSource="{Binding TriggerChoices}" SelectedItem="{Binding TriggerTag}" MinWidth="280" PlaceholderText="{loc:T 'Elige un tag del colector'}">
                     <ComboBox.ItemTemplate>
                       <DataTemplate x:DataType="vm:TrendTagChoice">
                         <TextBlock Text="{Binding Text}" TextTrimming="CharacterEllipsis" />
@@ -232,7 +232,7 @@
                   </StackPanel>
                 </Grid>
                 <TextBlock Classes="muted" FontSize="11.5" TextWrapping="Wrap" IsVisible="{Binding TriggerEnabled}"
-                           Text="{loc:T 'Fuera de esos tramos la gráfica queda en blanco. Se calcula con lo recibido en vivo (la última hora), como el histórico por disparo del agente.'}" />
+                           Text="{loc:T 'Fuera de esos tramos la gráfica queda en blanco. Se calcula con lo recibido en vivo (la última hora), como el histórico por disparo del colector.'}" />
                 <TextBlock Text="{Binding TriggerError}" Classes="error" TextWrapping="Wrap"
                            IsVisible="{Binding TriggerError, Converter={x:Static StringConverters.IsNotNullOrEmpty}}" />
               </StackPanel>

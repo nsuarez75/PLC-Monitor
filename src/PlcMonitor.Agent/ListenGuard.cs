@@ -16,7 +16,7 @@ public static class ListenGuard
         var exposed = ListenUrls(configuration).Where(url => !IsLoopback(url)).ToList();
         if (exposed.Count == 0)
             return null;
-        return $"El agente escucha en {string.Join(", ", exposed)} sin token de acceso. Sin token solo puede escuchar en este equipo "
+        return $"El colector escucha en {string.Join(", ", exposed)} sin token de acceso. Sin token solo puede escuchar en este equipo "
             + "(http://127.0.0.1:5310): instálalo desde la app (genera token y certificado) o indica Agent:Security:TokenSha256 en agent.settings.json.";
     }
 

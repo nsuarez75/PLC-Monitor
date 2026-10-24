@@ -84,7 +84,7 @@ public sealed class MainViewModelTests : IDisposable
 
         vm.IsConnected.ShouldBeFalse();
         vm.IsMessageError.ShouldBeTrue();
-        vm.Message.ShouldContain("No se puede conectar con el agente en http://127.0.0.1:1");
+        vm.Message.ShouldContain("No se puede conectar con el colector en http://127.0.0.1:1");
         File.Exists(_settingsPath).ShouldBeFalse();
     }
 
@@ -367,7 +367,7 @@ public sealed class MainViewModelTests : IDisposable
         var bars = new PeriodBarsViewModel(vm, barsView, t => vm.FindTag(t.Device, t.Tag));
         bars.Description.ShouldBe("Máximo por hora · hoy y ayer");
         await bars.RefreshCommand.ExecuteAsync(null);
-        bars.Missing.ShouldBe("Sin histórico en el agente: plc1 / otro");
+        bars.Missing.ShouldBe("Sin histórico en el colector: plc1 / otro");
         var barSeries = bars.Chart.Options.ShouldHaveSingleItem();
         barSeries.Name.ShouldBe("plc1 / velocidad");
         bars.Chart.Series.Single().Points[^1].Value.ShouldBe(50);
@@ -386,7 +386,7 @@ public sealed class MainViewModelTests : IDisposable
         var fromHistory = historyTrends.Live.ShouldNotBeNull();
         (fromHistory.IsLive, fromHistory.UsesWindow).ShouldBe((false, false));
         fromHistory.HistoryText.ShouldStartWith("Histórico última hora · ");
-        fromHistory.Missing.ShouldBe("Sin histórico en el agente: plc1 / otro");
+        fromHistory.Missing.ShouldBe("Sin histórico en el colector: plc1 / otro");
         fromHistory.Chart.Series.Single().Points.Where(p => p.Value is not null).Select(p => p.Value).ShouldBe([5, 50]);
         (fromHistory.Chart.To - fromHistory.Chart.From).ShouldBe(TimeSpan.FromHours(1));
 

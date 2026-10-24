@@ -15,19 +15,19 @@ machine's behavior during a shift.
 It is the window you open on your computer. From it you:
 
 - create and edit devices and tags;
-- connect to one or several agents;
+- connect to one or several collectors;
 - see the live values and write setpoints;
 - query the history and create trends, panels, and transformations;
-- configure the agent's OPC UA server;
-- install or update agents on other computers over SSH.
+- configure the collector's OPC UA server;
+- install or update collectors on other computers over SSH.
 
-The app does not need a central server. It saves its preferences, agent profiles, views, and panels in your
-user folder. The profiles include the URL and token of each agent; the token is stored protected by the
+The app does not need a central server. It saves its preferences, collector profiles, views, and panels in your
+user folder. The profiles include the URL and token of each collector; the token is stored protected by the
 operating system.
 
-### The agent
+### The collector
 
-The agent is a service installed on the computer that is close to the PLC. It is responsible for:
+The collector is a service installed on the computer that is close to the PLC. It is responsible for:
 
 - connecting to the PLCs through the drivers;
 - reading the tags in the scan groups;
@@ -36,16 +36,16 @@ The agent is a service installed on the computer that is close to the PLC. It is
 - publishing the tags over OPC UA if you enable it;
 - serving the app over gRPC.
 
-The agent keeps running when you close the app. If the app disconnects, the PLC keeps being read and the
+The collector keeps running when you close the app. If the app disconnects, the PLC keeps being read and the
 history continues. When it reconnects, the app receives the current status and the new changes.
 
 ## Concepts that appear throughout the manual
 
 | Concept | What it is |
 |---|---|
-| **Agent** | `plcmon-agent` service installed on a computer. It has a URL and a token. |
-| **Agent profile** | The local configuration the app uses to connect to an agent: name, URL, token, certificate, and SSH data. |
-| **Device** | A PLC, drive, or gateway configured inside the agent. It has a driver and some settings. |
+| **Collector** | `plcmon-agent` service installed on a computer. It has a URL and a token. |
+| **Collector profile** | The local configuration the app uses to connect to a collector: name, URL, token, certificate, and SSH data. |
+| **Device** | A PLC, drive, or gateway configured inside the collector. It has a driver and some settings. |
 | **Driver** | The protocol family: S7 symbolic, S7 absolute, or Modbus. |
 | **Tag** | A specific variable of a device, with an address, a type, and a scan group. |
 | **Scan group** | Set of tags that are read together at a certain interval (`intervalMs`). |
@@ -59,7 +59,7 @@ history continues. When it reconnects, the app receives the current status and t
 ## Architecture
 
 ```text
-Desktop app ─── gRPC (TLS + token) ───▶ Agent ─── S7 / Modbus ───▶ PLC
+Desktop app ─── gRPC (TLS + token) ───▶ Collector ─ S7 / Modbus ───▶ PLC
        ▲                                   │
        └──────────── status and values ────┘
                                            │
@@ -67,13 +67,13 @@ Desktop app ─── gRPC (TLS + token) ───▶ Agent ─── S7 / Modbu
                                            └── OPC UA server
 ```
 
-The app can be on the same computer as the agent or on another one. The usual setup in a plant is to have an
-agent on the machine network and the app at the maintenance workstation. You can also install an agent on
+The app can be on the same computer as the collector or on another one. The usual setup in a plant is to have an
+collector on the machine network and the app at the maintenance workstation. You can also install a collector on
 your own laptop to test with a laboratory PLC.
 
-By default, the agent listens on `http://127.0.0.1:5310` when it is run without installing and for local use
+By default, the collector listens on `http://127.0.0.1:5310` when it is run without installing and for local use
 only. The installer creates a configuration with TLS on port `5311` and a token. The app uses that URL and
-that token when connecting. Do not confuse the agent port with the PLC port: the PLC is configured inside
+that token when connecting. Do not confuse the collector port with the PLC port: the PLC is configured inside
 each device.
 
 ## What you can do with each driver
@@ -97,7 +97,7 @@ third-party equipment.
 - The release is a self-contained executable; you do not need to install .NET.
 - To build from the source code you do need the .NET 10 SDK.
 
-### For the agent
+### For the collector
 
 - Linux or Windows on the same network as the PLC.
 - Administrator permissions to install the service.
@@ -107,13 +107,13 @@ third-party equipment.
 
 | Port | Use |
 |---|---|
-| `5310/tcp` | Local agent without TLS, only for testing on the same computer. |
-| `5311/tcp` | Agent installed with TLS and token. It is the installer's default value. |
-| `4840/tcp` | The agent's OPC UA server, if you enable it. |
+| `5310/tcp` | Local collector without TLS, only for testing on the same computer. |
+| `5311/tcp` | Collector installed with TLS and token. It is the installer's default value. |
+| `4840/tcp` | The collector's OPC UA server, if you enable it. |
 | `102/tcp` | S7. |
 | `502/tcp` | Modbus TCP. |
 
-Open only the necessary ports and do not publish the agent on the Internet. The
+Open only the necessary ports and do not publish the collector on the Internet. The
 [Security](12-security.md) chapter explains how to combine them.
 
 ## What it does not do
@@ -122,18 +122,18 @@ Open only the necessary ports and do not publish the agent on the Internet. The
 - It does not program the PLC or download programs.
 - It does not guarantee that a write is safe for the machine. The decision to write and the value must
   always be validated in the process.
-- It does not synchronize data between several apps. Each app queries the same agent, but does not share its
+- It does not synchronize data between several apps. Each app queries the same collector, but does not share its
   views or panels with other people.
-- It does not send data to the cloud. Everything stays in the agent and on the computer where you run the
+- It does not send data to the cloud. Everything stays in the collector and on the computer where you run the
   app, unless you configure OPC UA or another integration.
 
 ## Quick tour of the window
 
-![Main window with an agent connected](../img/01-window.png)
+![Main window with a collector connected](../img/01-window.png)
 
-1. **Top bar**: agent profile, **Conectar** (Connect) or **Desconectar** (Disconnect) button, connection
+1. **Top bar**: collector profile, **Conectar** (Connect) or **Desconectar** (Disconnect) button, connection
    status, and the **Dispositivos** (Devices), **Tendencias** (Trends), **Transformaciones**
-   (Transformations), **OPC UA**, and **Agentes** (Agents) tabs.
+   (Transformations), **OPC UA**, and **Colectores** (Collectors) tabs.
 2. **Device list**: on the left. Each row shows the name, the status, the driver, and the number of tags.
    The **+** button creates a device.
 3. **Central area**: changes depending on the tab. In **Dispositivos** you have the **Tags**,
@@ -143,4 +143,4 @@ Open only the necessary ports and do not publish the agent on the Internet. The
 5. **Theme**: the icon on the right of the top bar switches between light and dark.
 
 With that you can now follow the [Installation and first use](02-installation-and-first-use.md) chapter. If
-you already have an agent running, skip to [Devices and drivers](04-devices-and-drivers.md).
+you already have a collector running, skip to [Devices and drivers](04-devices-and-drivers.md).

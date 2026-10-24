@@ -74,7 +74,7 @@ public sealed class TransformsAndFoldersTests : IDisposable
         request.Transforms.Add(transform);
         await agent.CreateGrpcClient().PutTransformsAsync(request);
 
-        await Wait.UntilAsync(() => _ui.Read(() => TagOf(vm, "motor").DisplayText) == "Fallo (7)", "transformación cambiada en el agente");
+        await Wait.UntilAsync(() => _ui.Read(() => TagOf(vm, "motor").DisplayText) == "Fallo (7)", "transformación cambiada en el colector");
     }
 
     [Fact]

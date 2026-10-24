@@ -37,17 +37,17 @@ public static class CliApp
 
         config.AddBranch<AgentSettings>("agent", agent =>
         {
-            agent.SetDescription("Habla con un agente plcmon-agent (local o remoto). URL con -a o PLCMON_AGENT.");
-            agent.AddCommand<AgentInfoCommand>("info").WithDescription("Versión, máquina y drivers del agente.");
+            agent.SetDescription("Habla con un colector plcmon-agent (local o remoto). URL con -a o PLCMON_AGENT.");
+            agent.AddCommand<AgentInfoCommand>("info").WithDescription("Versión, máquina y drivers del colector.");
             agent.AddCommand<AgentDevicesCommand>("devices").WithDescription("Dispositivos configurados y su estado.");
             agent.AddCommand<AgentTagsCommand>("tags")
                 .WithDescription("Tags configurados con su último valor.")
                 .WithExample("agent", "tags", "prensa1");
             agent.AddCommand<AgentReadCommand>("read")
-                .WithDescription("Lee direcciones cualesquiera a través del agente.")
+                .WithDescription("Lee direcciones cualesquiera a través del colector.")
                 .WithExample("agent", "read", "prensa1", "DB10.DBW0", "-a", "http://192.168.0.5:5310");
             agent.AddCommand<AgentWriteCommand>("write")
-                .WithDescription("Escribe un tag configurado (pide confirmación; doble llave en el agente).")
+                .WithDescription("Escribe un tag configurado (pide confirmación; doble llave en el colector).")
                 .WithExample("agent", "write", "prensa1", "marcha", "true");
             agent.AddCommand<AgentEnableCommand>("enable").WithDescription("Activa un dispositivo.");
             agent.AddCommand<AgentDisableCommand>("disable").WithDescription("Desactiva un dispositivo.");
@@ -77,7 +77,7 @@ public static class CliApp
                 tag.AddCommand<AgentTagDisableCommand>("disable").WithDescription("Desactiva uno o varios tags (no se leen, ni se historizan, ni se publican en OPC UA).");
             });
             agent.AddCommand<AgentHistoryCommand>("history")
-                .WithDescription("Histórico de tags guardado por el agente (tabla o CSV).")
+                .WithDescription("Histórico de tags guardado por el colector (tabla o CSV).")
                 .WithExample("agent", "history", "prensa1", "velocidad", "--last", "2h", "-i", "1m", "--agg", "max")
                 .WithExample("agent", "history", "prensa1", "velocidad", "presion", "--from", "2026-10-15 08:00", "--csv", "turno.csv");
             agent.AddCommand<AgentHistoryDeleteCommand>("history-delete")

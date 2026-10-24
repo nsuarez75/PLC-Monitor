@@ -147,7 +147,7 @@ public sealed class ChartExportTests
         Application.Current!.RequestedThemeVariant = Avalonia.Styling.ThemeVariant.Dark;
         try
         {
-            var chart = new ChartViewModel { Title = "Horno", Source = "Agente planta", ShowStats = true };
+            var chart = new ChartViewModel { Title = "Horno", Source = "Colector planta", ShowStats = true };
             chart.SetData(
             [
                 new ChartSeriesData("temperatura", Enumerable.Range(0, 60).Select(i => P(i * 10, 200 + (20 * Math.Sin(i / 6.0)))).ToList()) { Display = new SeriesFormat("°C", 1) },
