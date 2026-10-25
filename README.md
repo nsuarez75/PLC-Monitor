@@ -13,6 +13,9 @@ incluye además la CLI `plcmon` para diagnóstico y administración.
 **Documentación**
 - [Manual de usuario (Español)](docs/manual/README.md)
 
+**Desarrollo**: `mise install` instala el SDK de .NET fijado en `mise.toml`. `./checks.sh` compila y pasa las
+pruebas (sin tocar PLCs reales); tiene que pasar antes de cada commit.
+
 ## English
 
 Desktop app and agent for monitoring and troubleshooting PLCs. It reads variables over S7 and Modbus,
@@ -25,3 +28,6 @@ repository also includes the `plcmon` CLI for diagnostics and administration.
 
 **Documentation**
 - [User manual (English)](docs/manual/en/README.md)
+
+**Development**: `mise install` installs the .NET SDK pinned in `mise.toml`. `./checks.sh` builds and runs the
+tests (never against real PLCs); it must pass before every commit.
