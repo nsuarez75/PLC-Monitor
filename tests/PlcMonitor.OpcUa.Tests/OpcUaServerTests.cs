@@ -72,7 +72,8 @@ public class OpcUaServerTests
         var rejected = await Should.ThrowAsync<ServiceResultException>(() => Client.ConnectAsync(f.Url, Reader, Password));
 
         rejected.StatusCode.ShouldBe(StatusCodes.BadSecurityChecksFailed);
-        var pending = f.Host.ListClientCertificates().ShouldHaveSingleItem();
+        // El servidor guarda el certificado rechazado justo después de responder: con carga aún no está en la carpeta.
+        var pending = (await EventuallyAsync(() => Task.FromResult(f.Host.ListClientCertificates()), c => c.Count > 0)).ShouldHaveSingleItem();
         pending.Trusted.ShouldBeFalse();
         pending.Subject.ShouldContain("PlcMonitorTests");
         pending.ApplicationUri.ShouldBe("urn:localhost:plcmon-tests");
