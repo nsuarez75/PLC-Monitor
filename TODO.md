@@ -1,6 +1,6 @@
 # Pendientes
 
-Lista de lo que está abierto. Última revisión: 24/10/2026 (versión 2.0.1).
+Lista de lo que está abierto. Última revisión: 26/10/2026 (versión 2.0.1).
 
 ## Por probar con equipos reales
 
@@ -22,8 +22,15 @@ Lista de lo que está abierto. Última revisión: 24/10/2026 (versión 2.0.1).
       ratón, explicar que hay que conectarse a un colector.
 - [ ] **Barras por periodo:** las etiquetas de los días se quedan en el idioma anterior hasta
       volver a consultar.
-- [ ] **Tests intermitentes** que pasan al repetir:
-      `OpcUaServerTests.A_new_client_is_rejected_until_its_certificate_is_trusted` y
+- [ ] **Solo lectura en la app:** con un token de solo lectura la app ya bloquea escribir valores y
+      editar OPC UA, pero deja abrir «Nuevo dispositivo» (y demás acciones que cambian la
+      configuración) y solo avisa al guardar con un mensaje técnico («El token de solo lectura no
+      permite PutDevice.»). Desactivar crear, editar, borrar y reordenar dispositivos y tags, y el resto
+      de cambios de configuración, con el aviso «Conectado en solo lectura» al pasar el ratón; y si aun
+      así llega el rechazo del colector, mostrar un mensaje claro sin nombres internos.
+- [ ] **Texto del equipo conectado en la barra superior:** con la ventana estrecha tapa la
+      información del colector. Acortarlo (con «…») en vez de que se solapen.
+- [ ] **Test intermitente** que pasa al repetir:
       `MainViewModelTests.History_is_configured_in_the_tag_window_and_queried_in_the_history_tab`
       (espera de 10 s bajo carga).
 - [ ] **Renombrar el tipo de gráfica «Indicadores de panel» a «Indicadores»** (en inglés,
