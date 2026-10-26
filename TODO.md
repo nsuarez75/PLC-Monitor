@@ -37,6 +37,9 @@ Lista de lo que está abierto. Última revisión: 26/10/2026 (versión 2.0.1).
       *Gauges*), para que «panel» quede solo para la rejilla de vistas (ver `GLOSSARY.md`). Afecta
       a la interfaz ES/EN y al manual; las vistas guardadas no cambian si el identificador interno se
       mantiene.
+- [ ] **Arrays en la pestaña «Explorar» (S7 simbólico):** hoy cada elemento de un array sale como
+      una variable suelta, lo que ocupa mucho y dispara el número de tags. Mostrar el array como una
+      sola variable y dejar añadir solo los elementos que interesen.
 
 ## Ideas sin decidir
 
